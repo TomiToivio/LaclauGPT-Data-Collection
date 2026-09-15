@@ -54,7 +54,7 @@ def map_apify_item(item: dict[str, Any], *, handle: str = "") -> NormalizedRecor
             module="apify-x",
             visited_url=source_url,
             transformations=["apify-dataset", "map-x-item"],
-            metadata={"provider": "apify"},
+            metadata={"provider": "apify", "raw_item": item},
         ),
     )
 
