@@ -123,5 +123,6 @@ def _map_post(post: dict[str, Any], *, raw_payload: Any | None = None) -> Normal
             visited_url=source_url,
             api_url=uri,
             transformations=["bsky-xrpc", "map-post"],
+            metadata={"raw_item": post},
         ),
     )
