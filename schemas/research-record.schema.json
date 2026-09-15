@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/TomiToivio/LaclauGPT/schemas/research-record.schema.json",
+  "title": "LaclauGPT Four-Layer Research Record",
+  "description": "Project-wide record contract preserving raw capture, intermediate processing, canonical analysis and a human-readable researcher summary. The same logical record is projected to legacy-compatible CSV/dataframe/dashboard fields.",
+  "type": "object",
+  "required": ["schema_version","source_url","raw_capture","source","content","intermediate","analysis","human_readable","provenance","review","legacy"],
+  "properties": {
+    "schema_version": {"type":"string","const":"1.1.0"},
+    "source_url": {"type":"string","minLength":1},
+    "source_native_ids": {"type":"object","additionalProperties":{"type":"string"}},
+    "raw_capture": {"type":"object","required":["ref","payload","checksum","content_type","captured_at"],"properties":{"ref":{"type":["string","null"]},"payload":{},"checksum":{"type":["string","null"]},"content_type":{"type":["string","null"]},"captured_at":{"type":["string","null"]},"metadata":{"type":"object"}},"anyOf":[{"properties":{"ref":{"type":"string","minLength":1}}},{"required":["payload"],"not":{"properties":{"payload":{"type":"null"}}}}],"additionalProperties":true},
+    "source": {"type":"object","additionalProperties":true},
+    "content": {"type":"object","additionalProperties":true},
+    "intermediate": {"type":"object","required":["asr","ocr","frames","frame_analysis","translations","stage_outputs"],"properties":{"asr":{"type":"array"},"ocr":{"type":"array"},"frames":{"type":"array"},"frame_analysis":{"type":"array"},"translations":{"type":"array"},"stage_outputs":{"type":"object"}},"additionalProperties":true},
+    "evidence": {"type":"array"},
+    "analysis": {"type":"object","additionalProperties":true},
+    "human_readable": {"type":"object","required":["summary","markdown","generated_at","generator"],"properties":{"summary":{"type":"string"},"markdown":{"type":"string"},"generated_at":{"type":["string","null"]},"generator":{"type":"string"},"sections":{"type":"object"}},"additionalProperties":true},
+    "provenance": {"type":"array"},
+    "review": {"type":"object","additionalProperties":true},
+    "legacy": {"type":"object","additionalProperties":true}
+  },
+  "additionalProperties": false
+}
