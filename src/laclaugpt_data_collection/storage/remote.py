@@ -9,20 +9,32 @@ from ..models import CanonicalRecord, canonicalize_source_url
 
 
 class MongoRecordStore:
-    def __init__(self, uri: str, database: str, collection: str) -> None:
+    def __init__(
+        self,
+        uri: str,
+        database: str,
+        collection: str,
+        project_id: str,
+    ) -> None:
         try:
             from pymongo import MongoClient
         except ImportError as exc:  # pragma: no cover - optional dependency
             raise RuntimeError("Install laclaugpt-data-collection[distributed] for MongoDB") from exc
+        self.project_id = project_id
         self._client = MongoClient(uri)
         self._collection = self._client[database][collection]
         self._collection.create_index([("source_url", 1)], unique=True, name="source_url_unique")
+        self._collection.create_index([("project_id", 1)], name="project_id")
+
+    def _payload(self, record: CanonicalRecord) -> dict[str, Any]:
+        payload = record.model_dump(mode="json")
+        payload["project_id"] = self.project_id
+        return payload
 
     def upsert(self, record: CanonicalRecord) -> None:
-        payload = record.model_dump(mode="json")
         self._collection.replace_one(
-            {"source_url": record.source_url},
-            payload,
+            {"source_url": record.source_url, "project_id": self.project_id},
+            self._payload(record),
             upsert=True,
         )
 
@@ -33,8 +45,8 @@ class MongoRecordStore:
             raise RuntimeError("Install laclaugpt-data-collection[distributed] for MongoDB") from exc
         operations = [
             ReplaceOne(
-                {"source_url": record.source_url},
-                record.model_dump(mode="json"),
+                {"source_url": record.source_url, "project_id": self.project_id},
+                self._payload(record),
                 upsert=True,
             )
             for record in records
@@ -44,13 +56,14 @@ class MongoRecordStore:
 
     def contains(self, source_url: str) -> bool:
         identity = canonicalize_source_url(source_url)
-        return self._collection.find_one({"source_url": identity}, {"_id": 1}) is not None
+        query = {"source_url": identity, "project_id": self.project_id}
+        return self._collection.find_one(query, {"_id": 1}) is not None
 
     @staticmethod
     def from_document(document: dict[str, Any]) -> CanonicalRecord:
-        """Reconstruct canonical semantics without treating Mongo `_id` as identity."""
+        """Reconstruct canonical semantics without backend routing metadata."""
         return CanonicalRecord.model_validate(
-            {key: value for key, value in document.items() if key != "_id"}
+            {key: value for key, value in document.items() if key not in {"_id", "project_id"}}
         )
 
 
