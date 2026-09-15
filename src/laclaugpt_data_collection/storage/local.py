@@ -99,10 +99,24 @@ class SQLiteRecordStore:
                 rows,
             )
 
-    def contains(self, source_url: str) -> bool:
+    def contains(self, source_url_or_platform: str, document_id: str | None = None) -> bool:
+        """Check canonical identity, with a bounded legacy platform/id lookup.
+
+        New callers pass one canonical ``source_url``. Older browser-ingest
+        callers may still pass ``(platform, document_id)``; that compatibility
+        lookup inspects canonical source metadata and never changes storage
+        identity or creates a second database key.
+        """
+        if document_id is not None:
+            return any(
+                record.source.platform == source_url_or_platform
+                and record.source_native_ids.get("document_id") == document_id
+                for record in self.all()
+            )
+
         from ..models import canonicalize_source_url
 
-        identity = canonicalize_source_url(source_url)
+        identity = canonicalize_source_url(source_url_or_platform)
         with self._connect() as con:
             row = con.execute(
                 "SELECT 1 FROM records WHERE source_url = ? LIMIT 1", (identity,)
