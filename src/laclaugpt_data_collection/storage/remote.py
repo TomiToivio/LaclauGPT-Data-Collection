@@ -1,13 +1,10 @@
-"""Optional distributed backends.
-
-Dependencies are imported lazily so local-only installations stay lightweight.
-"""
+"""Optional distributed backends for canonical Collection records."""
 from __future__ import annotations
 
 from collections.abc import Iterable
 from typing import Any
 
-from ..models import NormalizedRecord
+from ..models import CanonicalRecord, canonicalize_source_url
 
 
 class MongoRecordStore:
@@ -18,26 +15,24 @@ class MongoRecordStore:
             raise RuntimeError("Install laclaugpt-data-collection[distributed] for MongoDB") from exc
         self._client = MongoClient(uri)
         self._collection = self._client[database][collection]
-        self._collection.create_index(
-            [("platform", 1), ("document_id", 1)], unique=True, name="platform_document_id"
-        )
+        self._collection.create_index([("source_url", 1)], unique=True, name="source_url_unique")
 
-    def upsert(self, record: NormalizedRecord) -> None:
+    def upsert(self, record: CanonicalRecord) -> None:
         payload = record.model_dump(mode="json")
         self._collection.replace_one(
-            {"platform": record.platform, "document_id": record.document_id},
+            {"source_url": record.source_url},
             payload,
             upsert=True,
         )
 
-    def upsert_many(self, records: Iterable[NormalizedRecord]) -> None:
+    def upsert_many(self, records: Iterable[CanonicalRecord]) -> None:
         try:
             from pymongo import ReplaceOne
         except ImportError as exc:  # pragma: no cover
             raise RuntimeError("Install laclaugpt-data-collection[distributed] for MongoDB") from exc
         operations = [
             ReplaceOne(
-                {"platform": record.platform, "document_id": record.document_id},
+                {"source_url": record.source_url},
                 record.model_dump(mode="json"),
                 upsert=True,
             )
@@ -46,12 +41,15 @@ class MongoRecordStore:
         if operations:
             self._collection.bulk_write(operations, ordered=False)
 
-    def contains(self, platform: str, document_id: str) -> bool:
-        return (
-            self._collection.find_one(
-                {"platform": platform, "document_id": document_id}, {"_id": 1}
-            )
-            is not None
+    def contains(self, source_url: str) -> bool:
+        identity = canonicalize_source_url(source_url)
+        return self._collection.find_one({"source_url": identity}, {"_id": 1}) is not None
+
+    @staticmethod
+    def from_document(document: dict[str, Any]) -> CanonicalRecord:
+        """Reconstruct canonical semantics without treating Mongo `_id` as identity."""
+        return CanonicalRecord.model_validate(
+            {key: value for key, value in document.items() if key != "_id"}
         )
 
 
@@ -87,7 +85,7 @@ class S3ObjectStore:
 
 
 class RedisCoordinator:
-    """Small coordination/cache facade, never the canonical research record store."""
+    """Coordination/cache facade. Redis never becomes the canonical record schema."""
 
     def __init__(self, url: str) -> None:
         try:

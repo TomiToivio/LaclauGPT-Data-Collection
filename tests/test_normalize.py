@@ -18,7 +18,7 @@ def test_normalise_tiktok_synthetic_record() -> None:
         raw_ref="raw/tiktok/test.json",
     )
 
-    assert record.schema_version == "1.0"
+    assert record.schema_version == "1.0.0"
     assert record.document_id == "7400000000000000001"
     assert record.platform == "tiktok"
     assert record.hashtags == ["synthetic", "example"]
