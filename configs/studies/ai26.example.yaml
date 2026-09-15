@@ -1,0 +1,42 @@
+# SYNTHETIC PUBLIC EXAMPLE ONLY.
+# Copy to an ignored/private runtime location and replace every placeholder.
+# Never commit the real AI26 watch list, account handles, browser profile,
+# credentials, private backend URLs, or collected records.
+study: ai26
+timezone: UTC
+window:
+  start: 2026-01-01
+  end: 2026-12-31
+
+platforms:
+  x:
+    enabled: true
+    base_urls:
+      - "https://x.com/{handle}"
+  tiktok:
+    enabled: true
+    base_urls:
+      - "https://www.tiktok.com/@{handle}"
+  instagram:
+    enabled: true
+    base_urls:
+      - "https://www.instagram.com/{handle}/"
+
+# Groups are sampling provenance, not automatic labels for captured posts.
+groups:
+  - id: synthetic_ai_labs
+    name: Synthetic AI labs
+    arena: elites
+    formation_seed: ""
+    accounts:
+      x: [example_ai_lab]
+      tiktok: [example_ai_lab]
+      instagram: [example_ai_lab]
+  - id: synthetic_civil_society
+    name: Synthetic civil society
+    arena: grassroots
+    formation_seed: ""
+    accounts:
+      x: [example_civic_group]
+      tiktok: [example_civic_group]
+      instagram: [example_civic_group]
