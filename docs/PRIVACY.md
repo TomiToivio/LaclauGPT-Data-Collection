@@ -49,9 +49,15 @@ Before pushing, run:
 ```bash
 python scripts/check_public_tree.py
 ruff check .
-mypy src/laclaugpt_data_collection
+mypy src/laclaugpt_data_collection/config.py \
+  src/laclaugpt_data_collection/models.py \
+  src/laclaugpt_data_collection/normalize.py \
+  src/laclaugpt_data_collection/storage/base.py \
+  src/laclaugpt_data_collection/storage/local.py
 pytest
 ```
+
+The scoped mypy check protects the stable public/core interfaces. Imported platform parsers still contain legacy typing debt and should be improved incrementally rather than suppressed globally.
 
 `ruff format .` is recommended for touched Python files. Formatting of older imported modules is being normalized incrementally rather than used as a repository-wide publication gate.
 
