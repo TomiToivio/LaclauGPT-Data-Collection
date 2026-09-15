@@ -1,7 +1,6 @@
 {
   "manifest_version": 2,
   "name": "LaclauGPT Data Collection",
-<<<<<<< HEAD
   "version": "0.2.0",
   "description": "Public social-media API response capture for LaclauGPT research. Sends captures to a local collector backend. Academic research use only.",
   "author": "Tomi Toivio / LaclauGPT",
@@ -28,41 +27,14 @@
         "*://*.x.com/*",
         "*://*.twitter.com/*"
       ],
-=======
-  "version": "0.1.0",
-  "description": "Browser-assisted capture for public research sources. Sends captures only to a user-configured local endpoint by default.",
-  "permissions": [
-    "storage",
-    "activeTab",
-    "http://127.0.0.1/*",
-    "http://localhost/*"
-  ],
-  "background": {
-    "scripts": ["background.js"]
-  },
-  "browser_action": {
-    "default_title": "Capture current page"
-  },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
->>>>>>> d32811c4af08a512bdf38f22ff0b072a6f479cf5
       "js": ["content.js"],
       "run_at": "document_idle"
     }
   ],
   "browser_specific_settings": {
     "gecko": {
-<<<<<<< HEAD
       "id": "laclaugpt-collector@laclaugpt.org",
       "strict_min_version": "115.0"
     }
   }
 }
-=======
-      "id": "laclaugpt-data-collection@laclaugpt.org",
-      "strict_min_version": "115.0"
-    }
-  }
-}
->>>>>>> d32811c4af08a512bdf38f22ff0b072a6f479cf5
