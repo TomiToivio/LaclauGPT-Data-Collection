@@ -46,6 +46,8 @@ def capture_to_record(capture: BrowserCapture) -> NormalizedRecord:
         source_url=capture.source_url,
         text=capture.text,
         media_references=media,
+        raw_payload=capture.model_dump(mode="json"),
+        raw_content_type="application/json",
         collection_provenance=CollectionProvenance(
             captured_at=capture.captured_at,
             capture_id=capture.capture_id,
@@ -295,13 +297,25 @@ class Handler(BaseHTTPRequestHandler):
                 if record is None:
                     continue
                 record.source.raw_ref = raw_ref
+                record.raw_capture.ref = raw_ref
+                record.raw_capture.payload = raw_item
+                record.raw_capture.content_type = "application/json"
+                record.raw_capture.captured_at = str(meta.get("captured_at") or "") or None
+                record.raw_capture.metadata["preservation"] = "exact-item-plus-full-response-ref"
+                record.refresh_human_readable()
                 records.append(record.model_dump(mode="json"))
             return records
 
         parser = PARSERS[platform]
         for item in parser.capture(payload, platform_url, api_url):
             mapped = parser.map_item(item, meta)
-            record = normalise(platform, mapped, metadata=meta, raw_ref=raw_ref)
+            record = normalise(
+                platform,
+                mapped,
+                metadata=meta,
+                raw_ref=raw_ref,
+                raw_payload=item,
+            )
             records.append(record.model_dump(mode="json"))
         return records
 
