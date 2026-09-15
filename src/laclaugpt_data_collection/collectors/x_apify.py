@@ -25,7 +25,13 @@ def map_apify_item(item: dict[str, Any], *, handle: str = "") -> NormalizedRecor
             continue
         url = str(entry.get("media_url_https") or entry.get("url") or "")
         if url:
-            media.append(MediaReference(kind=str(entry.get("type") or "media"), url=url, media_index=index))
+            media.append(
+                MediaReference(
+                    kind=str(entry.get("type") or "media"),
+                    url=url,
+                    media_index=index,
+                )
+            )
     return NormalizedRecord(
         document_id=tweet_id,
         platform="x",
@@ -42,17 +48,27 @@ def map_apify_item(item: dict[str, Any], *, handle: str = "") -> NormalizedRecor
             "quote_count": item.get("quoteCount") or item.get("quote_count"),
         },
         media_references=media,
+        raw_payload=item,
+        raw_content_type="application/json",
         collection_provenance=CollectionProvenance(
             module="apify-x",
             visited_url=source_url,
             transformations=["apify-dataset", "map-x-item"],
-            metadata={"provider": "apify", "raw_item": item},
+            metadata={"provider": "apify"},
         ),
     )
 
 
 class XApifyCollector:
-    def __init__(self, accounts: list[str], *, token: str, max_items: int = 100, actor_id: str = "nfp1fpt5gUlBwPcor", client: Any | None = None) -> None:
+    def __init__(
+        self,
+        accounts: list[str],
+        *,
+        token: str,
+        max_items: int = 100,
+        actor_id: str = "nfp1fpt5gUlBwPcor",
+        client: Any | None = None,
+    ) -> None:
         self.accounts = [account.lstrip("@") for account in accounts]
         self.token = token
         self.max_items = max_items
@@ -73,7 +89,14 @@ class XApifyCollector:
         client = self._client()
         for handle in self.accounts:
             result.requests_seen += 1
-            run = client.actor(self.actor_id).call(run_input={"includeSearchTerms": False, "maxItems": self.max_items, "sort": "Latest", "twitterHandles": [handle]})
+            run = client.actor(self.actor_id).call(
+                run_input={
+                    "includeSearchTerms": False,
+                    "maxItems": self.max_items,
+                    "sort": "Latest",
+                    "twitterHandles": [handle],
+                }
+            )
             rows = list(client.dataset(run["defaultDatasetId"]).iterate_items())
             result.bodies_seen += 1
             result.raw_items_seen += len(rows)
