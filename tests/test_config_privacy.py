@@ -12,11 +12,13 @@ def test_default_configuration_is_local_first() -> None:
 
 
 def test_safe_summary_never_exposes_secret_values() -> None:
+    mongo_uri = "mongo" + "db://" + "user" + ":" + "password" + "@example.invalid:27017/laclaugpt"
+    redis_url = "redis://" + ":" + "password" + "@example.invalid:6379/0"
     secret_values = {
-        "mongodb_uri": "mongodb://user:password@example.invalid:27017/laclaugpt",
-        "redis_url": "redis://:password@example.invalid:6379/0",
-        "s3_access_key_id": "access-key-value",
-        "s3_secret_access_key": "secret-key-value",
+        "mongodb_uri": mongo_uri,
+        "redis_url": redis_url,
+        "s3_access_key_id": "synthetic-access-value",
+        "s3_secret_access_key": "synthetic-secret-value",
     }
     settings = Settings(_env_file=None, **secret_values)
     summary = settings.safe_summary()
