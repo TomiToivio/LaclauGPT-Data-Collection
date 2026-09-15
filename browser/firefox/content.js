@@ -1,13 +1,8 @@
-<<<<<<< HEAD
 /**
- * LaclauGPT Collector — content script.
+ * LaclauGPT Collector content script.
  *
- * Responsibilities:
- *  1. scroll tour pages when requested by navigation.js;
- *  2. forward embedded public page-state JSON that never appears as XHR.
- *
- * Nothing is collected automatically from pages outside the configured
- * platform matchers, and no credentials or cookies are ever read.
+ * It supports page-tour scrolling and embedded public page-state extraction
+ * that never appears as XHR. Nothing here reads credentials or cookies.
  */
 
 (() => {
@@ -42,7 +37,6 @@
 
   function extractTikTok() {
     const payloads = [];
-
     const sigi = document.getElementById("SIGI_STATE");
     if (sigi?.textContent) {
       try {
@@ -66,13 +60,10 @@
         const detail = scope["webapp.video-detail"]?.itemInfo?.itemStruct;
         if (detail && !detail.liveRoomInfo) items.push(detail);
         if (items.length) {
-          // Shape this as a normal TikTok item-list payload so the canonical
-          // Python parser handles it through the same path as network data.
           payloads.push({ kind: "UNIVERSAL_DATA", body: { itemList: items } });
         }
       } catch {}
     }
-
     sendEmbedded("tiktok", payloads);
   }
 
@@ -100,16 +91,12 @@
   browser.runtime.onMessage.addListener((message) => {
     if (message?.action === "scroll") {
       window.scrollTo(0, document.body?.scrollHeight || document.documentElement.scrollHeight);
-      // Give lazy-loaded embedded state a chance to land after the scroll.
       setTimeout(scanEmbedded, 500);
       return Promise.resolve("scrolled");
     }
     return undefined;
   });
 
-  // document_idle means initial page state should already exist, but SPAs can
-  // replace it later. Scan once and again on URL changes without a heavy DOM
-  // observer.
   scanEmbedded();
   let lastUrl = location.href;
   setInterval(() => {
@@ -120,55 +107,3 @@
     }
   }, 1000);
 })();
-=======
-function detectPlatform(hostname) {
-  const host = hostname.toLowerCase();
-  if (host.includes("tiktok.com")) return "tiktok";
-  if (host.includes("instagram.com")) return "instagram";
-  if (host === "x.com" || host.endsWith(".x.com") || host.includes("twitter.com")) return "x";
-  if (host.includes("youtube.com") || host === "youtu.be") return "youtube";
-  if (host.includes("bsky.app")) return "bluesky";
-  return "web";
-}
-
-function firstText(selectors) {
-  for (const selector of selectors) {
-    const node = document.querySelector(selector);
-    const value = node?.getAttribute("content") || node?.textContent || "";
-    if (value.trim()) return value.trim();
-  }
-  return "";
-}
-
-function extractPage() {
-  const sourceUrl = location.href.split("#", 1)[0];
-  const platform = detectPlatform(location.hostname);
-  const text = firstText([
-    "meta[property='og:description']",
-    "meta[name='description']",
-    "article",
-    "main"
-  ]);
-  const mediaUrls = [...document.querySelectorAll("meta[property='og:video'], meta[property='og:image']")]
-    .map((node) => node.getAttribute("content"))
-    .filter(Boolean);
-  return {
-    schema_version: "1.0",
-    source_url: sourceUrl,
-    platform,
-    captured_at: new Date().toISOString(),
-    collection_method: "browser-extension",
-    post_id: "",
-    author: "",
-    text: text.slice(0, 20000),
-    media_urls: [...new Set(mediaUrls)],
-    api_url: "",
-    raw: { title: document.title }
-  };
-}
-
-browser.runtime.onMessage.addListener((message) => {
-  if (message?.type !== "capture-current-page") return undefined;
-  return Promise.resolve(extractPage());
-});
->>>>>>> d32811c4af08a512bdf38f22ff0b072a6f479cf5
