@@ -1,33 +1,19 @@
-﻿# LaclauGPT Data Collection
+# LaclauGPT Data Collection
 
 [![CI](https://github.com/TomiToivio/LaclauGPT-Data-Collection/actions/workflows/ci.yml/badge.svg)](https://github.com/TomiToivio/LaclauGPT-Data-Collection/actions/workflows/ci.yml)
 
 Public, reusable data-collection module for the LaclauGPT ecosystem.
 
-This repository contains **collection, capture, normalization, provenance and storage-adapter code only**. Analysis, simulation, dashboards, research datasets, operational target lists, credentials and machine-specific secrets belong elsewhere.
+This repository contains **collection, capture, normalization, provenance, scheduling and storage-adapter code only**. Analysis, simulation, dashboards, research datasets, operational target lists, credentials and machine-specific secrets belong elsewhere.
 
 ## Design goals
 
 - Python `src/` layout with a small typed package and CLI.
+- One canonical implementation across researcher laptops, Linux servers and agent operation.
 - Local-first defaults: filesystem + SQLite + CSV/JSONL work without external services.
-- Distributed deployment when configured: MongoDB for records, Redis for coordination/cache, and S3-compatible object storage such as CSC Allas for raw/media objects.
-- Explicit interoperability contract with LaclauGPT Data Storage, Data Analysis, Data Visualization, Research Assistant and Simulation modules.
-- Provenance-first collection. Normalized records retain stable IDs and references to source/raw capture metadata.
+- Distributed deployment when configured: MongoDB for records, Redis for coordination/settings/task queues/messaging, and S3-compatible object storage such as CSC Allas for raw/media objects.
+- Canonical `source_url` or stable URI-like identity across every backend and module handoff.
 - Public-repository hygiene: no research data, target/account lists, browser profiles, cookies, tokens, credentials or real deployment configuration in Git.
-
-## Lineage and imports
-
-The architecture primarily consolidates the reusable `collector/` subsystem from `TomiToivio/LaclauGPT-Discourse-Analysis`, including its native TikTok/Instagram/X parser design, normalization/provenance model, Firefox/browser capture approach and Bluesky public-API collector.
-
-Additional reusable ideas/code paths are consolidated from:
-
-- `TomiToivio/LaclauGPT-TikTok-Scraper` — TikTok request routing and Firefox capture lineage.
-- `TomiToivio/CyborgAnthropology` — generic collector patterns and RSS/YouTube/Telegram/arXiv source adapters.
-- `TomiToivio/LaclauGPT-Data-Storage` — storage/service integration patterns.
-- `TomiToivio/LaclauGPT-Social-Simulation-Laboratory` — generic URL/browser collector and scheduling/worker patterns.
-- `TomiToivio/LaclauGPT-Discourse-Analysis-Private` — only reusable, non-sensitive collector/runtime ideas; **no private configuration or data is copied**.
-
-See `docs/SOURCE_IMPORTS.md` for boundaries and provenance.
 
 ## Installation
 
@@ -43,82 +29,107 @@ Optional distributed backends:
 python -m pip install -e '.[distributed]'
 ```
 
-## Configuration
+## Deployment profiles
 
-Configuration is environment-driven. The checked-in files under `configs/` are **examples only**.
+Machine, execution, browser and storage are independent configuration dimensions. See [`docs/DEPLOYMENT_AND_HERMES.md`](docs/DEPLOYMENT_AND_HERMES.md).
 
-```bash
-cp .env.example .env
-# edit locally; .env is ignored by Git
-```
-
-Local laptop defaults:
+Researcher laptop with Firefox capture:
 
 ```bash
 laclaugpt-collect doctor --profile configs/laptop.example.toml
 ```
 
-Server/distributed example:
+Linux server with local SQLite/filesystem storage:
+
+```bash
+laclaugpt-collect doctor --profile configs/server-local.example.toml
+```
+
+Linux server with MongoDB + Redis + S3/CSC Allas:
 
 ```bash
 laclaugpt-collect doctor --profile configs/server.example.toml
 ```
 
-The application never requires a checked-in private config file. Real target lists, credentials, machine paths and deployment settings belong in environment variables, ignored local files, private operational repositories or secret-management systems.
+Generate scheduling examples without modifying cron or systemd:
+
+```bash
+laclaugpt-collect schedule cron --command-line "laclaugpt-collect doctor --profile data/config/server.toml"
+laclaugpt-collect schedule systemd --command-line "laclaugpt-collect doctor --profile data/config/server.toml"
+```
+
+Real target lists, credentials, machine paths and operational schedules belong under ignored `data/`, private operational repositories, environment variables or secret-management systems.
 
 ## Storage modes
 
-### Default: local
+Local/default:
 
-- metadata/state: SQLite
-- tabular/interchange output: JSONL/CSV
-- raw payloads/media: local filesystem
-- queue/cache: in-process/no Redis required
+- canonical records/state: SQLite
+- tabular/manual interchange: JSONL/CSV/Pandas-compatible files
+- raw payloads/media: local filesystem under `data/`
+- coordination/cache: in-process, no Redis required
 
-### Distributed
+Distributed:
 
-- records/metadata: MongoDB
-- coordination/cache: Redis
-- objects/raw/media: S3-compatible storage (CSC Allas works through its S3 API)
+- canonical records: MongoDB
+- coordination/settings/task queues/messaging: Redis
+- objects/raw/media: S3-compatible storage such as CSC Allas
 
-Backends are selected independently so hybrid deployments are possible.
+Backends are selected independently, so a Linux server may still use SQLite and local files. Redis is infrastructure, not the research-data schema. Backend-specific IDs never replace `source_url`.
 
-## Interoperability contract
+When Collection and Analysis run on the same machine, Analysis may read the configured Collection `data/` tree directly. CSV/JSONL remains the manual handoff fallback.
 
-Every normalized record uses a stable envelope:
+## Canonical record contract
+
+Collection populates the source-side sections of the project-wide canonical record. A simplified example is:
 
 ```json
 {
-  "schema_version": "1.0",
-  "document_id": "platform-stable-id",
-  "platform": "tiktok",
-  "author": "example",
-  "timestamp": "2026-09-15T12:00:00Z",
+  "schema_version": "1.0.0",
   "source_url": "https://example.invalid/post/1",
-  "text": "synthetic example",
-  "media_references": [],
-  "raw_ref": "objects/raw/...",
-  "collection_provenance": {
-    "collector": "laclaugpt-data-collection",
-    "collector_version": "0.1.0",
-    "capture_id": "...",
-    "run_id": "..."
-  }
+  "source_native_ids": {"document_id": "platform-stable-id"},
+  "source": {
+    "platform": "tiktok",
+    "author": "example",
+    "created_at": "2026-09-15T12:00:00Z",
+    "collection_method": "browser-extension",
+    "raw_ref": "raw/tiktok/example.ndjson"
+  },
+  "content": {
+    "text": "synthetic example",
+    "media_references": []
+  },
+  "provenance": []
 }
 ```
 
-Downstream modules should consume this envelope rather than collector-internal classes.
+`NormalizedRecord` remains only a compatibility constructor for older collectors. Persisted output uses the canonical nested record. See [`docs/CANONICAL_RECORD.md`](docs/CANONICAL_RECORD.md).
+
+## Firefox-assisted capture
+
+The Firefox workflow captures supported public platform response bodies and embedded public page state into a localhost backend. The default backend binds to `127.0.0.1:8765`; `firefox-local` configuration is rejected if it attempts a non-loopback bind.
+
+See [`docs/BROWSER_CAPTURE.md`](docs/BROWSER_CAPTURE.md) and [`docs/EXTENSION_PRIVACY.md`](docs/EXTENSION_PRIVACY.md). Browser capture remains researcher-controlled and does not carry credentials or target lists in the extension source.
+
+## Hermes agent operation
+
+Hermes uses the same Settings, canonical record, collector and storage APIs as the CLI. The reusable integration surface is `laclaugpt_data_collection.integrations.hermes`, and the agent skill is [`skills/laclaugpt-data-collection/SKILL.md`](skills/laclaugpt-data-collection/SKILL.md).
+
+Agent inspection and dry-run operations are redacted and offline. Agent-triggered canonical records can be stamped with caller metadata such as `hermes-agent`; agent operation does not create a second schema or collector pipeline.
+
+## Lineage and imports
+
+The architecture consolidates reusable Collection behavior from `TomiToivio/LaclauGPT-Discourse-Analysis`, the historical TikTok Firefox scraper lineage, selected generic collection patterns from `TomiToivio/CyborgAnthropology`, and storage/scheduling ideas from related LaclauGPT repositories. Historical repositories are reference implementations, not architecture templates.
+
+See [`docs/SOURCE_IMPORTS.md`](docs/SOURCE_IMPORTS.md) and [`docs/COLLECTOR_MIGRATION.md`](docs/COLLECTOR_MIGRATION.md) for migration boundaries and provenance.
 
 ## Privacy and public-repo rules
 
-Read `docs/PRIVACY.md` before adding any source, configuration or fixture. The repository is intended to remain public-safe at every commit, not merely after cleanup.
+Read [`docs/PRIVACY.md`](docs/PRIVACY.md) before adding any source, configuration or fixture. The repository is intended to remain public-safe at every commit.
 
-1. Never commit `.env`, cookies, browser profiles, HAR/PCAP captures, tokens, passwords, API keys, private URLs, CSC/OpenStack credentials, SSH material, infrastructure state or real deployment configs.
-2. Never commit collected research data, downloaded media, raw API responses, researcher exports or real participant/account/channel target lists.
-3. Real machine/server configuration belongs outside Git. Checked-in configuration must be an explicitly named example/schema containing placeholders only.
-4. Tests and fixtures must be synthetic and must not be lightly edited copies of real research material.
-5. CI runs a public-tree scanner that rejects common private/data artifacts, literal secrets and credential-bearing URLs.
-6. If a secret or restricted dataset is ever committed, treat it as compromised: rotate/revoke it and rewrite Git history. A later deletion commit is not sufficient.
+Never commit `.env`, cookies, browser profiles, HAR/PCAP captures, tokens, passwords, API keys, private URLs, CSC/OpenStack credentials, SSH material, infrastructure state, collected research data, downloaded media, raw API responses, researcher exports, or real participant/account/channel target lists. Tests and examples use synthetic content only.
+
+All runtime and study-specific material belongs under the ignored repository-local `data/` tree or external private infrastructure. See [`docs/RUNTIME_DATA.md`](docs/RUNTIME_DATA.md).
 
 Run the required publication checks locally with:
 
@@ -133,22 +144,8 @@ mypy src/laclaugpt_data_collection/config.py \
 pytest
 ```
 
-The mypy gate covers the stable interoperability/configuration/storage core. The imported platform parsers still have legacy typing debt and are covered by linting and functional tests instead of being hidden behind broad type ignores.
-
-`ruff format .` is recommended whenever touching Python files. Some imported legacy modules are being normalized incrementally, so formatting is not yet a repository-wide CI gate.
+The mypy gate covers the stable interoperability/configuration/storage core. Imported platform parsers retain some legacy typing debt and are covered by linting and functional tests.
 
 ## Development
 
-```bash
-python -m pip install -e '.[dev]'
-python scripts/check_public_tree.py
-ruff check .
-pytest
-```
-
-The repository uses a narrow package surface: collectors emit normalized records; storage adapters persist them; orchestration composes the two. Analysis belongs in `LaclauGPT-Data-Analysis`, not here.
-
-## Browser-assisted capture
-
-A minimal, user-triggered local Firefox capture extension and its privacy constraints are documented in [docs/BROWSER_CAPTURE.md](docs/BROWSER_CAPTURE.md). It is disabled by default and never carries credentials or target lists.
-
+The repository uses a narrow package surface: collectors emit canonical records, storage adapters persist them, and orchestration composes the two. Analysis belongs in `LaclauGPT-Data-Analysis`, not here.
