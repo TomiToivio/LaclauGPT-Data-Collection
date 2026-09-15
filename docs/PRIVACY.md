@@ -49,10 +49,11 @@ Before pushing, run:
 ```bash
 python scripts/check_public_tree.py
 ruff check .
-ruff format --check .
 mypy src/laclaugpt_data_collection
 pytest
 ```
+
+`ruff format .` is recommended for touched Python files. Formatting of older imported modules is being normalized incrementally rather than used as a repository-wide publication gate.
 
 ## Pull-request checklist
 
