@@ -8,6 +8,22 @@ This file is the canonical shared contract. Agent-specific files such as `CLAUDE
 
 Keep this repository limited to data collection: source/browser/network capture, platform parsers, normalization, provenance, collection state, media/raw persistence, scheduling, and storage adapters. Analysis, dashboards, simulations and other module responsibilities belong elsewhere.
 
+## Canonical record contract
+
+All collectors and storage adapters MUST use the project-wide canonical LaclauGPT record contract.
+
+- `source_url` or a stable URI-like equivalent is the semantic source identity.
+- Canonicalize source identity deterministically before persistence.
+- Platform-native IDs belong in `source_native_ids`; they never replace `source_url`.
+- Mongo `_id`, SQLite integer keys, CSV row numbers and local filenames are backend details, not research identities.
+- Collection populates `source`, source-side `content`, media/file references and collection provenance. Analysis enriches the same record later.
+- Text-only records are valid. Do not invent multimodal fields.
+- Flat legacy fields are accepted only through bounded adapters. Persisted canonical records use structured sections.
+- Every persisted schema change requires an explicit schema-version decision, migration note and synthetic round-trip contract tests.
+- CSV/JSONL/SQLite/Mongo representations must reconstruct the same logical record.
+
+`NormalizedRecord` is a compatibility constructor for existing collectors, not a second persistent schema.
+
 ## Mandatory runtime data boundary
 
 All runtime and study-specific material belongs below `data/`, and the complete `data/` tree stays outside Git. Follow `docs/RUNTIME_DATA.md`.
@@ -20,7 +36,7 @@ When sibling modules run on one machine, Data Analysis may consume Collection ou
 
 ## Architecture
 
-Use `src/laclaugpt_data_collection/`. Keep imports acyclic, platform adapters separate from normalization/storage, and the normalized record envelope stable. Keep local filesystem + SQLite operation working without remote services. Keep browser-extension source under `browser/` with an explicit extraction/transport/storage boundary.
+Use `src/laclaugpt_data_collection/`. Keep imports acyclic, platform adapters separate from normalization/storage, and the canonical record envelope stable. Keep local filesystem + SQLite operation working without remote services. Keep browser-extension source under `browser/` with an explicit extraction/transport/storage boundary.
 
 Do not make sibling LaclauGPT repositories mandatory Python dependencies. Interoperate through versioned records, files, or configured services.
 
@@ -32,4 +48,4 @@ Before merging run the public-tree check, Ruff, the configured mypy gate and pyt
 
 ## Legacy migration
 
-Historical repositories are reference implementations, not architecture templates. Classify substantial migrations as `MIGRATE`, `ALREADY_IMPLEMENTED`, `REIMPLEMENT_CLEANLY`, `OBSOLETE`, or `PRIVATE_OR_OPERATIONAL_DO_NOT_COPY` and document non-obvious decisions.
+Historical repositories are reference implementations, not architecture templates. Classify schema archaeology as `ADOPT`, `ADAPT`, `ALREADY_IMPLEMENTED`, `LEGACY_COMPATIBILITY_ONLY`, `OBSOLETE`, or `PRIVATE_DO_NOT_COPY`, and document non-obvious decisions.
