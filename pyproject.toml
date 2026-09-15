@@ -40,6 +40,10 @@ packages = ["src/laclaugpt_data_collection"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# src/ for the package, repo root so `tests.fixtures` resolves locally even
+# when a foreign top-level `tests` package exists in the interpreter's
+# site-packages (name shadowing).
+pythonpath = ["src", "."]
 addopts = "-q"
 
 [tool.ruff]

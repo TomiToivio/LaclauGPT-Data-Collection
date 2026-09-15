@@ -1,4 +1,4 @@
-# LaclauGPT Data Collection
+﻿# LaclauGPT Data Collection
 
 [![CI](https://github.com/TomiToivio/LaclauGPT-Data-Collection/actions/workflows/ci.yml/badge.svg)](https://github.com/TomiToivio/LaclauGPT-Data-Collection/actions/workflows/ci.yml)
 
@@ -147,3 +147,8 @@ pytest
 ```
 
 The repository uses a narrow package surface: collectors emit normalized records; storage adapters persist them; orchestration composes the two. Analysis belongs in `LaclauGPT-Data-Analysis`, not here.
+
+## Browser-assisted capture
+
+A minimal, user-triggered local Firefox capture extension and its privacy constraints are documented in [docs/BROWSER_CAPTURE.md](docs/BROWSER_CAPTURE.md). It is disabled by default and never carries credentials or target lists.
+

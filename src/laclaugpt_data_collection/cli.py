@@ -48,7 +48,30 @@ def _build_parser() -> argparse.ArgumentParser:
     doctor = sub.add_parser("doctor", help="validate a safe local/server profile")
     doctor.add_argument("--profile", help="path to a checked-in example or ignored local TOML profile")
     doctor.set_defaults(func=_doctor)
+
+    server = sub.add_parser(
+        "capture-server",
+        help="run the local HTTP capture backend for the browser extension",
+    )
+    server.add_argument("--study-config", required=True,
+                        help="study YAML configuration (ignored local file)")
+    server.add_argument("--data-root", required=True,
+                        help="persistent collection data root")
+    server.add_argument("--host", default="127.0.0.1")
+    server.add_argument("--port", type=int, default=8765)
+    server.set_defaults(func=_capture_server)
     return parser
+
+
+def _capture_server(args: argparse.Namespace) -> int:
+    from .capture_server import main as server_main
+
+    return server_main([
+        "--study-config", args.study_config,
+        "--data-root", args.data_root,
+        "--host", args.host,
+        "--port", str(args.port),
+    ])
 
 
 def main(argv: list[str] | None = None) -> int:

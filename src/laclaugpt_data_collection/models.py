@@ -4,7 +4,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from .canonical import normalize_source_uri
 
 
 class CollectionProvenance(BaseModel):
@@ -48,6 +50,15 @@ class NormalizedRecord(BaseModel):
     raw_ref: str = ""
     collection_provenance: CollectionProvenance = Field(default_factory=CollectionProvenance)
 
+    @field_validator("source_url")
+    @classmethod
+    def canonical_source_url(cls, value: str) -> str:
+        return normalize_source_uri(value) if value else value
+
+    @property
+    def canonical_identity(self) -> str:
+        return self.source_url or f"urn:laclaugpt:{self.platform}:{self.document_id}"
+
     @property
     def dedup_key(self) -> tuple[str, str]:
-        return self.platform, self.document_id
+        return self.platform, self.canonical_identity

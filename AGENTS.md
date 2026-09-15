@@ -53,3 +53,7 @@ Distributed integrations are optional extras. Prefer MongoDB for records, Redis 
 ## Interoperability
 
 Do not make another LaclauGPT module a mandatory dependency. Communicate through versioned schemas, JSONL/CSV exports, storage/service interfaces or explicit optional integrations.
+
+## Canonical record contract
+
+All collectors and storage adapters must use the canonical source contract: `source_url`/URI is the semantic identity when available; platform-native IDs are aliases; backend row/object IDs must not become downstream identities. Preserve schema version, provenance, timestamps, lists and media references across JSONL, CSV, SQLite and remote adapters.

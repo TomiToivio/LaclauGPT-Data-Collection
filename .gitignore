@@ -119,6 +119,7 @@ Thumbs.db
 # Local scratch
 /tmp/
 /temp/
+.test-tmp/
 .cache/
 logs/
 *.log

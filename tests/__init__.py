@@ -1,0 +1,1 @@
+"""LaclauGPT-Data-Collection test suite (synthetic fixtures only)."""

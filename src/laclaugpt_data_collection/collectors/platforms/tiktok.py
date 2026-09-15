@@ -1,9 +1,17 @@
 """LaclauGPT-native TikTok parser.
 
-Imported from the public LaclauGPT-Discourse-Analysis collector. Its design
-follows the original LaclauGPT-TikTok-Scraper: route captured responses by
-endpoint, parse native post objects in small helpers, and map them into a stable
-LaclauGPT record.
+The design follows the original 2024 LaclauGPT-TikTok-Scraper:
+route captured TikTok responses by endpoint, parse native post objects in small
+helpers, and map them into a stable LaclauGPT record.
+
+Migrated from the public `collector/modules/tiktok.py` in
+TomiToivio/LaclauGPT-Discourse-Analysis (the canonical richer implementation).
+Zeeschuimer is an architectural inspiration for browser/API-response capture,
+but this module is an independent LaclauGPT implementation and is not a port of
+Zeeschuimer source code.
+
+Author: Tomi Toivio / LaclauGPT
+License: CC0 1.0 Universal
 """
 from __future__ import annotations
 
@@ -102,7 +110,11 @@ def _universal_data(data: dict) -> list[dict]:
             if _is_post(candidate):
                 posts.append(candidate)
 
-    detail = ((scope.get("webapp.video-detail") or {}).get("itemInfo", {}).get("itemStruct"))
+    detail = (
+        (scope.get("webapp.video-detail") or {})
+        .get("itemInfo", {})
+        .get("itemStruct")
+    )
     if _is_post(detail):
         posts.append(detail)
     return posts

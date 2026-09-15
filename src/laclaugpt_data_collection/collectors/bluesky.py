@@ -90,6 +90,10 @@ def _map_post(post: dict[str, Any]) -> NormalizedRecord | None:
     cid = str(post.get("cid") or "")
     record = post.get("record") if isinstance(post.get("record"), dict) else {}
     author = post.get("author") if isinstance(post.get("author"), dict) else {}
+    if not isinstance(record, dict):
+        record = {}
+    if not isinstance(author, dict):
+        author = {}
     text = str(record.get("text") or "")
     created_at = str(record.get("createdAt") or "")
     handle = str(author.get("handle") or "")

@@ -1,7 +1,9 @@
-"""Normalize parser output into the stable LaclauGPT record envelope.
+﻿"""Normalize parser output into the stable LaclauGPT record envelope.
 
 Adapted from the public `collector/normalize.py` in
-TomiToivio/LaclauGPT-Discourse-Analysis.
+TomiToivio/LaclauGPT-Discourse-Analysis, extended with the auxiliary
+record families (comments/users/challenges) salvaged from the legacy
+LaclauGPT-TikTok-Scraper.
 """
 from __future__ import annotations
 
@@ -14,6 +16,10 @@ MODULE_VERSIONS = {
     "instagram": "laclaugpt-native-instagram-2026-09",
     "x": "laclaugpt-native-twitter-2026-09",
     "bluesky": "laclaugpt-native-bluesky-2026-09",
+    # Auxiliary families carry their own module labels via provenance.
+    "tiktok_comment": "tiktok-comments-legacy-salvage",
+    "tiktok_user": "tiktok-users-legacy-salvage",
+    "tiktok_challenge": "tiktok-challenges-legacy-salvage",
 }
 
 
@@ -101,6 +107,29 @@ def normalise(
     )
 
 
+def normalise_aux(platform: str, mapped: dict[str, Any], *, raw_ref: str = "") -> NormalizedRecord:
+    """Normalise one auxiliary-family mapped record (comments/users/challenges).
+
+    The aux parsers build complete NormalizedRecord envelopes themselves;
+    this wrapper only attaches the raw_ref pointer. The parser registry is
+    imported lazily: normalization must not depend on parser modules at
+    import time (they carry legacy typing debt outside the mypy gate).
+    """
+    from .collectors.platforms import AUX_PARSERS
+
+    record: NormalizedRecord | None = AUX_PARSERS[platform].to_record(mapped)
+    if record is None:
+        raise ValueError(f"normalise_aux: unmappable auxiliary item for {platform!r}")
+    record.raw_ref = raw_ref
+    return record
+
+
+def is_aux_platform(platform: str) -> bool:
+    from .collectors.platforms import AUX_PARSERS
+
+    return platform in AUX_PARSERS
+
+
 def _split_list(value: Any) -> list[str]:
     if isinstance(value, list):
         return [str(item) for item in value if item not in (None, "")]
@@ -134,3 +163,8 @@ def _media_refs(platform: str, mapped: dict[str, Any]) -> list[MediaReference]:
         for index, url in enumerate(_split_list(mapped.get("quote_images"))):
             add("quote_image", url, 30 + index)
     return refs
+
+
+def dedup_key(record: NormalizedRecord) -> tuple[str, str]:
+    """Identity of a record across runs: (platform, document_id)."""
+    return record.platform, record.document_id
