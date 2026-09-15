@@ -4,15 +4,15 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Protocol
 
-from ..models import NormalizedRecord
+from ..models import CanonicalRecord
 
 
 class RecordStore(Protocol):
-    def upsert(self, record: NormalizedRecord) -> None: ...
+    def upsert(self, record: CanonicalRecord) -> None: ...
 
-    def upsert_many(self, records: Iterable[NormalizedRecord]) -> None: ...
+    def upsert_many(self, records: Iterable[CanonicalRecord]) -> None: ...
 
-    def contains(self, platform: str, document_id: str) -> bool: ...
+    def contains(self, source_url: str) -> bool: ...
 
 
 class ObjectStore(Protocol):

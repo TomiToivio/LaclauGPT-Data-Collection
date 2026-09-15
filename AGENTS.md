@@ -1,55 +1,54 @@
 # Agent and Contributor Rules
 
-This repository is public-safe infrastructure. Treat every commit as if it will be published immediately.
+This repository is public-safe infrastructure. Treat every commit as publishable.
+
+This file is the canonical shared contract. Agent-specific files such as `CLAUDE.md`, `HERMES.md`, and `CODEX.md` may add workflow guidance but must not override this file, `docs/PRIVACY.md`, `docs/RUNTIME_DATA.md`, or CI.
 
 ## Scope
 
-Only add code directly required for data collection:
+Keep this repository limited to data collection: source/browser/network capture, platform parsers, normalization, provenance, collection state, media/raw persistence, scheduling, and storage adapters. Analysis, dashboards, simulations and other module responsibilities belong elsewhere.
 
-- source/browser/network capture;
-- platform/source parsers;
-- normalization and provenance;
-- collection state and resumability;
-- raw/media persistence;
-- source scheduling/worker glue;
-- backend adapters and interoperability schemas.
+## Canonical record contract
 
-Do **not** add discourse analysis, LLM analysis, dashboards, simulations, researcher reports, codebooks or project-specific datasets here.
+All collectors and storage adapters MUST use the project-wide canonical LaclauGPT record contract.
 
-## Privacy rules
+- `source_url` or a stable URI-like equivalent is the semantic source identity.
+- Canonicalize source identity deterministically before persistence.
+- Platform-native IDs belong in `source_native_ids`; they never replace `source_url`.
+- Mongo `_id`, SQLite integer keys, CSV row numbers and local filenames are backend details, not research identities.
+- Collection populates `source`, source-side `content`, media/file references and collection provenance. Analysis enriches the same record later.
+- Text-only records are valid. Do not invent multimodal fields.
+- Flat legacy fields are accepted only through bounded adapters. Persisted canonical records use structured sections.
+- Every persisted schema change requires an explicit schema-version decision, migration note and synthetic round-trip contract tests.
+- CSV/JSONL/SQLite/Mongo representations must reconstruct the same logical record.
 
-Never commit secrets, real credentials, cookies, browser profiles, private endpoints, study/account target lists, raw research data, media, exports or real operational config.
+`NormalizedRecord` is a compatibility constructor for existing collectors, not a second persistent schema.
 
-Use environment variables for secrets. Checked-in config must be schema/example/synthetic only. Never add a real `.env` file. Real machine/server profiles, target lists and deployment credentials belong in ignored local files, private operations repositories or secret-management systems.
+## Mandatory runtime data boundary
 
-Before committing copied code from a private repository, manually review every line and remove paths, identifiers, hostnames, account names, credentials and data samples. Prefer reimplementing a generic interface over copying private operational files.
+All runtime and study-specific material belongs below `data/`, and the complete `data/` tree stays outside Git. Follow `docs/RUNTIME_DATA.md`.
 
-If restricted material enters Git history, stop publication work, rotate credentials if applicable, and rewrite history. A later deletion commit is not sufficient. Also inspect pull-request refs and cached commit views before considering the repository clean.
+Logs, databases, local configuration, CSV/JSONL files, codebooks, source/target lists, downloads, media, browser state, transcripts, frames, exports, temporary files and local Ollama/Whisper model material all belong under `data/`.
+
+Never create new top-level runtime roots such as `logs/`, `database/`, `csv/`, `outputs/`, `downloads/` or model-cache directories. Derive paths from `Settings.data_root` and use `Settings.ensure_local_directories()` to initialize the standard tree.
+
+When sibling modules run on one machine, Data Analysis may consume Collection output directly from this module's configured `data/` path. In distributed mode use configured MongoDB, Redis and S3-compatible storage such as CSC Allas. Manual CSV/JSONL transfer is the fallback.
 
 ## Architecture
 
-Use the `src/laclaugpt_data_collection/` package. Keep imports acyclic and backend-neutral.
+Use `src/laclaugpt_data_collection/`. Keep imports acyclic, platform adapters separate from normalization/storage, and the canonical record envelope stable. Keep local filesystem + SQLite operation working without remote services. Keep browser-extension source under `browser/` with an explicit extraction/transport/storage boundary.
 
-Collectors emit `NormalizedRecord`. Downstream LaclauGPT modules depend on the stable record envelope, not collector internals.
+Do not make sibling LaclauGPT repositories mandatory Python dependencies. Interoperate through versioned records, files, or configured services.
 
-Local mode must remain usable with filesystem + SQLite and without MongoDB, Redis, S3 or browser extras installed.
+## Development
 
-Distributed integrations are optional extras. Prefer MongoDB for records, Redis for coordination/cache, and S3-compatible storage (including CSC Allas) for raw/media objects.
+Use Python 3.11+, typed public APIs, `pathlib`, standard logging and lazy optional dependencies. Avoid import-time network/model work and machine-specific paths. Tests must use synthetic fixtures.
 
-## Python practices
+Before merging run the public-tree check, Ruff, the configured mypy gate and pytest. Keep GitHub Actions green.
 
-- Python >= 3.11.
-- Type public APIs.
-- Use `pathlib`, context managers and standard logging.
-- Keep side effects out of imports.
-- Lazy-import optional dependencies.
-- No hard-coded machine paths or credentials.
-- Small modules with single responsibilities.
-- Synthetic tests for parsers and storage adapters.
-- `python scripts/check_public_tree.py`, `ruff check .`, the stable-core mypy check in CI, and `pytest` must pass before merge.
-- Do not silence legacy parser typing debt with broad `# type: ignore` directives. Improve those modules incrementally.
-- Use `ruff format .` when editing Python code; formatting modernization may be applied incrementally to legacy imported modules.
+## Legacy migration
 
+<<<<<<< HEAD
 ## Interoperability
 
 Do not make another LaclauGPT module a mandatory dependency. Communicate through versioned schemas, JSONL/CSV exports, storage/service interfaces or explicit optional integrations.
@@ -57,3 +56,6 @@ Do not make another LaclauGPT module a mandatory dependency. Communicate through
 ## Canonical record contract
 
 All collectors and storage adapters must use the canonical source contract: `source_url`/URI is the semantic identity when available; platform-native IDs are aliases; backend row/object IDs must not become downstream identities. Preserve schema version, provenance, timestamps, lists and media references across JSONL, CSV, SQLite and remote adapters.
+=======
+Historical repositories are reference implementations, not architecture templates. Classify schema archaeology as `ADOPT`, `ADAPT`, `ALREADY_IMPLEMENTED`, `LEGACY_COMPATIBILITY_ONLY`, `OBSOLETE`, or `PRIVATE_DO_NOT_COPY`, and document non-obvious decisions.
+>>>>>>> d32811c4af08a512bdf38f22ff0b072a6f479cf5

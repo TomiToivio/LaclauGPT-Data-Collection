@@ -1,10 +1,38 @@
-"""Environment-first configuration with local-safe defaults."""
+"""Environment-first configuration with local-safe defaults.
+
+All runtime state lives below ``data/``. The whole tree is gitignored and may
+contain sensitive research material, credentials/config overlays, model caches,
+logs, databases, downloaded files, and intermediate artifacts.
+"""
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+DATA_SUBDIRS = (
+    "logs",
+    "database",
+    "config",
+    "files",
+    "csv",
+    "jsonl",
+    "codebooks",
+    "sources",
+    "downloads",
+    "media",
+    "models/ollama",
+    "models/whisper",
+    "cache",
+    "tmp",
+    "exports",
+    "artifacts",
+    "runs",
+    "browser",
+    "transcripts",
+    "frames",
+)
 
 
 class Settings(BaseSettings):
@@ -17,7 +45,7 @@ class Settings(BaseSettings):
 
     profile: str = "local"
     data_root: Path = Path("./data")
-    sqlite_path: Path = Path("./data/state.sqlite3")
+    sqlite_path: Path = Path("./data/database/collection.sqlite3")
 
     record_backend: Literal["sqlite", "mongodb"] = "sqlite"
     object_backend: Literal["filesystem", "s3"] = "filesystem"
@@ -33,8 +61,14 @@ class Settings(BaseSettings):
     s3_access_key_id: str = ""
     s3_secret_access_key: str = ""
 
+    def data_path(self, *parts: str) -> Path:
+        """Return a path below the private runtime data root."""
+        return self.data_root.joinpath(*parts)
+
     def ensure_local_directories(self) -> None:
         self.data_root.mkdir(parents=True, exist_ok=True)
+        for relative in DATA_SUBDIRS:
+            self.data_path(*relative.split("/")).mkdir(parents=True, exist_ok=True)
         if self.record_backend == "sqlite":
             self.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
 

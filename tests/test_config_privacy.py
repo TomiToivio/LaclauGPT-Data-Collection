@@ -9,6 +9,31 @@ def test_default_configuration_is_local_first() -> None:
     assert settings.object_backend == "filesystem"
     assert settings.cache_backend == "memory"
     assert settings.data_root == Path("data")
+    assert settings.sqlite_path == Path("data/database/collection.sqlite3")
+
+
+def test_standard_runtime_tree_is_created_under_data(tmp_path: Path) -> None:
+    root = tmp_path / "data"
+    settings = Settings(
+        _env_file=None,
+        data_root=root,
+        sqlite_path=root / "database" / "collection.sqlite3",
+    )
+    settings.ensure_local_directories()
+    for relative in (
+        "logs",
+        "database",
+        "config",
+        "files",
+        "csv",
+        "codebooks",
+        "sources",
+        "downloads",
+        "models/ollama",
+        "models/whisper",
+        "exports",
+    ):
+        assert (root / relative).is_dir()
 
 
 def test_safe_summary_never_exposes_secret_values() -> None:
