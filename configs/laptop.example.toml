@@ -1,4 +1,7 @@
-profile = "laptop"
+profile = "laptop-firefox-local"
+machine = "laptop"
+execution = "cli"
+browser = "firefox-local"
 
 [storage]
 records = "sqlite"
@@ -9,12 +12,16 @@ cache = "memory"
 data_root = "./data"
 sqlite_path = "./data/database/collection.sqlite3"
 
+[browser_capture]
+host = "127.0.0.1"
+port = 8765
+
 [collector]
 mode = "local"
 workers = 1
 download_media = false
 
 [interoperability]
-schema_version = "1.0"
+schema_version = "1.0.0"
 emit_jsonl = true
 emit_csv = true
