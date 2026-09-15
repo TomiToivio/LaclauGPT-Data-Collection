@@ -9,20 +9,26 @@ import tomllib
 from pathlib import Path
 
 from .config import Settings
+from .deployment import render_cron, render_systemd_units, validate_profile
 
 
 def _apply_profile(path: Path) -> None:
     data = tomllib.loads(path.read_text(encoding="utf-8"))
     storage = data.get("storage", {})
     paths = data.get("paths", {})
-    profile = data.get("profile")
+    browser_capture = data.get("browser_capture", {})
     mapping = {
-        "LACLAUGPT_PROFILE": profile,
+        "LACLAUGPT_PROFILE": data.get("profile"),
+        "LACLAUGPT_MACHINE": data.get("machine"),
+        "LACLAUGPT_EXECUTION": data.get("execution"),
+        "LACLAUGPT_BROWSER": data.get("browser"),
         "LACLAUGPT_RECORD_BACKEND": storage.get("records"),
         "LACLAUGPT_OBJECT_BACKEND": storage.get("objects"),
         "LACLAUGPT_CACHE_BACKEND": storage.get("cache"),
         "LACLAUGPT_DATA_ROOT": paths.get("data_root"),
         "LACLAUGPT_SQLITE_PATH": paths.get("sqlite_path"),
+        "LACLAUGPT_BROWSER_HOST": browser_capture.get("host"),
+        "LACLAUGPT_BROWSER_PORT": browser_capture.get("port"),
     }
     for key, value in mapping.items():
         if value is not None and key not in os.environ:
@@ -35,9 +41,24 @@ def _doctor(args: argparse.Namespace) -> int:
     settings = Settings()
     settings.ensure_local_directories()
     summary = settings.safe_summary()
+    problems = validate_profile(settings)
     summary["python"] = sys.version.split()[0]
-    summary["status"] = "ok"
+    summary["status"] = "ok" if not problems else "invalid"
+    summary["problems"] = problems
     print(json.dumps(summary, indent=2, sort_keys=True))
+    return 0 if not problems else 2
+
+
+def _schedule(args: argparse.Namespace) -> int:
+    command = args.command_line
+    if args.kind == "cron":
+        print(render_cron(command, schedule=args.schedule))
+    else:
+        units = render_systemd_units(command, working_directory=Path(args.working_directory))
+        print("# laclaugpt-collection.service")
+        print(units["service"])
+        print("# laclaugpt-collection.timer")
+        print(units["timer"])
     return 0
 
 
@@ -48,6 +69,13 @@ def _build_parser() -> argparse.ArgumentParser:
     doctor = sub.add_parser("doctor", help="validate a safe local/server profile")
     doctor.add_argument("--profile", help="path to a checked-in example or ignored local TOML profile")
     doctor.set_defaults(func=_doctor)
+
+    schedule = sub.add_parser("schedule", help="render cron/systemd examples without installing them")
+    schedule.add_argument("kind", choices=("cron", "systemd"))
+    schedule.add_argument("--command-line", default="laclaugpt-collect doctor")
+    schedule.add_argument("--schedule", default="17 * * * *")
+    schedule.add_argument("--working-directory", default="/opt/laclaugpt-collection")
+    schedule.set_defaults(func=_schedule)
 
     server = sub.add_parser(
         "capture-server",
