@@ -1,0 +1,23 @@
+profile = "linux-server-local"
+machine = "linux-server"
+execution = "cron"
+browser = "none"
+
+[storage]
+records = "sqlite"
+objects = "filesystem"
+cache = "memory"
+
+[paths]
+data_root = "./data"
+sqlite_path = "./data/database/collection.sqlite3"
+
+[collector]
+mode = "local"
+workers = 1
+download_media = false
+
+[interoperability]
+schema_version = "1.0.0"
+emit_jsonl = true
+emit_csv = true
