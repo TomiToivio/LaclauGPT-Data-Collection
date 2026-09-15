@@ -123,3 +123,4 @@ Thumbs.db
 .cache/
 logs/
 *.log
+pytest*/*
