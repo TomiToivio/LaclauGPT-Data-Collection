@@ -120,7 +120,7 @@ def normalise_aux(platform: str, mapped: dict[str, Any], *, raw_ref: str = "") -
     record: NormalizedRecord | None = AUX_PARSERS[platform].to_record(mapped)
     if record is None:
         raise ValueError(f"normalise_aux: unmappable auxiliary item for {platform!r}")
-    record.raw_ref = raw_ref
+    record.source.raw_ref = raw_ref
     return record
 
 
