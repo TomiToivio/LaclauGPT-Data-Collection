@@ -46,7 +46,8 @@ Distributed integrations are optional extras. Prefer MongoDB for records, Redis 
 - No hard-coded machine paths or credentials.
 - Small modules with single responsibilities.
 - Synthetic tests for parsers and storage adapters.
-- `python scripts/check_public_tree.py`, `ruff check .`, `mypy src/laclaugpt_data_collection`, and `pytest` must pass before merge.
+- `python scripts/check_public_tree.py`, `ruff check .`, the stable-core mypy check in CI, and `pytest` must pass before merge.
+- Do not silence legacy parser typing debt with broad `# type: ignore` directives. Improve those modules incrementally.
 - Use `ruff format .` when editing Python code; formatting modernization may be applied incrementally to legacy imported modules.
 
 ## Interoperability
