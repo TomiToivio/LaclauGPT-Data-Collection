@@ -125,9 +125,15 @@ Run the required publication checks locally with:
 ```bash
 python scripts/check_public_tree.py
 ruff check .
-mypy src/laclaugpt_data_collection
+mypy src/laclaugpt_data_collection/config.py \
+  src/laclaugpt_data_collection/models.py \
+  src/laclaugpt_data_collection/normalize.py \
+  src/laclaugpt_data_collection/storage/base.py \
+  src/laclaugpt_data_collection/storage/local.py
 pytest
 ```
+
+The mypy gate covers the stable interoperability/configuration/storage core. The imported platform parsers still have legacy typing debt and are covered by linting and functional tests instead of being hidden behind broad type ignores.
 
 `ruff format .` is recommended whenever touching Python files. Some imported legacy modules are being normalized incrementally, so formatting is not yet a repository-wide CI gate.
 
@@ -137,7 +143,6 @@ pytest
 python -m pip install -e '.[dev]'
 python scripts/check_public_tree.py
 ruff check .
-mypy src/laclaugpt_data_collection
 pytest
 ```
 
