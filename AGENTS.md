@@ -2,6 +2,8 @@
 
 This repository is public-safe infrastructure. Treat every commit as if it will be published immediately.
 
+This file is the canonical shared contract for all coding agents and contributors. Agent-specific files such as `CLAUDE.md`, `HERMES.md`, and `CODEX.md` may add workflow guidance, but they must not override the rules here, `docs/PRIVACY.md`, or CI.
+
 ## Scope
 
 Only add code directly required for data collection:
@@ -32,6 +34,8 @@ Use the `src/laclaugpt_data_collection/` package. Keep imports acyclic and backe
 
 Collectors emit `NormalizedRecord`. Downstream LaclauGPT modules depend on the stable record envelope, not collector internals.
 
+Keep browser-extension source under `browser/` with an explicit boundary between page extraction, transport, normalization, and storage.
+
 Local mode must remain usable with filesystem + SQLite and without MongoDB, Redis, S3 or browser extras installed.
 
 Distributed integrations are optional extras. Prefer MongoDB for records, Redis for coordination/cache, and S3-compatible storage (including CSC Allas) for raw/media objects.
@@ -49,6 +53,12 @@ Distributed integrations are optional extras. Prefer MongoDB for records, Redis 
 - `python scripts/check_public_tree.py`, `ruff check .`, the stable-core mypy check in CI, and `pytest` must pass before merge.
 - Do not silence legacy parser typing debt with broad `# type: ignore` directives. Improve those modules incrementally.
 - Use `ruff format .` when editing Python code; formatting modernization may be applied incrementally to legacy imported modules.
+
+## Legacy migration
+
+Historical and private repositories are reference implementations, not architecture templates. For substantial migrations, classify source behavior as `MIGRATE`, `ALREADY_IMPLEMENTED`, `REIMPLEMENT_CLEANLY`, `OBSOLETE`, or `PRIVATE_OR_OPERATIONAL_DO_NOT_COPY`, and document non-obvious decisions.
+
+Do not create duplicate collector stacks merely to preserve old directory layouts.
 
 ## Interoperability
 
