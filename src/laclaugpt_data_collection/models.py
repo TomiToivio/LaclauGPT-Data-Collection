@@ -1,7 +1,10 @@
 """Canonical, storage-neutral data models for LaclauGPT Collection.
 
-Collection owns source identity, source metadata, source content references and
-collection provenance. Analysis enriches the same logical record later.
+Collection owns source identity, raw source preservation, normalized source metadata,
+source-derived content and collection provenance. Analysis enriches the same logical
+record later. The four-layer research contract is additive: raw capture, intermediate
+stage output, canonical analysis and a researcher-readable summary must survive every
+storage adapter.
 """
 from __future__ import annotations
 
@@ -11,7 +14,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-SCHEMA_VERSION = "1.0.0"
+SCHEMA_VERSION = "1.1.0"
 _TRACKING_KEYS = {"fbclid", "gclid", "mc_cid", "mc_eid"}
 
 
@@ -63,6 +66,45 @@ class CollectionProvenance(Model):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class RawCaptureSection(Model):
+    """Lossless source material received by the collector.
+
+    Production collectors should retain the exact payload inline, an immutable raw_ref,
+    or both. Compatibility imports may carry a reconstructed snapshot but must mark it in
+    metadata rather than claiming it is byte-for-byte source material.
+    """
+
+    ref: str | None = None
+    payload: Any | None = None
+    checksum: str | None = None
+    content_type: str | None = None
+    captured_at: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @property
+    def preserved(self) -> bool:
+        return bool(self.ref) or self.payload is not None
+
+
+class IntermediateSection(Model):
+    """Lossless preprocessing/stage outputs retained before final analysis."""
+
+    asr: list[dict[str, Any]] = Field(default_factory=list)
+    ocr: list[dict[str, Any]] = Field(default_factory=list)
+    frames: list[dict[str, Any]] = Field(default_factory=list)
+    frame_analysis: list[dict[str, Any]] = Field(default_factory=list)
+    translations: list[dict[str, Any]] = Field(default_factory=list)
+    stage_outputs: dict[str, Any] = Field(default_factory=dict)
+
+
+class HumanReadableSection(Model):
+    summary: str = ""
+    markdown: str = ""
+    generated_at: str | None = None
+    generator: str = "laclaugpt-data-collection"
+    sections: dict[str, str] = Field(default_factory=dict)
+
+
 class MediaReference(Model):
     kind: str
     url: str = ""
@@ -104,10 +146,13 @@ class CanonicalRecord(Model):
     schema_version: str = SCHEMA_VERSION
     source_url: str
     source_native_ids: dict[str, str] = Field(default_factory=dict)
+    raw_capture: RawCaptureSection = Field(default_factory=RawCaptureSection)
     source: SourceSection = Field(default_factory=SourceSection)
     content: ContentSection = Field(default_factory=ContentSection)
+    intermediate: IntermediateSection = Field(default_factory=IntermediateSection)
     evidence: list[dict[str, Any]] = Field(default_factory=list)
     analysis: dict[str, Any] = Field(default_factory=dict)
+    human_readable: HumanReadableSection = Field(default_factory=HumanReadableSection)
     provenance: list[CollectionProvenance] = Field(default_factory=list)
     review: dict[str, Any] = Field(default_factory=dict)
     legacy: dict[str, Any] = Field(default_factory=dict)
@@ -124,16 +169,51 @@ class CanonicalRecord(Model):
     def dedup_key(self) -> str:
         return self.source_url
 
+    def refresh_human_readable(self) -> None:
+        """Create the collection-stage researcher summary without model inference."""
+        source_bits = [self.source.platform or "source"]
+        if self.source.author:
+            source_bits.append(f"by {self.source.author}")
+        source_line = " ".join(source_bits)
+        text = (self.content.text or "").strip()
+        preview = text[:500] + ("…" if len(text) > 500 else "")
+        raw_status = self.raw_capture.ref or (
+            "inline raw payload" if self.raw_capture.payload is not None else "raw capture unavailable"
+        )
+        summary = preview or f"Collected {source_line}."
+        sections = {
+            "source": f"{source_line}; identity: {self.source_url}",
+            "raw_capture": str(raw_status),
+            "content": preview or "No normalized text content.",
+            "analysis": "Analysis has not yet been run.",
+        }
+        self.human_readable = HumanReadableSection(
+            summary=summary,
+            markdown=(
+                f"# Research record\n\n## Source\n{sections['source']}\n\n"
+                f"## Raw capture\n{sections['raw_capture']}\n\n"
+                f"## Collected content\n{sections['content']}\n\n"
+                "## Analysis\nAnalysis has not yet been run."
+            ),
+            generated_at=datetime.now(UTC).isoformat(),
+            sections=sections,
+        )
+
 
 class NormalizedRecord(CanonicalRecord):
     """Compatibility constructor for existing collectors.
 
-    Existing collectors may still construct the old flat envelope. Persisted
-    output is the canonical nested record, so this is an adapter rather than a
-    competing schema.
+    Existing collectors may still construct the old flat envelope. Persisted output is
+    the canonical nested record, so this is an adapter rather than a competing schema.
     """
 
     def __init__(self, **data: Any) -> None:
+        original = dict(data)
+        raw_payload = data.pop("raw_payload", None)
+        raw_content_type = str(data.pop("raw_content_type", "") or "") or None
+        raw_checksum = str(data.pop("raw_checksum", "") or "") or None
+        raw_capture = data.get("raw_capture")
+
         if "source" not in data and ("platform" in data or "document_id" in data):
             document_id = str(data.pop("document_id", "") or "")
             platform = str(data.pop("platform", "") or "")
@@ -155,9 +235,28 @@ class NormalizedRecord(CanonicalRecord):
             raw_ref = str(data.pop("raw_ref", "") or "")
             collection_provenance = data.pop("collection_provenance", None)
             provenance = [collection_provenance] if collection_provenance is not None else []
+            captured_at = getattr(collection_provenance, "captured_at", None)
+            if isinstance(collection_provenance, dict):
+                captured_at = collection_provenance.get("captured_at")
+            if raw_capture is None:
+                if raw_payload is None and not raw_ref:
+                    raw_payload = original
+                    raw_meta = {"preservation": "compatibility-derived-constructor-snapshot"}
+                else:
+                    raw_meta = {"preservation": "exact-or-durable-reference"}
+                raw_capture = RawCaptureSection(
+                    ref=raw_ref or None,
+                    payload=raw_payload,
+                    checksum=raw_checksum,
+                    content_type=raw_content_type,
+                    captured_at=str(captured_at) if captured_at else None,
+                    metadata=raw_meta,
+                )
             data.update(
                 source_url=source_url,
+                schema_version=SCHEMA_VERSION,
                 source_native_ids={"document_id": document_id} if document_id else {},
+                raw_capture=raw_capture,
                 source=SourceSection(
                     platform=platform,
                     author=author,
@@ -180,7 +279,31 @@ class NormalizedRecord(CanonicalRecord):
                 ),
                 provenance=provenance,
             )
+        else:
+            data["schema_version"] = SCHEMA_VERSION
+            if raw_capture is None:
+                source = data.get("source")
+                source_ref = ""
+                if isinstance(source, SourceSection):
+                    source_ref = source.raw_ref or ""
+                elif isinstance(source, dict):
+                    source_ref = str(source.get("raw_ref") or "")
+                data["raw_capture"] = RawCaptureSection(
+                    ref=source_ref or None,
+                    payload=raw_payload,
+                    checksum=raw_checksum,
+                    content_type=raw_content_type,
+                    metadata={
+                        "preservation": (
+                            "exact-or-durable-reference"
+                            if raw_payload is not None or source_ref
+                            else "compatibility-missing-original"
+                        )
+                    },
+                )
         super().__init__(**data)
+        if not self.human_readable.summary:
+            self.refresh_human_readable()
 
     @property
     def document_id(self) -> str:
@@ -237,7 +360,7 @@ class NormalizedRecord(CanonicalRecord):
 
     @property
     def raw_ref(self) -> str:
-        return self.source.raw_ref or ""
+        return self.source.raw_ref or self.raw_capture.ref or ""
 
     @property
     def collection_provenance(self) -> CollectionProvenance:

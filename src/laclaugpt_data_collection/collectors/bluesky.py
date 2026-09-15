@@ -76,14 +76,14 @@ def _map_feed_item(row: Any) -> NormalizedRecord | None:
     if not isinstance(row, dict):
         return None
     post = row.get("post")
-    return _map_post(post) if isinstance(post, dict) else None
+    return _map_post(post, raw_payload=row) if isinstance(post, dict) else None
 
 
 def _map_search_post(post: Any) -> NormalizedRecord | None:
-    return _map_post(post) if isinstance(post, dict) else None
+    return _map_post(post, raw_payload=post) if isinstance(post, dict) else None
 
 
-def _map_post(post: dict[str, Any]) -> NormalizedRecord | None:
+def _map_post(post: dict[str, Any], *, raw_payload: Any | None = None) -> NormalizedRecord | None:
     uri = str(post.get("uri") or "")
     if not uri:
         return None
@@ -115,12 +115,14 @@ def _map_post(post: dict[str, Any]) -> NormalizedRecord | None:
             "repost_count": post.get("repostCount"),
             "quote_count": post.get("quoteCount"),
         },
-        raw_ref="",
+        raw_payload=raw_payload if raw_payload is not None else post,
+        raw_content_type="application/json",
         collection_provenance=CollectionProvenance(
             captured_at=indexed_at,
             module="laclaugpt-native-bluesky-2026-09",
             visited_url=source_url,
             api_url=uri,
             transformations=["bsky-xrpc", "map-post"],
+            metadata={"raw_item": post},
         ),
     )

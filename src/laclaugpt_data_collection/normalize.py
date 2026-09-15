@@ -16,7 +16,6 @@ MODULE_VERSIONS = {
     "instagram": "laclaugpt-native-instagram-2026-09",
     "x": "laclaugpt-native-twitter-2026-09",
     "bluesky": "laclaugpt-native-bluesky-2026-09",
-    # Auxiliary families carry their own module labels via provenance.
     "tiktok_comment": "tiktok-comments-legacy-salvage",
     "tiktok_user": "tiktok-users-legacy-salvage",
     "tiktok_challenge": "tiktok-challenges-legacy-salvage",
@@ -29,7 +28,10 @@ def normalise(
     *,
     metadata: dict[str, Any] | None = None,
     raw_ref: str = "",
+    raw_payload: Any | None = None,
+    raw_content_type: str = "application/json",
 ) -> NormalizedRecord:
+    """Normalize one item while preserving the exact received item when available."""
     metadata = metadata or {}
     document_id = str(mapped.get("id") or "")
     if not document_id:
@@ -53,20 +55,9 @@ def normalise(
         parent = str(parent_value) if parent_value else None
 
     engagement_keys = (
-        "likes",
-        "comments",
-        "shares",
-        "plays",
-        "like_count",
-        "comment_count",
-        "retweet_count",
-        "quote_count",
-        "reply_count",
-        "impression_count",
-        "play_count",
-        "num_likes",
-        "num_comments",
-        "author_followers",
+        "likes", "comments", "shares", "plays", "like_count", "comment_count",
+        "retweet_count", "quote_count", "reply_count", "impression_count", "play_count",
+        "num_likes", "num_comments", "author_followers",
     )
     engagement = {
         key: mapped[key]
@@ -103,24 +94,32 @@ def normalise(
         engagement=engagement,
         media_references=_media_refs(platform, mapped),
         raw_ref=raw_ref,
+        raw_payload=raw_payload,
+        raw_content_type=raw_content_type,
         collection_provenance=provenance,
     )
 
 
-def normalise_aux(platform: str, mapped: dict[str, Any], *, raw_ref: str = "") -> NormalizedRecord:
-    """Normalise one auxiliary-family mapped record (comments/users/challenges).
-
-    The aux parsers build complete NormalizedRecord envelopes themselves;
-    this wrapper only attaches the raw_ref pointer. The parser registry is
-    imported lazily: normalization must not depend on parser modules at
-    import time (they carry legacy typing debt outside the mypy gate).
-    """
+def normalise_aux(
+    platform: str,
+    mapped: dict[str, Any],
+    *,
+    raw_ref: str = "",
+    raw_payload: Any | None = None,
+) -> NormalizedRecord:
+    """Normalise one auxiliary-family mapped record and attach raw fidelity."""
     from .collectors.platforms import AUX_PARSERS
 
     record: NormalizedRecord | None = AUX_PARSERS[platform].to_record(mapped)
     if record is None:
         raise ValueError(f"normalise_aux: unmappable auxiliary item for {platform!r}")
     record.source.raw_ref = raw_ref
+    record.raw_capture.ref = raw_ref or None
+    if raw_payload is not None:
+        record.raw_capture.payload = raw_payload
+        record.raw_capture.content_type = "application/json"
+        record.raw_capture.metadata["preservation"] = "exact-or-durable-reference"
+    record.refresh_human_readable()
     return record
 
 
