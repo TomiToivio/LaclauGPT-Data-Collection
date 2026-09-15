@@ -1,0 +1,44 @@
+# SYNTHETIC PUBLIC EXAMPLE ONLY.
+# Copy to an ignored/private runtime location and replace every placeholder.
+# Never commit the real Brazil26 candidate/party/account list, credentials,
+# browser profile, private backend URLs, or collected records.
+study: brazil26
+timezone: America/Sao_Paulo
+window:
+  start: 2026-01-01
+  end: 2026-12-31
+
+platforms:
+  x:
+    enabled: true
+    base_urls:
+      - "https://x.com/{handle}"
+  tiktok:
+    enabled: true
+    base_urls:
+      - "https://www.tiktok.com/@{handle}"
+  instagram:
+    enabled: true
+    base_urls:
+      - "https://www.instagram.com/{handle}/"
+
+# Replace with the researcher-approved election sampling frame privately.
+# These names and handles are deliberately fictional.
+expected_candidates: 2
+candidates:
+  - name: Example Candidate A
+    handles:
+      x: [example_candidate_a]
+      tiktok: [example_candidate_a]
+      instagram: [example_candidate_a]
+  - name: Example Candidate B
+    handles:
+      x: [example_candidate_b]
+      tiktok: [example_candidate_b]
+      instagram: [example_candidate_b]
+parties:
+  - name: Example Party A
+    handles:
+      x: [example_party_a]
+      tiktok: [example_party_a]
+      instagram: [example_party_a]
