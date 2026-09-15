@@ -44,12 +44,20 @@ class Settings(BaseSettings):
     )
 
     profile: str = "local"
+    machine: Literal["laptop", "linux-server", "custom"] = "laptop"
+    execution: Literal["cli", "cron", "systemd", "agent", "custom"] = "cli"
+    browser: Literal["firefox-local", "worker", "none", "custom"] = "firefox-local"
+    caller: str = "human-cli"
+
     data_root: Path = Path("./data")
     sqlite_path: Path = Path("./data/database/collection.sqlite3")
 
     record_backend: Literal["sqlite", "mongodb"] = "sqlite"
     object_backend: Literal["filesystem", "s3"] = "filesystem"
     cache_backend: Literal["memory", "redis"] = "memory"
+
+    browser_host: str = "127.0.0.1"
+    browser_port: int = 8765
 
     mongodb_uri: str = "mongodb://localhost:27017"
     mongodb_database: str = "laclaugpt"
@@ -76,6 +84,10 @@ class Settings(BaseSettings):
         """Return non-secret operational settings suitable for logs/doctor output."""
         return {
             "profile": self.profile,
+            "machine": self.machine,
+            "execution": self.execution,
+            "browser": self.browser,
+            "caller": self.caller,
             "record_backend": self.record_backend,
             "object_backend": self.object_backend,
             "cache_backend": self.cache_backend,
@@ -83,4 +95,6 @@ class Settings(BaseSettings):
             "sqlite_path": str(self.sqlite_path),
             "mongodb_database": self.mongodb_database,
             "s3_bucket": self.s3_bucket,
+            "browser_host": self.browser_host,
+            "browser_port": str(self.browser_port),
         }
