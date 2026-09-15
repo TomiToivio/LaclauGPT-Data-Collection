@@ -3,7 +3,6 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-
 SCRIPT = Path(__file__).parents[1] / "scripts" / "check_public_tree.py"
 SPEC = importlib.util.spec_from_file_location("check_public_tree", SCRIPT)
 assert SPEC and SPEC.loader
