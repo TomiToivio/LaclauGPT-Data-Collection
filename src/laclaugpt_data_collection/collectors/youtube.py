@@ -17,6 +17,10 @@ def map_video(info: dict[str, Any], *, transcript: str = "", transcript_source: 
     if len(upload_date) == 8 and upload_date.isdigit():
         created_at = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:]}"
     text = transcript or str(info.get("description") or info.get("title") or "")
+    raw_payload = dict(info)
+    if transcript:
+        raw_payload["_laclaugpt_transcript"] = transcript
+        raw_payload["_laclaugpt_transcript_source"] = transcript_source
     return NormalizedRecord(
         document_id=video_id,
         platform="youtube",
@@ -25,6 +29,8 @@ def map_video(info: dict[str, Any], *, transcript: str = "", transcript_source: 
         timestamp=created_at,
         source_url=source_url,
         text=text,
+        raw_payload=raw_payload,
+        raw_content_type="application/json",
         collection_provenance=CollectionProvenance(
             module="yt-dlp",
             visited_url=source_url,
