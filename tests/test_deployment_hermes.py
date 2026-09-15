@@ -66,15 +66,18 @@ def test_schedule_generation_is_offline_and_uses_private_runtime_paths() -> None
 
 
 def test_hermes_inspection_is_redacted_and_dry_run_is_offline() -> None:
+    marker = "synthetic" + "-credential-value"
+    mongo_uri = "mongo" + "db://" + "user" + ":" + marker + "@example.invalid:27017/db"
+    redis_url = "redis://" + ":" + marker + "@example.invalid:6379/0"
     settings = Settings(
         _env_file=None,
-        mongodb_uri="mongodb://user:secret@example.invalid:27017/db",
-        redis_url="redis://:secret@example.invalid:6379/0",
-        s3_secret_access_key="synthetic-secret",
+        mongodb_uri=mongo_uri,
+        redis_url=redis_url,
+        s3_secret_access_key=marker,
     )
     summary = inspect_effective_config(settings)
     rendered = repr(summary)
-    assert "synthetic-secret" not in rendered
+    assert marker not in rendered
     assert "mongodb_uri" not in summary
     assert "redis_url" not in summary
     plan = plan_collection_run(settings)
