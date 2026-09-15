@@ -23,8 +23,6 @@
 (() => {
   "use strict";
 
-  // Public default for a local collector backend. Study-specific backend
-  // addresses and ports belong in Firefox profile/private runtime settings.
   const DEFAULT_BACKEND_URL = "http://127.0.0.1:8765";
   let backendUrl = DEFAULT_BACKEND_URL;
   browser.storage.local.get({ backend_url: DEFAULT_BACKEND_URL })
@@ -34,10 +32,6 @@
     })
     .catch(() => {});
 
-  // Endpoint matchers: which response URLs carry parseable public API data.
-  // TikTok entries include the legacy-salvaged comment/user/challenge
-  // endpoints; X entries match GraphQL post operations; Instagram matches
-  // the feed/graphql endpoints.
   const MATCHERS = {
     tiktok: /api\.tiktokv\.com|\/api\/(?:post|challenge)\/item_list|\/api\/user\/playlist|\/api\/search\/(?:item_list|general\/full)|\/api\/preload\/item_list|\/api\/comment\/list\/|\/api\/user\/detail\/|\/api\/challenge\/detail\//,
     x: /(?:^|\.)x\.com\/i\/api\/graphql|(?:^|\.)twitter\.com\/i\/api\/graphql|\/i\/api\/graphql(?:\/|\?|$)/,
@@ -80,13 +74,6 @@
     }
   }
 
-  /**
-   * Intercept a response without modifying what the website receives.
-   *
-   * The historical scraper used filterResponseData for this job.
-   * event.data is written back as the original ArrayBuffer, byte-for-byte;
-   * decoding is only for the collector's private forward copy.
-   */
   function listener(details) {
     const platform = platformFor(details.url);
     if (!platform) return;
@@ -104,8 +91,6 @@
 
     filter.ondata = event => {
       responseData += decoder.decode(event.data, { stream: true });
-      // Forward exactly the bytes received by the browser. Do not decode and
-      // re-encode the website response.
       filter.write(event.data);
     };
 
@@ -118,8 +103,6 @@
       responseData += decoder.decode();
       try { filter.disconnect(); } catch {}
 
-      // Capture source HTML and API/GraphQL JSON, never image/video bodies:
-      // main_frame + xmlhttprequest only (manifest types filter enforces this).
       const pageUrl = await tabUrlFor(details.tabId)
         || details.documentUrl || details.originUrl || "";
       await postToBackend({
@@ -141,27 +124,27 @@
         "*://*.x.com/*",
         "*://*.twitter.com/*",
       ],
-      // Capture source HTML and API/GraphQL JSON, never image/video bodies.
       types: ["main_frame", "xmlhttprequest"],
     },
     ["blocking"],
   );
 
-  // The content script forwards embedded page-state JSON that never appears
-  // as a separate XHR; both paths converge on the same backend endpoint.
+  // content.js emits embedded page-state objects as {kind, body}. Keep this
+  // envelope aligned so those captures reach the same canonical Python path
+  // as intercepted API/GraphQL responses.
   browser.runtime.onMessage.addListener((message, sender) => {
     if (message?.type !== "embedded" || !Array.isArray(message.payloads)) {
       return undefined;
     }
     const pageUrl = sender?.tab?.url || message.page_url || "";
     for (const payload of message.payloads) {
-      if (!payload?.json) continue;
+      if (payload?.body === undefined) continue;
       void postToBackend({
         platform: message.platform,
         api_url: payload.kind || "embedded",
         platform_url: pageUrl,
         captured_at: new Date().toISOString(),
-        body: JSON.stringify(payload.json),
+        body: JSON.stringify(payload.body),
       });
     }
     return undefined;
