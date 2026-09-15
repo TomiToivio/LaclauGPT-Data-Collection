@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/TomiToivio/LaclauGPT/schemas/distributed-project.schema.json",
+  "title": "LaclauGPT distributed project runtime",
+  "description": "Shared namespace contract for Redis control-plane state, MongoDB canonical/queryable records and S3-compatible object storage.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "project_id", "redis", "mongodb", "object_store"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "project_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{1,63}$", "examples": ["ai26", "ep24", "brazil26", "hungary26"]},
+    "redis": {"type": "object", "additionalProperties": false, "required": ["key_prefix", "control_document_ttl_seconds", "stream_maxlen"], "properties": {"key_prefix": {"type": "string", "default": "laclaugpt"}, "control_document_ttl_seconds": {"type": ["integer", "null"], "minimum": 60, "default": null}, "stream_maxlen": {"type": "integer", "minimum": 100, "default": 100000}, "consumer_group_prefix": {"type": "string", "default": "workers"}}},
+    "mongodb": {"type": "object", "additionalProperties": false, "required": ["database", "collection_strategy"], "properties": {"database": {"type": "string", "default": "laclaugpt"}, "collection_strategy": {"const": "project-prefixed"}, "collection_separator": {"type": "string", "default": "__"}}},
+    "object_store": {"type": "object", "additionalProperties": false, "required": ["provider", "bucket_env", "prefix_root"], "properties": {"provider": {"enum": ["s3", "allas", "s3-compatible"]}, "bucket_env": {"type": "string", "default": "LACLAUGPT_S3_BUCKET"}, "prefix_root": {"type": "string", "default": "projects"}, "versioning_recommended": {"type": "boolean", "default": true}}}
+  },
+  "$defs": {
+    "control_document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "project_id", "document_type", "name", "revision", "updated_at", "sha256", "payload"],
+      "properties": {
+        "schema_version": {"const": "1.0"},
+        "project_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{1,63}$"},
+        "document_type": {"enum": ["project-manifest", "collection-settings", "analysis-settings", "visualization-settings", "codebook", "run-config", "worker-config"]},
+        "name": {"type": "string", "minLength": 1},
+        "revision": {"type": "string", "minLength": 1},
+        "updated_at": {"type": "string", "format": "date-time"},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "payload": {"type": "object"},
+        "refs": {"type": "array", "items": {"type": "object", "required": ["kind", "uri"], "properties": {"kind": {"enum": ["mongodb", "s3", "https", "file"]}, "uri": {"type": "string", "minLength": 1}, "sha256": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"}}}, "default": []}
+      }
+    }
+  }
+}
