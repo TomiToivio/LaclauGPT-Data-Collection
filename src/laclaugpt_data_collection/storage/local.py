@@ -99,22 +99,28 @@ class SQLiteRecordStore:
                 rows,
             )
 
-    def contains(self, source_url: str, document_id: str | None = None) -> bool:
-        """Check canonical identity, with a legacy platform/document-id shim."""
-        with self._connect() as con:
-            if document_id is not None:
-                row = con.execute(
-                    "SELECT 1 FROM records WHERE json_extract(payload_json, '$.source.platform') = ? "
-                    "AND json_extract(payload_json, '$.source_native_ids.document_id') = ? LIMIT 1",
-                    (source_url, document_id),
-                ).fetchone()
-            else:
-                from ..models import canonicalize_source_url
+    def contains(self, source_url_or_platform: str, document_id: str | None = None) -> bool:
+        """Check canonical identity, with a bounded legacy platform/id lookup.
 
-                identity = canonicalize_source_url(source_url)
-                row = con.execute(
-                    "SELECT 1 FROM records WHERE source_url = ? LIMIT 1", (identity,)
-                ).fetchone()
+        New callers pass one canonical ``source_url``. Older browser-ingest
+        callers may still pass ``(platform, document_id)``; that compatibility
+        lookup inspects canonical source metadata and never changes storage
+        identity or creates a second database key.
+        """
+        if document_id is not None:
+            return any(
+                record.source.platform == source_url_or_platform
+                and record.source_native_ids.get("document_id") == document_id
+                for record in self.all()
+            )
+
+        from ..models import canonicalize_source_url
+
+        identity = canonicalize_source_url(source_url_or_platform)
+        with self._connect() as con:
+            row = con.execute(
+                "SELECT 1 FROM records WHERE source_url = ? LIMIT 1", (identity,)
+            ).fetchone()
         return row is not None
 
     def get(self, source_url: str) -> CanonicalRecord | None:

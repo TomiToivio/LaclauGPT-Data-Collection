@@ -34,6 +34,25 @@ Never create new top-level runtime roots such as `logs/`, `database/`, `csv/`, `
 
 When sibling modules run on one machine, Data Analysis may consume Collection output directly from this module's configured `data/` path. In distributed mode use configured MongoDB, Redis and S3-compatible storage such as CSC Allas. Manual CSV/JSONL transfer is the fallback.
 
+## Deployment architecture
+
+Execution environment and storage topology are independent configuration dimensions. Do not fork collectors for laptop, server, cron, systemd, agent, local-storage or distributed-storage operation.
+
+Supported dimensions include:
+
+- machine: `laptop`, `linux-server`, `custom`
+- execution: `cli`, `cron`, `systemd`, `agent`, `custom`
+- browser: `firefox-local`, `worker`, `none`, `custom`
+- storage: SQLite/filesystem/memory locally or MongoDB/S3/Redis when distributed
+
+`firefox-local` must bind only to localhost by default. Server schedules must use private `data/runs/` lock/state and `data/logs/` logging. Redis is coordination/settings/queue infrastructure, never the canonical record schema.
+
+## Agent operation
+
+Hermes and other agents must call the same deployment, collector, storage and canonical-record APIs used by the CLI. Do not create a second agent-specific collection stack.
+
+Agent-triggered runs must identify their caller in provenance/execution metadata, normally `hermes-agent`. Agent inspection must redact credentials and private source lists. Dry-run and environment-validation operations must remain offline where practical.
+
 ## Architecture
 
 Use `src/laclaugpt_data_collection/`. Keep imports acyclic, platform adapters separate from normalization/storage, and the canonical record envelope stable. Keep local filesystem + SQLite operation working without remote services. Keep browser-extension source under `browser/` with an explicit extraction/transport/storage boundary.
@@ -47,13 +66,5 @@ Use Python 3.11+, typed public APIs, `pathlib`, standard logging and lazy option
 Before merging run the public-tree check, Ruff, the configured mypy gate and pytest. Keep GitHub Actions green.
 
 ## Legacy migration
-
-## Interoperability
-
-Do not make another LaclauGPT module a mandatory dependency. Communicate through versioned schemas, JSONL/CSV exports, storage/service interfaces or explicit optional integrations.
-
-## Canonical record contract
-
-All collectors and storage adapters must use the canonical source contract: `source_url`/URI is the semantic identity when available; platform-native IDs are aliases; backend row/object IDs must not become downstream identities. Preserve schema version, provenance, timestamps, lists and media references across JSONL, CSV, SQLite and remote adapters.
 
 Historical repositories are reference implementations, not architecture templates. Classify schema archaeology as `ADOPT`, `ADAPT`, `ALREADY_IMPLEMENTED`, `LEGACY_COMPATIBILITY_ONLY`, `OBSOLETE`, or `PRIVATE_DO_NOT_COPY`, and document non-obvious decisions.

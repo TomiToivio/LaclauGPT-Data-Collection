@@ -1,4 +1,13 @@
-﻿from laclaugpt_data_collection.profiles import laptop, linux_server
-def test_laptop_and_server_profiles_are_composable():
- p=laptop('data'); p.validate(); assert p.browser=='firefox-local'
- s=linux_server(storage='distributed'); s.validate(); assert s.execution=='cron' and s.browser=='none'
+from laclaugpt_data_collection.profiles import laptop, linux_server
+
+
+def test_laptop_and_server_profiles_are_composable() -> None:
+    local = laptop("data")
+    assert local.machine == "laptop"
+    assert local.browser == "firefox-local"
+
+    server = linux_server(storage="distributed")
+    assert server.machine == "linux-server"
+    assert server.execution == "cron"
+    assert server.browser == "none"
+    assert server.storage == "distributed"

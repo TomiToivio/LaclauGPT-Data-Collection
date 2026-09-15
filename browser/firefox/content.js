@@ -1,12 +1,8 @@
 /**
- * LaclauGPT Collector — content script.
+ * LaclauGPT Collector content script.
  *
- * Responsibilities:
- *  1. scroll tour pages when requested by navigation.js;
- *  2. forward embedded public page-state JSON that never appears as XHR.
- *
- * Nothing is collected automatically from pages outside the configured
- * platform matchers, and no credentials or cookies are ever read.
+ * It supports page-tour scrolling and embedded public page-state extraction
+ * that never appears as XHR. Nothing here reads credentials or cookies.
  */
 
 (() => {
@@ -41,7 +37,6 @@
 
   function extractTikTok() {
     const payloads = [];
-
     const sigi = document.getElementById("SIGI_STATE");
     if (sigi?.textContent) {
       try {
@@ -65,13 +60,10 @@
         const detail = scope["webapp.video-detail"]?.itemInfo?.itemStruct;
         if (detail && !detail.liveRoomInfo) items.push(detail);
         if (items.length) {
-          // Shape this as a normal TikTok item-list payload so the canonical
-          // Python parser handles it through the same path as network data.
           payloads.push({ kind: "UNIVERSAL_DATA", body: { itemList: items } });
         }
       } catch {}
     }
-
     sendEmbedded("tiktok", payloads);
   }
 
@@ -99,16 +91,12 @@
   browser.runtime.onMessage.addListener((message) => {
     if (message?.action === "scroll") {
       window.scrollTo(0, document.body?.scrollHeight || document.documentElement.scrollHeight);
-      // Give lazy-loaded embedded state a chance to land after the scroll.
       setTimeout(scanEmbedded, 500);
       return Promise.resolve("scrolled");
     }
     return undefined;
   });
 
-  // document_idle means initial page state should already exist, but SPAs can
-  // replace it later. Scan once and again on URL changes without a heavy DOM
-  // observer.
   scanEmbedded();
   let lastUrl = location.href;
   setInterval(() => {

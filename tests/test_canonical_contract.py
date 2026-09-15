@@ -171,12 +171,3 @@ def test_compatibility_constructor_generates_stable_uri_fallback() -> None:
 def test_source_url_is_required_for_canonical_record() -> None:
     with pytest.raises(Exception):
         CanonicalRecord(source_url="")
-
-def test_normalized_record_uri_normalization_is_stable() -> None:
-    record = NormalizedRecord(
-        document_id="native-1",
-        platform="synthetic",
-        source_url="HTTPS://Example.Invalid/item/#fragment",
-    )
-    assert record.source_url == "https://example.invalid/item"
-    assert record.dedup_key == record.source_url

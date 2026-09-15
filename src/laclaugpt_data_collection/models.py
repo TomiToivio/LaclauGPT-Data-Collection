@@ -154,9 +154,7 @@ class NormalizedRecord(CanonicalRecord):
             media_references = list(data.pop("media_references", []) or [])
             raw_ref = str(data.pop("raw_ref", "") or "")
             collection_provenance = data.pop("collection_provenance", None)
-            provenance = []
-            if collection_provenance is not None:
-                provenance = [collection_provenance]
+            provenance = [collection_provenance] if collection_provenance is not None else []
             data.update(
                 source_url=source_url,
                 source_native_ids={"document_id": document_id} if document_id else {},
@@ -240,31 +238,6 @@ class NormalizedRecord(CanonicalRecord):
     @property
     def raw_ref(self) -> str:
         return self.source.raw_ref or ""
-
-    @raw_ref.setter
-    def raw_ref(self, value: str) -> None:
-        self.source.raw_ref = value or None
-
-    def legacy_flat_dict(self) -> dict[str, Any]:
-        """Provide the temporary flat envelope required by legacy local storage."""
-        payload = self.model_dump(mode="json")
-        payload.update(
-            document_id=self.document_id,
-            platform=self.platform,
-            author=self.author,
-            author_fullname=self.author_fullname,
-            timestamp=self.timestamp,
-            unix_timestamp=self.unix_timestamp,
-            text=self.text,
-            language=self.language,
-            parent_document_id=self.parent_document_id,
-            hashtags=self.hashtags,
-            mentions=self.mentions,
-            engagement=self.engagement,
-            media_references=[media.model_dump(mode="json") for media in self.media_references],
-            raw_ref=self.raw_ref,
-        )
-        return payload
 
     @property
     def collection_provenance(self) -> CollectionProvenance:
