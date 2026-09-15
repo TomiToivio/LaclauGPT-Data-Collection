@@ -99,14 +99,22 @@ class SQLiteRecordStore:
                 rows,
             )
 
-    def contains(self, source_url: str) -> bool:
-        from ..models import canonicalize_source_url
-
-        identity = canonicalize_source_url(source_url)
+    def contains(self, source_url: str, document_id: str | None = None) -> bool:
+        """Check canonical identity, with a legacy platform/document-id shim."""
         with self._connect() as con:
-            row = con.execute(
-                "SELECT 1 FROM records WHERE source_url = ? LIMIT 1", (identity,)
-            ).fetchone()
+            if document_id is not None:
+                row = con.execute(
+                    "SELECT 1 FROM records WHERE json_extract(payload_json, '$.source.platform') = ? "
+                    "AND json_extract(payload_json, '$.source_native_ids.document_id') = ? LIMIT 1",
+                    (source_url, document_id),
+                ).fetchone()
+            else:
+                from ..models import canonicalize_source_url
+
+                identity = canonicalize_source_url(source_url)
+                row = con.execute(
+                    "SELECT 1 FROM records WHERE source_url = ? LIMIT 1", (identity,)
+                ).fetchone()
         return row is not None
 
     def get(self, source_url: str) -> CanonicalRecord | None:

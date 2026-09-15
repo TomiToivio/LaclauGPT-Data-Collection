@@ -48,7 +48,6 @@ Before merging run the public-tree check, Ruff, the configured mypy gate and pyt
 
 ## Legacy migration
 
-<<<<<<< HEAD
 ## Interoperability
 
 Do not make another LaclauGPT module a mandatory dependency. Communicate through versioned schemas, JSONL/CSV exports, storage/service interfaces or explicit optional integrations.
@@ -56,6 +55,5 @@ Do not make another LaclauGPT module a mandatory dependency. Communicate through
 ## Canonical record contract
 
 All collectors and storage adapters must use the canonical source contract: `source_url`/URI is the semantic identity when available; platform-native IDs are aliases; backend row/object IDs must not become downstream identities. Preserve schema version, provenance, timestamps, lists and media references across JSONL, CSV, SQLite and remote adapters.
-=======
+
 Historical repositories are reference implementations, not architecture templates. Classify schema archaeology as `ADOPT`, `ADAPT`, `ALREADY_IMPLEMENTED`, `LEGACY_COMPATIBILITY_ONLY`, `OBSOLETE`, or `PRIVATE_DO_NOT_COPY`, and document non-obvious decisions.
->>>>>>> d32811c4af08a512bdf38f22ff0b072a6f479cf5

@@ -1,69 +1,3 @@
-<<<<<<< HEAD
-"""Backend-neutral data models shared across LaclauGPT modules."""
-from __future__ import annotations
-
-from datetime import datetime, timezone
-from typing import Any
-
-from pydantic import BaseModel, Field, field_validator
-
-from .canonical import normalize_source_uri
-
-
-class CollectionProvenance(BaseModel):
-    collector: str = "laclaugpt-data-collection"
-    collector_version: str = "0.1.0"
-    captured_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    capture_id: str = ""
-    run_id: str = ""
-    module: str = ""
-    module_version: str = ""
-    git_commit: str = ""
-    visited_url: str = ""
-    api_url: str = ""
-    transformations: list[str] = Field(default_factory=list)
-
-
-class MediaReference(BaseModel):
-    kind: str
-    url: str
-    media_index: int = 0
-    object_ref: str = ""
-    checksum: str = ""
-
-
-class NormalizedRecord(BaseModel):
-    schema_version: str = "1.0"
-    document_id: str
-    platform: str
-    author: str = ""
-    author_fullname: str = ""
-    timestamp: str = ""
-    unix_timestamp: int = 0
-    source_url: str = ""
-    text: str = ""
-    language: str = ""
-    parent_document_id: str | None = None
-    hashtags: list[str] = Field(default_factory=list)
-    mentions: list[str] = Field(default_factory=list)
-    engagement: dict[str, Any] = Field(default_factory=dict)
-    media_references: list[MediaReference] = Field(default_factory=list)
-    raw_ref: str = ""
-    collection_provenance: CollectionProvenance = Field(default_factory=CollectionProvenance)
-
-    @field_validator("source_url")
-    @classmethod
-    def canonical_source_url(cls, value: str) -> str:
-        return normalize_source_uri(value) if value else value
-
-    @property
-    def canonical_identity(self) -> str:
-        return self.source_url or f"urn:laclaugpt:{self.platform}:{self.document_id}"
-
-    @property
-    def dedup_key(self) -> tuple[str, str]:
-        return self.platform, self.canonical_identity
-=======
 """Canonical, storage-neutral data models for LaclauGPT Collection.
 
 Collection owns source identity, source metadata, source content references and
@@ -307,7 +241,31 @@ class NormalizedRecord(CanonicalRecord):
     def raw_ref(self) -> str:
         return self.source.raw_ref or ""
 
+    @raw_ref.setter
+    def raw_ref(self, value: str) -> None:
+        self.source.raw_ref = value or None
+
+    def legacy_flat_dict(self) -> dict[str, Any]:
+        """Provide the temporary flat envelope required by legacy local storage."""
+        payload = self.model_dump(mode="json")
+        payload.update(
+            document_id=self.document_id,
+            platform=self.platform,
+            author=self.author,
+            author_fullname=self.author_fullname,
+            timestamp=self.timestamp,
+            unix_timestamp=self.unix_timestamp,
+            text=self.text,
+            language=self.language,
+            parent_document_id=self.parent_document_id,
+            hashtags=self.hashtags,
+            mentions=self.mentions,
+            engagement=self.engagement,
+            media_references=[media.model_dump(mode="json") for media in self.media_references],
+            raw_ref=self.raw_ref,
+        )
+        return payload
+
     @property
     def collection_provenance(self) -> CollectionProvenance:
         return self.provenance[0] if self.provenance else CollectionProvenance()
->>>>>>> d32811c4af08a512bdf38f22ff0b072a6f479cf5
