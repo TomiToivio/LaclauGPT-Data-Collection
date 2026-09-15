@@ -1,0 +1,31 @@
+{
+  "manifest_version": 2,
+  "name": "LaclauGPT Data Collection",
+  "version": "0.1.0",
+  "description": "Browser-assisted capture for public research sources. Sends captures only to a user-configured local endpoint by default.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "http://127.0.0.1/*",
+    "http://localhost/*"
+  ],
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "browser_action": {
+    "default_title": "Capture current page"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "laclaugpt-data-collection@laclaugpt.org",
+      "strict_min_version": "115.0"
+    }
+  }
+}
