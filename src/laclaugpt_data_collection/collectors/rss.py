@@ -50,6 +50,7 @@ def _entry_to_record(feed_url: str, entry: Any) -> NormalizedRecord | None:
     if not (link or title or summary):
         return None
     author = str(getattr(entry, "author", "") or "")
+    raw_entry = dict(entry) if hasattr(entry, "items") else {"value": str(entry)}
     return NormalizedRecord(
         document_id=document_id,
         platform="rss",
@@ -57,6 +58,8 @@ def _entry_to_record(feed_url: str, entry: Any) -> NormalizedRecord | None:
         timestamp=published,
         source_url=link,
         text="\n\n".join(part for part in (title, summary) if part),
+        raw_payload=raw_entry,
+        raw_content_type="application/feed+json",
         collection_provenance=CollectionProvenance(
             module="rss-feedparser",
             visited_url=feed_url,
