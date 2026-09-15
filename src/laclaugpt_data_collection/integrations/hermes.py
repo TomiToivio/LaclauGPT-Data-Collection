@@ -10,6 +10,7 @@ from typing import Any
 
 from ..config import Settings
 from ..deployment import validate_profile
+from ..models import CanonicalRecord, CollectionProvenance
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,22 @@ def plan_collection_run(settings: Settings, *, dry_run: bool = True, caller: str
         profile=agent_settings.safe_summary(),
         problems=tuple(validate_profile(agent_settings)),
     )
+
+
+def stamp_agent_provenance(
+    record: CanonicalRecord,
+    *,
+    caller: str = "hermes-agent",
+    run_id: str = "",
+) -> CanonicalRecord:
+    """Append collection provenance identifying an agent-triggered canonical run."""
+    record.provenance.append(
+        CollectionProvenance(
+            run_id=run_id,
+            metadata={"caller": caller, "execution": "agent"},
+        )
+    )
+    return record
 
 
 def browser_capture_readiness(settings: Settings) -> dict[str, Any]:
