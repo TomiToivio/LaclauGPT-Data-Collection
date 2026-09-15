@@ -2,9 +2,45 @@
 
 [![CI](https://github.com/TomiToivio/LaclauGPT-Data-Collection/actions/workflows/ci.yml/badge.svg)](https://github.com/TomiToivio/LaclauGPT-Data-Collection/actions/workflows/ci.yml)
 
-Public, reusable data-collection module for the LaclauGPT ecosystem.
+**LaclauGPT** is an open social-science research framework for **LLM-assisted computational discourse analysis** of large textual and multimodal corpora. It combines computational methods with interpretive political research while keeping model outputs traceable to source evidence, uncertainty, provenance and human review.
 
-This repository contains **collection, capture, normalization, provenance, scheduling and storage-adapter code only**. Analysis, simulation, dashboards, research datasets, operational target lists, credentials and machine-specific secrets belong elsewhere.
+The current flagship research programme is **[LaclauGPT: Ideological contestation over AI](https://github.com/TomiToivio/LaclauGPT/blob/main/paper/PAPER.md)**. The canonical theoretical and methodological contract is **[THEORY.md](https://github.com/TomiToivio/LaclauGPT/blob/main/THEORY.md)**.
+
+The framework is developed around Ernesto Laclau and Chantal Mouffe's discourse theory and Emilia Palonen's work on populism, polarisation and hegemonic dynamics. The AI/AGI study is the main development case, but LaclauGPT is a **general research framework rather than a single-purpose AI classifier**. The same architecture can support election research, populism, grievance politics, social-media research and other comparative discourse-analysis projects.
+
+> [!WARNING]
+> **Human-in-the-loop academic research only.** LaclauGPT's machine-generated summaries, classifications, discourse-theoretical codes, signifier roles, ideological formations, affects and other interpretations are preliminary analyses that must be verified by a human researcher. They are not ground truth or autonomous scholarly judgement. LaclauGPT is designed for academic research, not autonomous operational, administrative, intelligence, moderation, profiling or policy decisions about people or groups.
+
+## Research philosophy: human-in-the-loop as an assemblage
+
+LaclauGPT uses a deliberately assemblage-based working philosophy of AI:
+
+> **AI = HUMAN + LLM + LANGUAGE + INTERNET**
+
+This is a methodological and philosophical framing, not a settled empirical claim about machine consciousness.
+
+- **HUMAN — interpretation and accountable agency.** Researchers choose questions, define concepts and codebooks, evaluate evidence, resolve ambiguity and remain responsible for conclusions.
+- **LLM — learned model plus agentic machinery.** Models may contribute structured proposals, retrieval, comparison and tool use, but their outputs remain fallible and provisional.
+- **LANGUAGE — communication protocol and cognitive medium.** Language couples the researcher, model, sources and theoretical concepts, and helps structure the distinctions and relations available to analysis.
+- **INTERNET — infrastructure and epistemic environment.** Networks, software, model repositories, databases, APIs and research corpora form part of the practical research system. Retrieved information remains evidence to evaluate.
+
+Human-in-the-loop therefore means more than a final approval step. The human researcher is constitutive of the research process throughout.
+
+## Theoretical and methodological orientation
+
+LaclauGPT treats political meaning as relational, contested and only partially fixed. The system is designed to investigate articulations among actors, demands, identities, signifiers and political frontiers rather than reducing discourse to keywords, topics or sentiment.
+
+Its theoretical concepts include nodal points, floating and empty signifiers, equivalence and difference, collective subjects, antagonistic frontiers, affective investment, ideological formations, myths, imaginaries and hegemonic dynamics. These are evidence-supported analytical roles, not automatic labels.
+
+Important cautions include: **frequency is not hegemony; semantic similarity is not equivalence; negative sentiment is not antagonism; polysemy is not empty signification; and document-level evidence does not automatically establish corpus-level formations.** Abstention is a valid output when evidence is insufficient.
+
+See the **[scientific paper](https://github.com/TomiToivio/LaclauGPT/blob/main/paper/PAPER.md)** and **[theory contract](https://github.com/TomiToivio/LaclauGPT/blob/main/THEORY.md)** for the full conceptual framework.
+
+## This repository
+
+**LaclauGPT Data Collection** is the public, reusable data-acquisition layer of the LaclauGPT ecosystem. This repository contains **collection, capture, normalization, provenance, scheduling and storage-adapter code only**. It prepares auditable source material for later analysis without performing discourse-theoretical interpretation itself.
+
+Analysis, simulation, dashboards, research datasets, operational target lists, credentials and machine-specific secrets belong elsewhere.
 
 ## Design goals
 
