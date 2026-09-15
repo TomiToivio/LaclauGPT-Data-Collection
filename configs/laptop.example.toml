@@ -1,0 +1,20 @@
+profile = "laptop"
+
+[storage]
+records = "sqlite"
+objects = "filesystem"
+cache = "memory"
+
+[paths]
+data_root = "./data"
+sqlite_path = "./data/state.sqlite3"
+
+[collector]
+mode = "local"
+workers = 1
+download_media = false
+
+[interoperability]
+schema_version = "1.0"
+emit_jsonl = true
+emit_csv = true
