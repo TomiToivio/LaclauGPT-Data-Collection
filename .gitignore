@@ -16,6 +16,7 @@ venv/
 .env
 .env.*
 !.env.example
+.envrc
 *.pem
 *.key
 *.p12
@@ -29,13 +30,20 @@ credentials*
 secrets*
 private*
 *.private.*
+*.secrets.*
+*.local.toml
+*.local.yaml
+*.local.yml
 config/private/
 configs/private/
+config/local/
+configs/local/
 **/study.private.*
 **/*credentials*
 **/*secret*
+.streamlit/secrets.toml
 
-# Browser/session state
+# Browser/session/network capture state
 cookies*.json
 cookies*.txt
 storage_state*.json
@@ -43,6 +51,9 @@ browser-profile/
 profiles/
 playwright/.auth/
 **/session*/
+*.har
+*.pcap
+*.pcapng
 
 # Research data and generated collection output
 data/
@@ -60,6 +71,7 @@ state/
 *.sqlite
 *.sqlite3
 *.db
+*.duckdb
 *.ndjson
 *.jsonl
 *.parquet
@@ -89,8 +101,12 @@ state/
 .aws/
 openrc*
 clouds.yaml
+clouds.yml
 kubeconfig*
 .ssh/
+id_rsa*
+id_ed25519*
+terraform.tfvars
 *.tfstate
 *.tfstate.*
 
@@ -101,8 +117,8 @@ kubeconfig*
 Thumbs.db
 
 # Local scratch
-tmp/
-temp/
+/tmp/
+/temp/
 .cache/
 logs/
 *.log

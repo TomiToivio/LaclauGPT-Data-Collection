@@ -1,5 +1,7 @@
 # LaclauGPT Data Collection
 
+[![CI](https://github.com/TomiToivio/LaclauGPT-Data-Collection/actions/workflows/ci.yml/badge.svg)](https://github.com/TomiToivio/LaclauGPT-Data-Collection/actions/workflows/ci.yml)
+
 Public, reusable data-collection module for the LaclauGPT ecosystem.
 
 This repository contains **collection, capture, normalization, provenance and storage-adapter code only**. Analysis, simulation, dashboards, research datasets, operational target lists, credentials and machine-specific secrets belong elsewhere.
@@ -62,7 +64,7 @@ Server/distributed example:
 laclaugpt-collect doctor --profile configs/server.example.toml
 ```
 
-The application never requires a checked-in private config file.
+The application never requires a checked-in private config file. Real target lists, credentials, machine paths and deployment settings belong in environment variables, ignored local files, private operational repositories or secret-management systems.
 
 ## Storage modes
 
@@ -109,19 +111,38 @@ Downstream modules should consume this envelope rather than collector-internal c
 
 ## Privacy and public-repo rules
 
-Read `docs/PRIVACY.md` before adding any source, configuration or fixture. In short:
+Read `docs/PRIVACY.md` before adding any source, configuration or fixture. The repository is intended to remain public-safe at every commit, not merely after cleanup.
 
-1. Never commit `.env`, cookies, browser profiles, tokens, passwords, API keys, private URLs, CSC credentials, SSH material or real deployment configs.
-2. Never commit collected research data or real participant/account target lists.
-3. Tests use synthetic fixtures only.
-4. Public examples use placeholders such as `example.invalid`, `localhost`, `bucket-name` and fake handles.
-5. If a secret or restricted dataset is ever committed, treat it as compromised: rotate/revoke it and rewrite Git history before publication.
+1. Never commit `.env`, cookies, browser profiles, HAR/PCAP captures, tokens, passwords, API keys, private URLs, CSC/OpenStack credentials, SSH material, infrastructure state or real deployment configs.
+2. Never commit collected research data, downloaded media, raw API responses, researcher exports or real participant/account/channel target lists.
+3. Real machine/server configuration belongs outside Git. Checked-in configuration must be an explicitly named example/schema containing placeholders only.
+4. Tests and fixtures must be synthetic and must not be lightly edited copies of real research material.
+5. CI runs a public-tree scanner that rejects common private/data artifacts, literal secrets and credential-bearing URLs.
+6. If a secret or restricted dataset is ever committed, treat it as compromised: rotate/revoke it and rewrite Git history. A later deletion commit is not sufficient.
+
+Run the required publication checks locally with:
+
+```bash
+python scripts/check_public_tree.py
+ruff check .
+mypy src/laclaugpt_data_collection/config.py \
+  src/laclaugpt_data_collection/models.py \
+  src/laclaugpt_data_collection/normalize.py \
+  src/laclaugpt_data_collection/storage/base.py \
+  src/laclaugpt_data_collection/storage/local.py
+pytest
+```
+
+The mypy gate covers the stable interoperability/configuration/storage core. The imported platform parsers still have legacy typing debt and are covered by linting and functional tests instead of being hidden behind broad type ignores.
+
+`ruff format .` is recommended whenever touching Python files. Some imported legacy modules are being normalized incrementally, so formatting is not yet a repository-wide CI gate.
 
 ## Development
 
 ```bash
+python -m pip install -e '.[dev]'
+python scripts/check_public_tree.py
 ruff check .
-ruff format --check .
 pytest
 ```
 

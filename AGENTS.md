@@ -20,11 +20,11 @@ Do **not** add discourse analysis, LLM analysis, dashboards, simulations, resear
 
 Never commit secrets, real credentials, cookies, browser profiles, private endpoints, study/account target lists, raw research data, media, exports or real operational config.
 
-Use environment variables for secrets. Checked-in config must be schema/example/synthetic only. Never add a real `.env` file.
+Use environment variables for secrets. Checked-in config must be schema/example/synthetic only. Never add a real `.env` file. Real machine/server profiles, target lists and deployment credentials belong in ignored local files, private operations repositories or secret-management systems.
 
 Before committing copied code from a private repository, manually review every line and remove paths, identifiers, hostnames, account names, credentials and data samples. Prefer reimplementing a generic interface over copying private operational files.
 
-If restricted material enters Git history, stop publication work, rotate credentials if applicable, and rewrite history. A later deletion commit is not sufficient.
+If restricted material enters Git history, stop publication work, rotate credentials if applicable, and rewrite history. A later deletion commit is not sufficient. Also inspect pull-request refs and cached commit views before considering the repository clean.
 
 ## Architecture
 
@@ -46,7 +46,9 @@ Distributed integrations are optional extras. Prefer MongoDB for records, Redis 
 - No hard-coded machine paths or credentials.
 - Small modules with single responsibilities.
 - Synthetic tests for parsers and storage adapters.
-- `ruff check .`, `ruff format --check .`, and `pytest` must pass before merge.
+- `python scripts/check_public_tree.py`, `ruff check .`, the stable-core mypy check in CI, and `pytest` must pass before merge.
+- Do not silence legacy parser typing debt with broad `# type: ignore` directives. Improve those modules incrementally.
+- Use `ruff format .` when editing Python code; formatting modernization may be applied incrementally to legacy imported modules.
 
 ## Interoperability
 
