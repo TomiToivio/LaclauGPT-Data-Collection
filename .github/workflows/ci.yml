@@ -17,6 +17,13 @@ jobs:
           python-version: "3.11"
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e '.[dev]'
-      - run: python scripts/check_public_tree.py
-      - run: ruff check .
-      - run: pytest
+      - name: Public repository policy
+        run: python scripts/check_public_tree.py
+      - name: Ruff lint
+        run: ruff check .
+      - name: Ruff format
+        run: ruff format --check .
+      - name: Type check
+        run: mypy src/laclaugpt_data_collection
+      - name: Tests
+        run: pytest
