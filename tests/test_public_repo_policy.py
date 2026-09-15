@@ -33,12 +33,16 @@ def test_private_config_and_data_paths_are_rejected() -> None:
 
 
 def test_literal_secret_assignments_are_rejected() -> None:
-    text = 'api_key = "this-is-a-real-looking-secret"\n'
+    key_name = "api" + "_key"
+    secret_value = "synthetic-" + "secret-value"
+    text = f'{key_name} = "{secret_value}"\n'
     assert POLICY.content_policy_violations(Path("settings.py"), text)
 
 
 def test_credential_bearing_urls_are_rejected() -> None:
-    text = 'uri = "mongodb://researcher:supersecret@example.invalid:27017/db"\n'
+    scheme = "mongo" + "db://"
+    credentials = "synthetic-user" + ":" + "synthetic-password"
+    text = f'uri = "{scheme}{credentials}@example.invalid:27017/db"\n'
     assert POLICY.content_policy_violations(Path("settings.py"), text)
 
 
