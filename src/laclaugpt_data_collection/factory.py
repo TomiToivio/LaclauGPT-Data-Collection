@@ -17,6 +17,7 @@ def build_record_store(settings: Settings) -> RecordStore:
             settings.mongodb_uri,
             settings.mongodb_database,
             collection=collection,
+            project_id=settings.project_id,
         )
     raise ValueError(f"Unsupported record backend: {settings.record_backend}")
 
