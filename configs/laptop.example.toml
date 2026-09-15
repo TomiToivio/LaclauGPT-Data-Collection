@@ -7,7 +7,7 @@ cache = "memory"
 
 [paths]
 data_root = "./data"
-sqlite_path = "./data/state.sqlite3"
+sqlite_path = "./data/database/collection.sqlite3"
 
 [collector]
 mode = "local"
