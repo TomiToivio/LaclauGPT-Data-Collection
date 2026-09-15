@@ -120,15 +120,16 @@ Read `docs/PRIVACY.md` before adding any source, configuration or fixture. The r
 5. CI runs a public-tree scanner that rejects common private/data artifacts, literal secrets and credential-bearing URLs.
 6. If a secret or restricted dataset is ever committed, treat it as compromised: rotate/revoke it and rewrite Git history. A later deletion commit is not sufficient.
 
-Run the publication checks locally with:
+Run the required publication checks locally with:
 
 ```bash
 python scripts/check_public_tree.py
 ruff check .
-ruff format --check .
 mypy src/laclaugpt_data_collection
 pytest
 ```
+
+`ruff format .` is recommended whenever touching Python files. Some imported legacy modules are being normalized incrementally, so formatting is not yet a repository-wide CI gate.
 
 ## Development
 
@@ -136,7 +137,6 @@ pytest
 python -m pip install -e '.[dev]'
 python scripts/check_public_tree.py
 ruff check .
-ruff format --check .
 mypy src/laclaugpt_data_collection
 pytest
 ```
