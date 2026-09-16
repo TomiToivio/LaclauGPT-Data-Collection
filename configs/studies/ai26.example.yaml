@@ -1,114 +1,189 @@
-# Public-safe AI26 reference study.
-# This is publication-facing methodology, not the private operational watch list.
-# Copy/extend it under ignored runtime configuration for actual collection.
-# Never commit credentials, cookies, browser profiles, private backend URLs,
-# unpublished watch lists, row-level collected data, or machine-specific secrets.
+# Public AI26 reference study.
+# This file intentionally exposes publication-facing methodology and a bounded
+# public target strategy. It is not a credentials/runtime-secrets file.
+# Never commit cookies, browser profiles, private backend URLs, row-level data,
+# machine-specific secrets, or unpublished researcher annotations.
 
 study: ai26
 title: Ideological contestation over AI
 timezone: UTC
 reference_case: true
 paper: https://github.com/TomiToivio/LaclauGPT/blob/main/paper/PAPER.md
+collection_agent_prompt: ../../docs/agents/AI26_COLLECTION_TARGETS_AGENT.md
 
+# AI26 is currently a near-real-time study. Source publication time, rather
+# than collection time, controls eligibility for downstream analysis.
 window:
-  start: 2026-01-01
+  start: 2026-09-01
   end: 2026-12-31
+  timestamp_basis: source_publication_time
+  missing_publication_time: retain_but_mark_unresolved
 
 relevance:
   # Preserve uncertain material for later human/theory-guided assessment.
   mode: retain_unjudged
 
-# Arenas mirror the public paper and the private study configuration. They are
-# sampling provenance, not automatic ideological labels for captured records.
+# Arenas mirror the paper but are dimensions of one AI26 dataset/run, not
+# separate databases or dashboards.
 arenas:
   elites:
     title: AI elites
-    platforms: [web, rss, podcast, x]
+    platforms: [web, rss, youtube, x, bluesky, mastodon, scholarly]
     languages: [en]
-    regions: [US, EU]
+    regions: [GLOBAL, US, EU, FI]
     description: >-
       Entrepreneurs, researchers, intellectuals, major AI labs and adjacent
-      ideological movements. Collect public blogs, statements, interviews,
-      podcasts, forums and social-media material where permitted.
+      ideological movements. Prefer substantive public blogs, statements,
+      interviews, transcripts, papers and bounded social-media samples.
     public_source_examples:
       - https://openai.com/
       - https://www.anthropic.com/
       - https://deepmind.google/
       - https://ai.meta.com/
+      - https://www.nvidia.com/
       - https://www.miri.org/
       - https://www.dair-institute.org/
+      - https://www.ainowinstitute.org/
+      - https://www.lesswrong.com/
+      - https://www.alignmentforum.org/
 
   grassroots:
     title: Grassroots mobilisation around and against AI
-    platforms: [web, rss, tiktok, x, instagram]
+    platforms: [web, rss, youtube, x, bluesky, mastodon, tiktok, instagram]
     languages: [en, fi]
-    regions: [FI, EU, US]
+    regions: [GLOBAL, FI, EU, US]
     description: >-
       Public mobilisation and conflict around employment, creative work,
       surveillance, data extraction, data centres, environment, regulation,
-      AI safety, local resistance and broader support/opposition to AI.
+      AI safety, creator rights, labour, local resistance and broader
+      support/opposition to AI.
     public_source_examples:
       - https://pauseai.info/
+      - https://www.eff.org/
+      - https://www.sagaftra.org/
+      - https://aflcio.org/
+      - https://www.uniglobalunion.org/
+      - https://www.sak.fi/
+      - https://www.sttk.fi/
+      - https://akava.fi/
 
   parliamentary:
     title: Parliamentary and electoral politics
-    platforms: [web, rss, tiktok, x]
+    platforms: [web, rss, youtube, x, bluesky, mastodon]
     languages: [en, fi]
-    regions: [FI, EU, US]
+    regions: [FI, EU, US, GLOBAL]
     description: >-
       AI-related parliamentary debates, policy documents, election material,
-      party/government discourse and news. The EU AI Act is one governance
-      anchor, not the sole frame for the arena.
+      party/government discourse and institutional AI governance. Prefer
+      institutional/keyword collection over selective partisan watch lists.
     public_source_examples:
       - https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai
       - https://www.europarl.europa.eu/
+      - https://www.eduskunta.fi/
+      - https://valtioneuvosto.fi/
+      - https://www.oecd.ai/
 
 # Collection hints support discovery only. They are not analysis results and
-# must never be written into records as inferred formations or discourse roles.
+# must never be written into records as inferred formations/discourse roles.
 discovery_hints:
   signifiers:
     - artificial intelligence
+    - AI
     - AGI
+    - frontier AI
+    - superintelligence
     - AI safety
     - AI regulation
     - safety
     - pacing
+    - slowdown
+    - pause
     - competition
+    - AI race
     - innovation
     - China
+    - sovereignty
+    - national security
     - control
+    - loss of control
+    - recursive self-improvement
+    - autonomous agents
+    - agent swarms
     - liability
+    - accountability
     - independent evaluation
+    - third-party evaluation
+    - audits
+    - red lines
+    - incident reporting
     - standards
+    - antitrust
+    - safety coordination
     - existential risk
+    - catastrophic risk
     - abundance
     - stagnation
     - deceleration
     - labour
     - job displacement
+    - job replacement
     - automation
     - ownership
+    - corporate concentration
     - public interest AI
+    - democratic AI
     - open source
+    - open weights
     - surveillance
+    - military use
+    - automated decision-making
     - data extraction
     - copyright
+    - creator rights
     - creative work
     - data centres
     - energy
     - environment
     - democracy
-    - pause
 
+  # Public entities aid source discovery/entity resolution only. Never infer a
+  # formation from presence in this list.
   public_actor_examples:
     - OpenAI
+    - Sam Altman
     - Anthropic
+    - Dario Amodei
     - Google DeepMind
+    - Demis Hassabis
     - Meta AI
+    - Mark Zuckerberg
+    - Yann LeCun
+    - NVIDIA
+    - Jensen Huang
+    - xAI
+    - Elon Musk
+    - Andreessen Horowitz
+    - Marc Andreessen
     - Machine Intelligence Research Institute
+    - Eliezer Yudkowsky
+    - Center for AI Safety
+    - Future of Life Institute
+    - Stuart Russell
+    - Yoshua Bengio
     - Distributed AI Research Institute
+    - Timnit Gebru
+    - Emily M. Bender
+    - Émile P. Torres
+    - Gary Marcus
+    - AI Now Institute
     - PauseAI
     - European Commission AI Office
+    - European Parliament
+    - Parliament of Finland
+    - Finnish Government
+    - Finnish Center for Artificial Intelligence
+    - Silo AI
+    - AI Finland
 
 # These are reproducibility anchors for downstream Analysis, never labels that
 # Collection assigns to people, organizations or posts.
@@ -125,18 +200,86 @@ collection_policy:
   preserve_source_url: true
   preserve_native_ids: true
   download_public_media_only_when_permitted: true
+  publication_date_floor: 2026-09-01
+  source_publication_time_required_for_analysis: true
   attach_project_metadata:
     project: ai26
+    collection_id: ai26
     arena_from_collection_job: true
+  unified_arenas: true
   infer_ideology_during_collection: false
+  fetch_external_links_as_web_sources: true
+  web_source_type: WEB
+  link_fetch_failure_blocks_parent: false
+  attachments:
+    near_real_time: true
+    include: [image, video, audio, pdf, public_document]
+    youtube_transcript_only_by_default: true
 
-# Tiny executable browser-account fixtures are deliberately synthetic. They
-# keep public config parsing and browser workflow tests runnable without turning
-# the repository into the real operational watch list.
+# Runtime budgets are guardrails for a laptop/small server, not scientific
+# quotas. Agents may lower them when backlog/CPU/storage pressure grows.
+source_budgets:
+  rss_web:
+    target_endpoints: 100
+    daily_relevant_items_soft_cap: 400
+    downstream_priority: 1
+  scholarly:
+    daily_candidate_cap: 50
+    daily_full_analysis_target: 20
+    downstream_priority: 1
+  youtube:
+    target_channels: 20
+    daily_transcript_cap: 10
+    download_media: false
+    downstream_priority: 1
+  bluesky:
+    target_accounts: 20
+    daily_record_cap: 150
+    downstream_priority: 2
+  mastodon:
+    target_accounts: 15
+    daily_record_cap: 100
+    downstream_priority: 2
+  x:
+    target_accounts: 35
+    daily_record_cap: 300
+    per_target_per_poll_cap: 5
+    downstream_priority: 3
+
+analysis_handoff:
+  ordering:
+    - source_priority_ascending
+    - source_publication_time_descending
+    - canonical_source_id_ascending
+  x_last: true
+  newly_downloaded_assets_immediately_ready: true
+
+scholarly_discovery:
+  services: [arxiv, openalex, semantic_scholar, acl_anthology, socarxiv, osf, ssrn]
+  arxiv_categories: [cs.AI, cs.LG, cs.CL, cs.CY, cs.HC, stat.ML]
+  public_pdf_download_when_permitted: true
+
+# Platform entries are examples of enabled source families. Real account/feed
+# handles are curated by the AI26 agent prompt and may live in ignored runtime
+# configuration when operations need to diverge from publication examples.
 platforms:
   x:
     enabled: true
     base_urls: ["https://x.com/{handle}"]
+  bluesky:
+    enabled: true
+    base_urls: ["https://bsky.app/profile/{handle}"]
+  mastodon:
+    enabled: true
+  youtube:
+    enabled: true
+    transcripts_only: true
+  rss:
+    enabled: true
+  web:
+    enabled: true
+  scholarly:
+    enabled: true
   tiktok:
     enabled: true
     base_urls: ["https://www.tiktok.com/@{handle}"]
@@ -144,6 +287,8 @@ platforms:
     enabled: true
     base_urls: ["https://www.instagram.com/{handle}/"]
 
+# Tiny executable fixtures remain synthetic so public tests do not become the
+# operational watch list.
 groups:
   - id: example_ai_labs
     name: Example AI labs fixture
