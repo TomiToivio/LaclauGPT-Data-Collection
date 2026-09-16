@@ -59,12 +59,18 @@ class Settings(BaseSettings):
     object_backend: Literal["filesystem", "s3"] = "filesystem"
     cache_backend: Literal["memory", "redis"] = "memory"
 
+    # Direct/no-Redis is intentionally the simplest default. Messaging and task
+    # dispatch can be selected independently, matching the umbrella contract.
+    messaging_backend: Literal["none", "redis"] = "none"
+    task_queue_backend: Literal["direct", "redis"] = "direct"
+
     browser_host: str = "127.0.0.1"
     browser_port: int = 8765
 
     mongodb_uri: str = "mongodb://localhost:27017"
     mongodb_database: str = "laclaugpt"
-    redis_url: str = "redis://localhost:6379/0"
+    # Redis values are private runtime configuration. Empty means not configured.
+    redis_url: str = ""
     redis_key_prefix: str = "laclaugpt"
 
     s3_endpoint_url: str = ""
@@ -124,6 +130,8 @@ class Settings(BaseSettings):
             "record_backend": self.record_backend,
             "object_backend": self.object_backend,
             "cache_backend": self.cache_backend,
+            "messaging_backend": self.messaging_backend,
+            "task_queue_backend": self.task_queue_backend,
             "data_root": str(self.data_root),
             "sqlite_path": str(self.sqlite_path),
             "redis_namespace": namespace.redis_base,
