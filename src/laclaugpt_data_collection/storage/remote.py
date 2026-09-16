@@ -8,6 +8,19 @@ from ..distributed import ProjectNamespace
 from ..models import CanonicalRecord, canonicalize_source_url
 
 
+def _routing_metadata(record: CanonicalRecord, project_id: str) -> tuple[str, str]:
+    """Read collection/arena routing metadata without making it analysis truth."""
+    collection_id = ""
+    arena = ""
+    if record.provenance:
+        metadata = record.provenance[-1].metadata
+        collection_id = str(metadata.get("collection_id") or "")
+        arena = str(metadata.get("arena") or "")
+    collection_id = collection_id or str(record.source.raw_metadata.get("collection_id") or "")
+    arena = arena or str(record.source.raw_metadata.get("arena") or "")
+    return collection_id or project_id, arena
+
+
 class MongoRecordStore:
     def __init__(
         self,
@@ -23,17 +36,41 @@ class MongoRecordStore:
         self.project_id = project_id
         self._client = MongoClient(uri)
         self._collection = self._client[database][collection]
-        self._collection.create_index([("source_url", 1)], unique=True, name="source_url_unique")
+        # Old pilot builds used source_url alone as a unique key. That prevents a
+        # shared runtime from preserving the same public source in two studies.
+        try:
+            if "source_url_unique" in self._collection.index_information():
+                self._collection.drop_index("source_url_unique")
+        except (AttributeError, TypeError):  # pragma: no cover - simple fakes/mocks
+            pass
+        self._collection.create_index(
+            [("project_id", 1), ("collection_id", 1), ("source_url", 1)],
+            unique=True,
+            name="routing_source_unique",
+        )
         self._collection.create_index([("project_id", 1)], name="project_id")
+        self._collection.create_index([("collection_id", 1)], name="collection_id")
+        self._collection.create_index([("arena", 1)], name="arena")
 
     def _payload(self, record: CanonicalRecord) -> dict[str, Any]:
         payload = record.model_dump(mode="json")
+        collection_id, arena = _routing_metadata(record, self.project_id)
         payload["project_id"] = self.project_id
+        payload["collection_id"] = collection_id
+        payload["arena"] = arena
         return payload
+
+    def _query(self, record: CanonicalRecord) -> dict[str, str]:
+        collection_id, _ = _routing_metadata(record, self.project_id)
+        return {
+            "source_url": record.source_url,
+            "project_id": self.project_id,
+            "collection_id": collection_id,
+        }
 
     def upsert(self, record: CanonicalRecord) -> None:
         self._collection.replace_one(
-            {"source_url": record.source_url, "project_id": self.project_id},
+            self._query(record),
             self._payload(record),
             upsert=True,
         )
@@ -45,7 +82,7 @@ class MongoRecordStore:
             raise RuntimeError("Install laclaugpt-data-collection[distributed] for MongoDB") from exc
         operations = [
             ReplaceOne(
-                {"source_url": record.source_url, "project_id": self.project_id},
+                self._query(record),
                 self._payload(record),
                 upsert=True,
             )
@@ -54,16 +91,22 @@ class MongoRecordStore:
         if operations:
             self._collection.bulk_write(operations, ordered=False)
 
-    def contains(self, source_url: str) -> bool:
+    def contains(self, source_url: str, *, collection_id: str | None = None) -> bool:
         identity = canonicalize_source_url(source_url)
-        query = {"source_url": identity, "project_id": self.project_id}
+        query: dict[str, Any] = {"source_url": identity, "project_id": self.project_id}
+        if collection_id:
+            query["collection_id"] = collection_id
         return self._collection.find_one(query, {"_id": 1}) is not None
 
     @staticmethod
     def from_document(document: dict[str, Any]) -> CanonicalRecord:
         """Reconstruct canonical semantics without backend routing metadata."""
         return CanonicalRecord.model_validate(
-            {key: value for key, value in document.items() if key not in {"_id", "project_id"}}
+            {
+                key: value
+                for key, value in document.items()
+                if key not in {"_id", "project_id", "collection_id", "arena"}
+            }
         )
 
 
