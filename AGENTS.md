@@ -63,11 +63,39 @@ Hermes and other agents must call the same deployment, collector, storage and ca
 
 Agent-triggered runs must identify their caller in provenance/execution metadata, normally `hermes-agent`. Agent inspection must redact credentials and private source lists. Dry-run and environment-validation operations must remain offline where practical.
 
+## Agent roles
+
+Agent-assisted work in this repository falls into three roles. The same canonical API, record contract and privacy boundary apply to all of them; only the output differs.
+
+- **Data collection agent.** Runs the canonical collectors against public sources and submits canonical records. Recognises relevance, filters obvious non-relevance, preserves ambiguous material for later human assessment, records source identity and collection provenance, and leaves interpretation to Analysis.
+- **Digital ethnographer.** Independently searches for relevant public material, observes how communities and discourse change over time, and writes separate research notes. Notes are researcher interpretation, not participant speech, and must be stored as a distinct source type rather than merged into collected records.
+- **Research assistant.** Answers questions about the project, the collected data and the methodology; inspects and summarises collection state; runs bounded read-only queries and scripts; and reports trends, gaps or blockers.
+
+A collection agent may also file a research note when it makes a substantive observation. Keep the roles distinguishable: do not let one role silently perform another's interpretation.
+
+Research notes and agent commentary are interpretations and must not be written into canonical source records as if they were source content.
+
 ## Architecture
 
 Use `src/laclaugpt_data_collection/`. Keep imports acyclic, platform adapters separate from normalization/storage, and the canonical record envelope stable. Keep local filesystem + SQLite operation working without remote services. Keep browser-extension source under `browser/` with an explicit extraction/transport/storage boundary.
 
 Do not make sibling LaclauGPT repositories mandatory Python dependencies. Interoperate through versioned records, files, or configured services.
+
+## Branches and pull requests
+
+Never commit directly to `main`.
+
+When working on a tracked issue, create a branch first and open a pull request for review. Follow the existing naming convention:
+
+```bash
+git switch -c issue-<n>-<short-slug>
+```
+
+`feature/issue-<n>-<short-slug>` is also accepted. Keep the branch focused on that issue; do not bundle unrelated refactors or formatting sweeps.
+
+Push the branch and open the pull request early with a bounded first increment, then keep committing to the same branch. Report the branch name, the commit and the test status in the issue. A pull request is ready to merge only when the public-tree check, Ruff, the mypy gate and pytest are green and no private material has been introduced.
+
+Do not merge your own pull request without human review. If `main` has advanced while you worked, rebase on the updated `main` and re-run the quality gates rather than force-pushing. Never force-push a shared branch.
 
 ## Development
 
