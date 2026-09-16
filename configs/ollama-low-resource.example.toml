@@ -1,0 +1,32 @@
+# Optional public-safe Ollama profile for lightweight collection-time helpers.
+# Collection remains descriptive: do not use this profile to assign final
+# ideology/discourse labels. Final interpretation belongs in Data Analysis.
+#
+# This consolidates conservative settings repeatedly used in predecessor repos:
+# deterministic temperature, moderate context, top-p sampling and repeat penalty.
+# The exact legacy application pipelines are intentionally not copied.
+
+provider = "ollama"
+endpoint = "http://127.0.0.1:11434"
+model = "llama3.2:3b"
+
+[options]
+temperature = 0.0
+num_ctx = 8192
+num_predict = 512
+top_p = 0.9
+repeat_penalty = 1.1
+
+[policy]
+optional = true
+fallback_without_llm = true
+allow_final_ideology_classification = false
+allowed_uses = [
+  "short metadata normalization",
+  "language/source hints",
+  "bounded relevance triage with retain-unjudged fallback",
+]
+
+# For larger local machines, override the model in ignored runtime config rather
+# than editing the public profile. Predecessor repositories experimented with
+# larger Gemma/Qwen/Mistral/Llama models, but collection must not depend on them.

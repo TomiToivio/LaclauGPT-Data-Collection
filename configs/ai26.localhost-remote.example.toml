@@ -1,0 +1,34 @@
+profile = "ai26-localhost-remote"
+machine = "laptop"
+execution = "cli"
+browser = "firefox-local"
+
+# Runtime secrets and endpoints are supplied through an ignored .env or shell
+# environment. This checked-in file only declares the intended backend roles.
+[storage]
+records = "mongodb"
+objects = "s3"
+cache = "memory"
+
+[paths]
+data_root = "./data"
+sqlite_path = "./data/database/collection.sqlite3"
+
+[browser_capture]
+host = "127.0.0.1"
+port = 8765
+
+[collector]
+mode = "localhost-remote"
+workers = 1
+download_media = true
+
+[distributed]
+config_backend = "redis"
+messaging_backend = "none"
+task_queue_backend = "direct"
+
+[interoperability]
+schema_version = "1.1.0"
+emit_jsonl = true
+emit_csv = true
