@@ -1,14 +1,14 @@
-# Public, bounded AI26 source manifest for the demo/reference case.
-# Inclusion is a sampling decision, not an ideological classification of an
-# actor. `source_family` describes why a source is sampled and MUST NOT be
-# copied into analysis as ground-truth ideology.
+# Public, bounded AI26 source manifest for the reference case.
+# Inclusion is a sampling decision, not an ideological classification.
+# `source_family` explains why material is sampled and MUST NOT be copied into
+# analysis as ground-truth ideology.
 #
-# The current Linux-server runner executes the [[feed]] entries directly.
-# Other tables document public targets for the browser/social collectors and
-# future adapters. Runtime configuration may extend this manifest privately.
+# RSS/Atom entries are executable by the server collector. X account entries
+# mirror the browser-tour strata in ai26.example.yaml and are intentionally
+# bounded. Runtime configuration may extend this manifest privately.
 
 # ---------------------------------------------------------------------------
-# Executable RSS / Atom backbone
+# RSS / Atom backbone
 # ---------------------------------------------------------------------------
 
 [[feed]]
@@ -84,7 +84,7 @@ sampling_rationale = "Elite criticism of capability claims, hype, deployment and
 priority = "P2"
 
 # ---------------------------------------------------------------------------
-# Public web endpoints without a stable feed in this demo
+# Public web endpoints
 # ---------------------------------------------------------------------------
 
 [[web_source]]
@@ -108,7 +108,7 @@ name = "dario_amodei_essays"
 homepage = "https://darioamodei.com/"
 arena = "elites"
 source_family = "frontier AI / safety / capability futures"
-sampling_rationale = "Long-form elite arguments about capability, benefits, catastrophic risk and pacing."
+sampling_rationale = "Long-form arguments about capability, benefits, catastrophic risk and pacing."
 priority = "P1"
 
 [[web_source]]
@@ -176,35 +176,39 @@ sampling_rationale = "Finnish research and innovation discourse connecting AI sc
 priority = "P2"
 
 # ---------------------------------------------------------------------------
-# Bounded social targets
+# Firefox/X browser-tour targets
 # ---------------------------------------------------------------------------
+# These rows intentionally cover contrasting discourse families. They do not
+# declare an actor's ideology. Handles should be periodically verified because
+# X usernames can change. The actual browser tour is generated from
+# configs/studies/ai26.example.yaml groups.accounts.x.
 
 [[x_account]]
 name = "OpenAI"
 handle = "OpenAI"
 arena = "elites"
-source_family = "frontier lab"
+source_family = "frontier lab / capability / deployment"
 priority = "P1"
 
 [[x_account]]
 name = "Anthropic"
 handle = "AnthropicAI"
 arena = "elites"
-source_family = "frontier lab / safety"
+source_family = "frontier lab / safety / policy"
 priority = "P1"
 
 [[x_account]]
 name = "Google DeepMind"
 handle = "GoogleDeepMind"
 arena = "elites"
-source_family = "frontier lab / research"
+source_family = "frontier lab / research / safety"
 priority = "P1"
 
 [[x_account]]
 name = "Meta AI"
 handle = "MetaAI"
 arena = "elites"
-source_family = "frontier lab / open models"
+source_family = "frontier lab / open models / competition"
 priority = "P1"
 
 [[x_account]]
@@ -215,11 +219,120 @@ source_family = "AI infrastructure / industry"
 priority = "P2"
 
 [[x_account]]
+name = "Marc Andreessen"
+handle = "pmarca"
+arena = "elites"
+source_family = "market techno-optimism / acceleration-adjacent"
+priority = "P1"
+
+[[x_account]]
+name = "Yann LeCun"
+handle = "ylecun"
+arena = "elites"
+source_family = "open research / techno-optimism / capability debate"
+priority = "P1"
+
+[[x_account]]
+name = "Sam Altman"
+handle = "sama"
+arena = "elites"
+source_family = "frontier-lab leadership / abundance / deployment"
+priority = "P2"
+
+[[x_account]]
+name = "Eliezer Yudkowsky"
+handle = "ESYudkowsky"
+arena = "elites"
+source_family = "existential-risk / catastrophic-risk discourse"
+priority = "P1"
+
+[[x_account]]
+name = "Machine Intelligence Research Institute"
+handle = "MIRI_AI"
+arena = "elites"
+source_family = "alignment / catastrophic-risk discourse"
+priority = "P1"
+
+[[x_account]]
+name = "Future of Life Institute"
+handle = "FLI_org"
+arena = "elites"
+source_family = "AI safety / governance / catastrophic risk"
+priority = "P1"
+
+[[x_account]]
 name = "Timnit Gebru"
 handle = "timnitGebru"
 arena = "elites"
 source_family = "Critical AI / political economy"
 priority = "P1"
+
+[[x_account]]
+name = "Emily M. Bender"
+handle = "emilymbender"
+arena = "elites"
+source_family = "Critical AI / language-model critique"
+priority = "P1"
+
+[[x_account]]
+name = "SAG-AFTRA"
+handle = "sagaftra"
+arena = "grassroots"
+source_family = "labour / creative work / generative AI"
+priority = "P1"
+
+[[x_account]]
+name = "Writers Guild of America West"
+handle = "WGAWest"
+arena = "grassroots"
+source_family = "creative labour / generative AI / bargaining"
+priority = "P1"
+
+[[x_account]]
+name = "UNI Global Union"
+handle = "uniglobalunion"
+arena = "grassroots"
+source_family = "labour / automation / worker governance"
+priority = "P2"
+
+[[x_account]]
+name = "PauseAI"
+handle = "PauseAI"
+arena = "grassroots"
+source_family = "pause / safety mobilisation"
+priority = "P1"
+
+[[x_account]]
+name = "European Commission"
+handle = "EU_Commission"
+arena = "parliamentary"
+source_family = "EU governance / regulation / competitiveness"
+priority = "P1"
+
+[[x_account]]
+name = "European Parliament"
+handle = "Europarl_EN"
+arena = "parliamentary"
+source_family = "EU parliamentary governance"
+priority = "P1"
+
+[[x_account]]
+name = "OECD.AI"
+handle = "OECD_AI"
+arena = "parliamentary"
+source_family = "international AI policy / governance"
+priority = "P2"
+
+[[x_account]]
+name = "NIST"
+handle = "NIST"
+arena = "parliamentary"
+source_family = "standards / evaluation / public governance"
+priority = "P2"
+
+# ---------------------------------------------------------------------------
+# Other social targets
+# ---------------------------------------------------------------------------
 
 [[bluesky_account]]
 name = "Timnit Gebru"
@@ -316,4 +429,11 @@ name = "ai_creative_labour"
 services = ["openalex", "semantic_scholar", "socArxiv"]
 query = "generative AI AND (copyright OR creative work OR artists OR labour OR automation)"
 arena = "grassroots"
+priority = "P2"
+
+[[scholarly_query]]
+name = "left_techno_optimism"
+services = ["openalex", "semantic_scholar", "socArxiv"]
+query = "(AI OR automation) AND (post-work OR postcapitalism OR public ownership OR redistribution OR technological emancipation)"
+arena = "elites"
 priority = "P2"
