@@ -16,8 +16,9 @@ from .config import Settings
 from .distributed_capture import DistributedCaptureSink
 
 
-def _identity_token(source_url: str) -> str:
-    return hashlib.sha256(source_url.encode("utf-8")).hexdigest()
+def _identity_token(collection_id: str, source_url: str) -> str:
+    identity = f"{collection_id}\n{source_url}"
+    return hashlib.sha256(identity.encode("utf-8")).hexdigest()
 
 
 def sync_normalized_records(
@@ -54,7 +55,8 @@ def sync_normalized_records(
                     source_url = str(record.get("source_url") or "")
                     if not source_url:
                         raise ValueError("record has no source_url")
-                    token = _identity_token(source_url)
+                    collection_id = str(record.get("collection_id") or settings.project_id)
+                    token = _identity_token(collection_id, source_url)
                     if not sink.redis.acquire_once(
                         f"distributed-sync:{settings.run_id}:{token}",
                         ttl_seconds=7 * 24 * 3600,
