@@ -74,6 +74,20 @@ class Settings(BaseSettings):
     s3_access_key_id: str = ""
     s3_secret_access_key: str = ""
 
+    # Optional graph/vector RAG integration. Disabled by default and intentionally
+    # free of credentials/endpoints in committed configuration.
+    rag_enabled: bool = False
+    rag_backend: Literal["none", "neo4j", "queue", "custom"] = "none"
+    rag_dataset: str = ""
+    rag_failure_log: Path = Path("./data/logs/rag-index-failures.jsonl")
+    neo4j_uri: str = ""
+    neo4j_database: str = "neo4j"
+    neo4j_user: str = ""
+    neo4j_password: str = ""
+    embedding_provider: Literal["none", "ollama", "remote", "custom"] = "none"
+    embedding_endpoint: str = ""
+    embedding_model: str = ""
+
     @property
     def distributed_namespace(self) -> ProjectNamespace:
         """Return the shared project namespace for Redis, MongoDB and S3."""
@@ -94,6 +108,8 @@ class Settings(BaseSettings):
             self.data_path(*relative.split("/")).mkdir(parents=True, exist_ok=True)
         if self.record_backend == "sqlite":
             self.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.rag_enabled:
+            self.rag_failure_log.parent.mkdir(parents=True, exist_ok=True)
 
     def safe_summary(self) -> dict[str, str]:
         """Return non-secret operational settings suitable for logs/doctor output."""
@@ -117,4 +133,9 @@ class Settings(BaseSettings):
             "s3_project_prefix": namespace.s3_key("raw"),
             "browser_host": self.browser_host,
             "browser_port": str(self.browser_port),
+            "rag_enabled": str(self.rag_enabled),
+            "rag_backend": self.rag_backend,
+            "rag_dataset": self.rag_dataset,
+            "embedding_provider": self.embedding_provider,
+            "embedding_model": self.embedding_model,
         }
