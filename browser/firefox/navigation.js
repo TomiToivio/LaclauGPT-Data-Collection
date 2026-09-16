@@ -18,17 +18,6 @@
 (() => {
   "use strict";
 
-  // Public default for a local collector backend. Any study-specific backend
-  // address or port must be stored in the Firefox profile/private runtime
-  // configuration rather than committed to this repository.
-  const DEFAULT_BACKEND_URL = "http://127.0.0.1:8765";
-  let backendUrl = DEFAULT_BACKEND_URL;
-  let backendReady = browser.storage.local.get({ backend_url: DEFAULT_BACKEND_URL })
-    .then(item => {
-      const stored = (item.backend_url || "").toString().trim();
-      backendUrl = stored.startsWith("http") ? stored : DEFAULT_BACKEND_URL;
-    })
-    .catch(() => {});
   const VISIT_INTERVAL_MS = 300000;
   const SCROLL_INTERVAL_MS = 3000;
   const SCROLLS_PER_VISIT = 10;
@@ -39,11 +28,14 @@
 
   async function fetchTour() {
     try {
-      await backendReady;
-      const response = await fetch(`${backendUrl}/tour`, { cache: "no-store" });
-      if (!response.ok) return null;
+      const response = await globalThis.LaclauGPTBackend.request("/tour");
+      if (!response.ok) {
+        console.warn(`[laclaugpt-collector] /tour returned ${response.status}`);
+        return null;
+      }
       return await response.json();
-    } catch {
+    } catch (error) {
+      console.warn("[laclaugpt-collector] local backend /tour unavailable", error);
       return null;
     }
   }
