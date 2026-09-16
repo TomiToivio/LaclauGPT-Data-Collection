@@ -120,6 +120,7 @@ class PluginRunResult:
     records_seen: int
     records_written: int
     duplicates_skipped: int
+    next_cursor: str | None = None
     warnings: list[str] = field(default_factory=list)
 
 
@@ -159,6 +160,7 @@ class CollectionRunner:
             records_seen=len(result.records),
             records_written=written,
             duplicates_skipped=duplicates,
+            next_cursor=result.next_cursor,
             warnings=list(result.warnings),
         )
 
