@@ -115,6 +115,24 @@ class MediaReference(Model):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class SourceLocation(Model):
+    """Factual location metadata provided directly by the source.
+
+    Collection preserves source-provided place names/coordinates and their provenance.
+    Geocoder-, model- or researcher-inferred locations belong to downstream analysis and
+    must never be written here as if they were source truth.
+    """
+
+    name: str = ""
+    country: str = ""
+    region: str = ""
+    locality: str = ""
+    latitude: float | None = None
+    longitude: float | None = None
+    source_field: str = ""
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class SourceSection(Model):
     platform: str = ""
     source_type: str = ""
@@ -126,6 +144,7 @@ class SourceSection(Model):
     collection_method: str = ""
     language: str = ""
     country: str = ""
+    locations: list[SourceLocation] = Field(default_factory=list)
     parent_source_url: str | None = None
     raw_metadata: dict[str, Any] = Field(default_factory=dict)
     raw_ref: str | None = None
@@ -327,7 +346,8 @@ class NormalizedRecord(CanonicalRecord):
 
     @property
     def unix_timestamp(self) -> int:
-        return int(self.source.raw_metadata.get("unix_timestamp") or 0)
+        value = self.source.raw_metadata.get("unix_timestamp", 0)
+        return int(value or 0)
 
     @property
     def text(self) -> str:
@@ -335,24 +355,19 @@ class NormalizedRecord(CanonicalRecord):
 
     @property
     def language(self) -> str:
-        return self.source.language
-
-    @property
-    def parent_document_id(self) -> str | None:
-        value = self.source.raw_metadata.get("parent_document_id")
-        return str(value) if value else None
+        return self.source.language or self.content.language or ""
 
     @property
     def hashtags(self) -> list[str]:
-        return list(self.source.raw_metadata.get("hashtags") or [])
+        return list(self.source.raw_metadata.get("hashtags", []) or [])
 
     @property
     def mentions(self) -> list[str]:
-        return list(self.source.raw_metadata.get("mentions") or [])
+        return list(self.source.raw_metadata.get("mentions", []) or [])
 
     @property
     def engagement(self) -> dict[str, Any]:
-        return dict(self.source.raw_metadata.get("engagement") or {})
+        return dict(self.source.raw_metadata.get("engagement", {}) or {})
 
     @property
     def media_references(self) -> list[MediaReference]:
@@ -360,8 +375,8 @@ class NormalizedRecord(CanonicalRecord):
 
     @property
     def raw_ref(self) -> str:
-        return self.source.raw_ref or self.raw_capture.ref or ""
+        return self.raw_capture.ref or self.source.raw_ref or ""
 
     @property
-    def collection_provenance(self) -> CollectionProvenance:
-        return self.provenance[0] if self.provenance else CollectionProvenance()
+    def collection_provenance(self) -> CollectionProvenance | None:
+        return self.provenance[-1] if self.provenance else None
