@@ -24,6 +24,7 @@ class StudyConfig:
         self.start: date = _date(window.get("start"))
         self.end: date = _date(window.get("end"))
         self.timezone = data.get("timezone", "UTC")
+        self.collection_policy: dict[str, Any] = dict(data.get("collection_policy") or {})
         platforms = data.get("platforms") or {}
         self.platforms = [p for p, cfg in platforms.items()
                           if isinstance(cfg, dict) and cfg.get("enabled")]
@@ -32,25 +33,25 @@ class StudyConfig:
                               if isinstance(cfg, dict)}
         self.candidates: list[dict] = list(data.get("candidates") or [])
         self.parties: list[dict] = list(data.get("parties") or [])
-        # Generic study groups (STUDY_TEMPLATE.yaml "groups"): free-form target
-        # sets for non-election studies (researchers, labs, movements,
-        # organisations). Election-specific groups ride as metadata.
         self.groups: list[dict] = [
             g for g in (data.get("groups") or []) if isinstance(g, dict)]
-        # Handles are stored EXACTLY as supplied; empty or whitespace-only
-        # handles fail loudly here instead of being silently corrected later.
         self._reject_invalid_handles()
         self.expected_candidates = int(data.get("expected_candidates",
                                                 _infer_expected(data)))
         self.study = data.get("study", "unnamed")
 
-    def _reject_invalid_handles(self) -> None:
-        """Fail visibly on empty/whitespace/non-string handles (no silent fixes).
+    @property
+    def fetch_external_links_as_web_sources(self) -> bool:
+        """Whether post-write external links should be fetched as WEB children."""
+        return bool(self.collection_policy.get("fetch_external_links_as_web_sources", False))
 
-        Handles are research identifiers: they are stored exactly as supplied.
-        A typo must surface at config-load time, never as a silently repaired
-        tour URL pointing at the wrong account.
-        """
+    @property
+    def link_fetch_failure_blocks_parent(self) -> bool:
+        """Failure policy. Public reference configs should normally keep this false."""
+        return bool(self.collection_policy.get("link_fetch_failure_blocks_parent", False))
+
+    def _reject_invalid_handles(self) -> None:
+        """Fail visibly on empty/whitespace/non-string handles (no silent fixes)."""
         bad: list[str] = []
         for entity in self.candidates + self.parties:
             handles = entity.get("handles") or entity.get("accounts") or {}
@@ -70,14 +71,7 @@ class StudyConfig:
                 "(handles are never silently corrected): " + "; ".join(bad))
 
     def accounts(self) -> list[dict]:
-        """All collection targets as flat (name, kind, platform, handle) rows.
-
-        Election studies keep their legacy candidate/party shape; generic
-        studies use `groups` entries. Every row carries `group_id` and
-        `formation_seed` as sampling provenance metadata (never used as an
-        automatic discourse label — a group's seed category is provenance,
-        not truth about any post).
-        """
+        """All collection targets as flat (name, kind, platform, handle) rows."""
         rows: list[dict] = []
         for kind, group in (("candidate", self.candidates), ("party", self.parties)):
             for entity in group:
@@ -104,7 +98,6 @@ class StudyConfig:
         return rows
 
     def local_today(self) -> date:
-        """Current date in the study timezone, falling back to UTC if unavailable."""
         try:
             tz = ZoneInfo(self.timezone)
         except ZoneInfoNotFoundError:
@@ -115,7 +108,6 @@ class StudyConfig:
         return self.start <= (today or self.local_today()) <= self.end
 
     def missing_candidates(self) -> list[str]:
-        """Flag expected-but-unlisted candidates (never invented)."""
         if self.expected_candidates <= 0:
             return []
         have = {c["name"] for c in self.candidates}
@@ -130,18 +122,11 @@ def _date(value: Any) -> date:
 
 
 def _formation_seed(group: dict) -> str:
-    """Sampling-provenance seed of a generic group; empty string is allowed.
-
-    This is a SAMPLING label recorded for provenance. It must never be used
-    as an automatic discourse label for captured posts — documents keep
-    requiring discourse analysis regardless of the group that captured them.
-    """
     seed = group.get("formation_seed")
     return "" if seed is None else str(seed)
 
 
 def _infer_expected(data: dict) -> int:
-    """Study expectation: seven main presidential candidates (legacy default)."""
     return 7 if (data.get("candidates") or data.get("parties")) else 0
 
 
