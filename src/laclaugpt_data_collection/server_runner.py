@@ -11,6 +11,7 @@ import json
 import tomllib
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from .collectors.rss import RSSCollector
 from .config import Settings
@@ -19,19 +20,35 @@ from .handoff import build_handoff, ready_sort_key
 
 
 def load_feed_manifest(path: str | Path) -> list[dict[str, Any]]:
-    """Load the public/private `[[feed]]` source-manifest convention."""
+    """Load and validate the public/private `[[feed]]` source-manifest convention."""
     manifest = Path(path)
     data = tomllib.loads(manifest.read_text(encoding="utf-8"))
     feeds = data.get("feed") or []
     if not isinstance(feeds, list):
         raise ValueError("source manifest 'feed' must be an array of tables")
     rows: list[dict[str, Any]] = []
-    for entry in feeds:
+    for index, entry in enumerate(feeds, start=1):
         if not isinstance(entry, dict):
+            raise ValueError(f"source manifest feed #{index} must be a table")
+        enabled = entry.get("enabled", True)
+        if not isinstance(enabled, bool):
+            raise ValueError(f"source manifest feed #{index} enabled must be boolean")
+        if not enabled:
             continue
+        name = str(entry.get("name") or "").strip()
         feed_url = str(entry.get("feed_url") or "").strip()
-        if not feed_url:
-            continue
+        if not name:
+            raise ValueError(f"source manifest feed #{index} requires a name")
+        parsed = urlsplit(feed_url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError(
+                f"source manifest feed {name!r} requires an http(s) feed_url"
+            )
+        priority = str(entry.get("priority") or "").strip()
+        if priority and priority not in {"P1", "P2", "P3"}:
+            raise ValueError(
+                f"source manifest feed {name!r} priority must be P1, P2 or P3"
+            )
         rows.append(dict(entry))
     return rows
 

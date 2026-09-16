@@ -1,0 +1,87 @@
+# AI26 collection codebook
+# Lightweight sampling taxonomy only. This file guides source/query selection;
+# it does not perform discourse analysis or assign ideology to records/actors.
+
+version: ai26-collection-v1
+study: ai26
+purpose: balanced_collection_discovery
+
+principles:
+  - formations are provisional sensitising concepts, not fixed actor identities
+  - collect claims and relations across formations rather than classifying by source identity
+  - allow documents to be relevant to several formations or none
+  - preserve ambiguous material for downstream human/theory-guided analysis
+  - institutional/corporate/policy/open-source/labour facets are modifiers, not new formations
+
+arenas:
+  elites:
+    focus: AI labs, researchers, entrepreneurs, intellectuals and adjacent ideological movements
+  grassroots:
+    focus: mobilisation around labour, creative work, surveillance, data extraction, environment, data centres and AI risk
+  parliamentary:
+    focus: parliamentary, electoral, governmental and regulatory discourse about AI
+
+formation_sampling_cues:
+  accelerationism:
+    discovery_terms: [abundance, growth, innovation, acceleration, progress, AI race]
+    note: Includes techno-optimist and e/acc-adjacent material, but these terms are not synonyms.
+
+  doomerism:
+    discovery_terms: [existential risk, extinction, catastrophic risk, loss of control, superintelligence]
+    note: "Doomer" is a situated label; use x-risk/catastrophic-risk language for neutral discovery.
+
+  left-wing accelerationism:
+    discovery_terms: [post-work, automation, public ownership, redistribution, technological emancipation]
+    note: Seek technology-positive projects tied to egalitarian, postcapitalist or redistributive politics.
+
+  ai safety:
+    discovery_terms: [alignment, evaluation, guardrails, pacing, slowdown, standards, incident reporting]
+    note: AI-safety discourse is broader than existential-risk discourse and may overlap with other formations.
+
+  ai critical:
+    discovery_terms: [power, labour, inequality, discrimination, surveillance, extraction, ownership, corporate concentration]
+    note: Includes Critical AI and adjacent political-economy/accountability critique.
+
+  anti-ai:
+    discovery_terms: [pause, ban, resistance, job displacement, creator rights, data centre opposition]
+    note: Opposition to a specific deployment must not automatically be treated as opposition to AI in general.
+
+cross_cutting_facets:
+  - corporate
+  - institutional
+  - policy_governance
+  - open_source
+  - labour_rights
+  - creator_rights
+  - national_security
+  - China_competition
+  - data_centres
+  - environment
+  - surveillance
+  - copyright
+  - democratic_control
+  - public_interest_ai
+  - anti_hype
+
+current_watch_relations:
+  # September 2026: collect the emerging pacing/safety/competition dispute as
+  # relations among claims, not as permanent actor labels.
+  - [AI safety, pacing]
+  - [AI safety, independent evaluation]
+  - [innovation, competition]
+  - [AI race, China]
+  - [regulation, liability]
+  - [data centres, national security]
+
+collection_boundary:
+  allowed:
+    - source discovery
+    - query construction
+    - balanced sampling
+    - arena metadata
+    - source-family provenance
+  forbidden:
+    - assigning a formation from actor identity alone
+    - treating source_family as ideological ground truth
+    - running Laclau/Mouffe/Palonen interpretation in Collection
+    - copying private target lists or secrets into exported provenance
