@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
+# AI26 media/file worker on Laskin (cron-safe, one bounded batch per call).
+#
+# Downloads media referenced by canonical records, stores deterministic
+# objects under the shared CSC Allas / S3 prefix, persists checksums and
+# refreshes the affected canonical MongoDB records. Bounded and idempotent;
+# cron owns the schedule and flock prevents overlap.
 set -euo pipefail
 
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-ENV_FILE=${LACLAUGPT_ENV_FILE:-"$ROOT_DIR/data/config/ai26-laskin.env"}
+ENV_FILE=${LACLAUGPT_ENV_FILE:-"$ROOT_DIR/.env"}
 STUDY_CONFIG=${LACLAUGPT_AI26_STUDY_CONFIG:-"$ROOT_DIR/data/config/ai26.yaml"}
-DATA_ROOT=${LACLAUGPT_DATA_ROOT:-"$ROOT_DIR/data"}
+DATA_ROOT=${LACLAUGPT_AI26_DATA_ROOT:-"$ROOT_DIR/data"}
 LOCK_FILE=${LACLAUGPT_AI26_MEDIA_LOCK:-"$ROOT_DIR/data/tmp/ai26-laskin-media.lock"}
 
 mkdir -p "$ROOT_DIR/data/tmp" "$ROOT_DIR/data/logs"
@@ -23,8 +29,16 @@ if ! flock -n 9; then
 fi
 
 cd "$ROOT_DIR"
+
+RUNNER="$ROOT_DIR/.venv/bin/laclaugpt-distributed-media"
+if [[ -x "$RUNNER" ]]; then
+  RUN=("$RUNNER")
+else
+  RUN=(python3 -m laclaugpt_data_collection.distributed_media_runner)
+fi
+
 echo "[$(date -Is)] AI26 Laskin media start"
-laclaugpt-distributed-media \
+"${RUN[@]}" \
   --study-config "$STUDY_CONFIG" \
   --data-root "$DATA_ROOT" \
   --workers "${LACLAUGPT_AI26_MEDIA_WORKERS:-2}" \
