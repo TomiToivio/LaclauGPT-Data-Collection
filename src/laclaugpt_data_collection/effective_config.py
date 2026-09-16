@@ -6,13 +6,13 @@ adapted into the modular Collection package.
 """
 from __future__ import annotations
 
+import json
+import tomllib
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
 from hashlib import sha256
-import json
 from pathlib import Path
-import tomllib
 from typing import Any
 
 import yaml
