@@ -53,6 +53,7 @@ laclaugpt-collect = "laclaugpt_data_collection.cli:main"
 laclaugpt-capture = "laclaugpt_data_collection.capture_server:main"
 laclaugpt-multi-capture = "laclaugpt_data_collection.multi_capture_server:main"
 laclaugpt-media-download = "laclaugpt_data_collection.media_runner:main"
+laclaugpt-distributed-media = "laclaugpt_data_collection.distributed_media_runner:main"
 laclaugpt-handoff = "laclaugpt_data_collection.handoff_runner:main"
 
 [tool.hatch.build.targets.wheel]
