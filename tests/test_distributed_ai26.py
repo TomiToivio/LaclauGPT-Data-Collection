@@ -58,6 +58,7 @@ def distributed_settings(tmp_path: Path) -> Settings:
             redis_url="redis://example.invalid:6379/0",
             s3_bucket="laclaugpt-test",
             private_config_dir=private,
+            data_root=tmp_path / "data",
         ),
         DeploymentProfile.laptop_firefox_distributed(),
     )
@@ -83,24 +84,40 @@ def test_distributed_profile_accepts_explicit_private_runtime(tmp_path: Path) ->
     assert validate_profile(distributed_settings(tmp_path)) == []
 
 
-def test_sink_rejects_study_config_outside_private_root(tmp_path: Path, monkeypatch) -> None:
+def _sink(tmp_path: Path, monkeypatch) -> DistributedCaptureSink:
     settings = distributed_settings(tmp_path)
     monkeypatch.setattr("laclaugpt_data_collection.distributed_capture.MongoRecordStore", FakeMongo)
     monkeypatch.setattr("laclaugpt_data_collection.distributed_capture.S3ObjectStore", FakeS3)
     monkeypatch.setattr("laclaugpt_data_collection.distributed_capture.RedisCoordinator", FakeRedis)
-    sink = DistributedCaptureSink(settings)
+    return DistributedCaptureSink(settings)
+
+
+def test_sink_accepts_study_config_below_private_root(tmp_path: Path, monkeypatch) -> None:
+    sink = _sink(tmp_path, monkeypatch)
+    config = sink.settings.private_config_dir / "ai26.yaml"
+    config.write_text("study: synthetic", encoding="utf-8")
+    assert sink.assert_private_config(config) == config.resolve()
+
+
+def test_sink_accepts_study_config_below_ignored_data_config(tmp_path: Path, monkeypatch) -> None:
+    sink = _sink(tmp_path, monkeypatch)
+    config_dir = sink.settings.data_path("config")
+    config_dir.mkdir(parents=True)
+    config = config_dir / "ai26.yaml"
+    config.write_text("study: synthetic", encoding="utf-8")
+    assert sink.assert_private_config(config) == config.resolve()
+
+
+def test_sink_rejects_study_config_outside_runtime_roots(tmp_path: Path, monkeypatch) -> None:
+    sink = _sink(tmp_path, monkeypatch)
     outside = tmp_path / "public.yaml"
     outside.write_text("study: synthetic", encoding="utf-8")
-    with pytest.raises(ValueError, match="PRIVATE_CONFIG_DIR"):
+    with pytest.raises(ValueError, match="ignored runtime config root"):
         sink.assert_private_config(outside)
 
 
 def test_sink_writes_raw_to_s3_record_to_mongo_and_reference_event(tmp_path: Path, monkeypatch) -> None:
-    settings = distributed_settings(tmp_path)
-    monkeypatch.setattr("laclaugpt_data_collection.distributed_capture.MongoRecordStore", FakeMongo)
-    monkeypatch.setattr("laclaugpt_data_collection.distributed_capture.S3ObjectStore", FakeS3)
-    monkeypatch.setattr("laclaugpt_data_collection.distributed_capture.RedisCoordinator", FakeRedis)
-    sink = DistributedCaptureSink(settings)
+    sink = _sink(tmp_path, monkeypatch)
 
     record = CanonicalRecord(
         source_url="https://example.invalid/post/1?utm_source=test",
