@@ -2,7 +2,7 @@
 # Sampling taxonomy only. This guides source/query selection and provenance;
 # it does not perform discourse analysis or assign ideology to records/actors.
 
-version: ai26-collection-v2
+version: ai26-collection-v3
 study: ai26
 purpose: balanced_collection_discovery
 source_of_truth: https://github.com/TomiToivio/LaclauGPT/blob/main/paper/PAPER.md
@@ -15,6 +15,7 @@ principles:
   - institutional, corporate, policy, open-source and labour facets are modifiers, not ideological classes
   - source prominence is not evidence of hegemony and source frequency is not ideological importance
   - balance means discursive coverage, not equal quotas for artificially symmetric camps
+  - browser targets are bounded sampling strata, not endorsement, opposition or ideological ground truth
 
 arenas:
   elites:
@@ -29,12 +30,12 @@ formation_sampling_cues:
     discovery_terms: [abundance, growth, innovation, acceleration, progress, AI race, techno-optimism]
     note: Includes e/acc-adjacent and market-oriented techno-optimist material as discovery targets; these traditions are not synonyms.
 
-  doomerism:
+  existential-risk discourse:
     discovery_terms: [existential risk, extinction, catastrophic risk, loss of control, superintelligence]
-    note: "Doomer" is a situated label. Prefer x-risk/catastrophic-risk language for neutral retrieval and preserve self-description where available.
+    note: "Doomer" is a situated political label. Prefer x-risk/catastrophic-risk language for neutral retrieval and preserve self-description where available.
 
-  left-wing accelerationism:
-    discovery_terms: [post-work, automation, public ownership, redistribution, technological emancipation, postcapitalism]
+  left-wing techno-optimism:
+    discovery_terms: [post-work, automation, public ownership, redistribution, technological emancipation, postcapitalism, public AI, public compute]
     note: Seek technology-positive projects tied to egalitarian, postcapitalist, public-interest or redistributive politics.
 
   ai safety:
@@ -45,7 +46,7 @@ formation_sampling_cues:
     discovery_terms: [power, labour, inequality, discrimination, surveillance, extraction, ownership, corporate concentration, hype]
     note: Includes Critical AI and adjacent political-economy/accountability critique without assuming a single unified doctrine.
 
-  anti-ai:
+  anti-ai and deployment resistance:
     discovery_terms: [pause, ban, resistance, job displacement, creator rights, data centre opposition, refusal]
     note: Opposition to a specific deployment must not automatically be treated as opposition to AI in general.
 
@@ -72,9 +73,6 @@ cross_cutting_facets:
   - military_use
   - automated_decision_making
 
-# Candidate relations to make visible in collection. These are retrieval hooks,
-# not theoretical conclusions. Analysis must decide whether they constitute
-# equivalence, difference, antagonism, nodal/floating signification, etc.
 current_watch_relations:
   - [AI safety, pacing]
   - [AI safety, independent evaluation]
@@ -86,11 +84,14 @@ current_watch_relations:
   - [open weights, innovation]
   - [open weights, safety]
   - [automation, labour]
+  - [automation, post-work]
   - [generative AI, copyright]
   - [data centres, energy]
   - [data centres, local opposition]
   - [AI, public infrastructure]
   - [AI, corporate concentration]
+  - [AI, abundance]
+  - [AI, extinction]
 
 minimum_discursive_coverage:
   - frontier_lab_and_industry
@@ -103,6 +104,27 @@ minimum_discursive_coverage:
   - public_interest_or_left_techno_optimism
   - parliamentary_and_regulatory_governance
   - open_source_open_weights
+
+browser_sampling:
+  purpose: bounded_realtime_public_discourse_sample
+  primary_platform: x
+  method: firefox_profile_tour_plus_graphql_capture
+  target_mix:
+    - frontier labs and industry
+    - techno-optimist and acceleration-adjacent voices
+    - existential-risk and AI-safety voices
+    - Critical AI and political-economy voices
+    - labour and creator-rights organisations
+    - pause or deployment-resistance mobilisation
+    - public governance institutions
+  rules:
+    - keep the public X tour small enough for a researcher laptop and ordinary network connection
+    - prefer public profiles with sustained AI discourse over broad celebrity or news accounts
+    - include institutions as well as individuals so collection does not reduce politics to personalities
+    - do not infer formation membership from inclusion in a browser group
+    - periodically verify handles because platform usernames can change
+    - preserve quote and reply context when available because articulation depends on relational context
+    - do not treat post counts as measurements of ideological strength without a separate sampling analysis
 
 collection_boundary:
   allowed:
