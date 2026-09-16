@@ -29,9 +29,11 @@ collector -> canonical record -> CSV -> local filesystem
 
 ### Remote/shared MongoDB
 
+Load the authenticated TLS URI from a local secret store or ignored environment file rather than writing credentials into scripts or documentation:
+
 ```bash
 export LACLAUGPT_RECORD_BACKEND=mongodb
-export LACLAUGPT_MONGODB_URI='mongodb://USER:PASSWORD@HOST:27017/?tls=true'
+export LACLAUGPT_MONGODB_URI="$MONGODB_URI_FROM_SECRET_STORE"
 export LACLAUGPT_MONGODB_DATABASE=laclaugpt
 # optional; otherwise project-scoped collection naming is used
 export LACLAUGPT_MONGODB_COLLECTION=documents
