@@ -130,6 +130,38 @@ collection_policy:
     arena_from_collection_job: true
   infer_ideology_during_collection: false
 
+# Tiny executable browser-account fixtures are deliberately synthetic. They
+# keep public config parsing and browser workflow tests runnable without turning
+# the repository into the real operational watch list.
+platforms:
+  x:
+    enabled: true
+    base_urls: ["https://x.com/{handle}"]
+  tiktok:
+    enabled: true
+    base_urls: ["https://www.tiktok.com/@{handle}"]
+  instagram:
+    enabled: true
+    base_urls: ["https://www.instagram.com/{handle}/"]
+
+groups:
+  - id: example_ai_labs
+    name: Example AI labs fixture
+    arena: elites
+    formation_seed: ""
+    accounts:
+      x: [example_ai_lab]
+      tiktok: [example_ai_lab]
+      instagram: [example_ai_lab]
+  - id: example_civil_society
+    name: Example civil society fixture
+    arena: grassroots
+    formation_seed: ""
+    accounts:
+      x: [example_civic_group]
+      tiktok: [example_civic_group]
+      instagram: [example_civic_group]
+
 # Local/distributed backends are configured separately. Values here are
 # intentionally non-secret and backend-neutral.
 storage:
