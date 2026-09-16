@@ -45,8 +45,13 @@ class Settings(BaseSettings):
     object_backend: Literal["filesystem", "s3"] = "filesystem"
     cache_backend: Literal["memory", "redis"] = "memory"
 
+    # Redis has three intentionally separate roles. AI26 currently opts into only
+    # distributed configuration. Messaging and task coordination remain available
+    # but disabled until there is an operational need for them.
+    distributed_config_backend: Literal["local", "redis"] = "local"
     messaging_backend: Literal["none", "redis"] = "none"
     task_queue_backend: Literal["direct", "redis"] = "direct"
+    redis_config_snapshot_root: Path = Path("./data/config/redis-snapshots")
 
     browser_host: str = "127.0.0.1"
     browser_port: int = 8765
@@ -124,6 +129,7 @@ class Settings(BaseSettings):
             or (self.record_backend == "auto" and bool(self.mongodb_uri))
             or self.object_backend == "s3"
             or self.cache_backend == "redis"
+            or self.distributed_config_backend == "redis"
             or self.messaging_backend == "redis"
             or self.task_queue_backend == "redis"
         )
@@ -140,6 +146,8 @@ class Settings(BaseSettings):
             self.csv_path.parent.mkdir(parents=True, exist_ok=True)
         if self.rag_enabled:
             self.rag_failure_log.parent.mkdir(parents=True, exist_ok=True)
+        if self.distributed_config_backend == "redis":
+            self.redis_config_snapshot_root.mkdir(parents=True, exist_ok=True)
 
     def safe_summary(self) -> dict[str, str]:
         namespace = self.distributed_namespace
@@ -154,6 +162,7 @@ class Settings(BaseSettings):
             "record_backend": self.record_backend,
             "object_backend": self.object_backend,
             "cache_backend": self.cache_backend,
+            "distributed_config_backend": self.distributed_config_backend,
             "messaging_backend": self.messaging_backend,
             "task_queue_backend": self.task_queue_backend,
             "data_root": str(self.data_root),
@@ -161,6 +170,7 @@ class Settings(BaseSettings):
             "csv_path": str(self.csv_path),
             "private_config_dir_configured": str(self.private_config_dir is not None),
             "redis_namespace": namespace.redis_base,
+            "redis_config_snapshot_root": str(self.redis_config_snapshot_root),
             "mongodb_configured": str(bool(self.mongodb_uri)),
             "mongodb_database": self.mongodb_database,
             "mongodb_records_collection": self.effective_mongodb_collection,
