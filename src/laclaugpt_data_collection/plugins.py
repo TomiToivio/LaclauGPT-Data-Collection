@@ -8,15 +8,25 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
-from .collectors.base import CollectionResult, Collector
 from .models import CanonicalRecord, CollectionProvenance
 from .storage.base import RecordStore
 
+if TYPE_CHECKING:
+    from .collectors.base import CollectionResult
+
 PluginMode = Literal["polling", "streaming", "manual", "batch", "webhook"]
-CollectorFactory = Callable[["CollectionContext"], Collector]
 RecordNotifier = Callable[[CanonicalRecord], None]
+
+
+class LegacyCollector(Protocol):
+    """Minimal interface required to adapt an existing source collector."""
+
+    def collect(self) -> CollectionResult: ...
+
+
+CollectorFactory = Callable[["CollectionContext"], LegacyCollector]
 
 
 @dataclass(frozen=True, slots=True)
@@ -181,7 +191,7 @@ def default_registry() -> PluginRegistry:
 
     registry = PluginRegistry()
 
-    def rss_factory(context: CollectionContext) -> Collector:
+    def rss_factory(context: CollectionContext) -> LegacyCollector:
         feed_urls = context.require("feed_urls")
         if not isinstance(feed_urls, list) or not all(isinstance(url, str) for url in feed_urls):
             raise ValueError("rss feed_urls must be a list of strings")
@@ -209,7 +219,7 @@ def default_registry() -> PluginRegistry:
         )
     )
 
-    def bluesky_factory(context: CollectionContext) -> Collector:
+    def bluesky_factory(context: CollectionContext) -> LegacyCollector:
         query = context.config.get("query")
         actor = context.config.get("actor")
         max_results = int(context.config.get("max_results", 100))
