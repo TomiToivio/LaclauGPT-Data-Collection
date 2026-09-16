@@ -57,6 +57,28 @@ Analysis, simulation, dashboards, research datasets, operational target lists, c
 - Canonical `source_url` or stable URI-like identity across every backend and module handoff.
 - Public-repository hygiene: no research data, target/account lists, browser profiles, cookies, tokens, credentials or real deployment configuration in Git.
 
+## Source-plugin architecture
+
+Collection now has a versioned source-plugin layer around the existing collectors. The architecture is intentionally simple:
+
+```text
+SOURCE PLUGINS -> CANONICAL RECORD -> DURABLE STORAGE -> DATA ANALYSIS
+```
+
+The "WordPress for social data science" analogy means modular plugin contracts and interoperability. It does **not** merge Collection, Analysis and Visualization into one runtime. Collection can continue running independently on Linux servers and researcher laptops while Analysis runs on suitable GPU/compute infrastructure and Visualization runs locally or on a web server.
+
+`PluginSpec` declares plugin ID/version, source type, configuration schema, authentication, execution modes, retry/identity/raw/media policies and scheduling expectations. `adapt_collector()` wraps existing `Collector.collect()` implementations, while `CollectionRunner` writes canonical records to backend-neutral durable storage before any optional Redis/event notification.
+
+The first incrementally migrated built-ins are RSS and Bluesky; the same adapter is intended for Mastodon, YouTube, Telegram, arXiv, browser-assisted collectors and future external packages.
+
+Inspect the built-in contract without contacting source services:
+
+```bash
+laclaugpt-collect plugins list
+```
+
+See [`docs/PLUGIN_ARCHITECTURE.md`](docs/PLUGIN_ARCHITECTURE.md) for the plugin API, scheduling model, identity/deduplication rules, media boundary, privacy propagation and Data Analysis handoff.
+
 ## Installation
 
 ```bash

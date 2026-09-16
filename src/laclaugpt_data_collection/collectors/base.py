@@ -13,6 +13,7 @@ class CollectionResult:
     requests_seen: int = 0
     bodies_seen: int = 0
     raw_items_seen: int = 0
+    next_cursor: str | None = None
     warnings: list[str] = field(default_factory=list)
 
     @property

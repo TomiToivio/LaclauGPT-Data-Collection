@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import tomllib
+from dataclasses import asdict
 from pathlib import Path
 
 from .config import Settings
@@ -47,6 +48,14 @@ def _doctor(args: argparse.Namespace) -> int:
     summary["problems"] = problems
     print(json.dumps(summary, indent=2, sort_keys=True))
     return 0 if not problems else 2
+
+
+def _plugins_list(_args: argparse.Namespace) -> int:
+    from .plugins import default_registry
+
+    plugins = [asdict(spec) for spec in default_registry().specs()]
+    print(json.dumps(plugins, indent=2, sort_keys=True))
+    return 0
 
 
 def _distributed_check(args: argparse.Namespace) -> int:
@@ -102,6 +111,11 @@ def _build_parser() -> argparse.ArgumentParser:
     doctor.add_argument("--profile", help="path to a checked-in example or ignored local TOML profile")
     doctor.set_defaults(func=_doctor)
 
+    plugins = sub.add_parser("plugins", help="inspect the versioned collection-plugin registry")
+    plugin_sub = plugins.add_subparsers(dest="plugins_command", required=True)
+    plugin_list = plugin_sub.add_parser("list", help="list built-in plugin declarations")
+    plugin_list.set_defaults(func=_plugins_list)
+
     check = sub.add_parser(
         "distributed-check",
         help="validate distributed AI26-style backends without exposing secrets",
@@ -142,10 +156,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "capture-server",
         help="run the local HTTP capture backend for the browser extension",
     )
-    server.add_argument("--study-config", required=True,
-                        help="study YAML configuration (ignored local file)")
-    server.add_argument("--data-root", required=True,
-                        help="persistent collection data root")
+    server.add_argument(
+        "--study-config",
+        required=True,
+        help="study YAML configuration (ignored local file)",
+    )
+    server.add_argument("--data-root", required=True, help="persistent collection data root")
     server.add_argument("--host", default="127.0.0.1")
     server.add_argument("--port", type=int, default=8765)
     server.set_defaults(func=_capture_server)
@@ -155,12 +171,18 @@ def _build_parser() -> argparse.ArgumentParser:
 def _capture_server(args: argparse.Namespace) -> int:
     from .capture_server import main as server_main
 
-    return server_main([
-        "--study-config", args.study_config,
-        "--data-root", args.data_root,
-        "--host", args.host,
-        "--port", str(args.port),
-    ])
+    return server_main(
+        [
+            "--study-config",
+            args.study_config,
+            "--data-root",
+            args.data_root,
+            "--host",
+            args.host,
+            "--port",
+            str(args.port),
+        ]
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
