@@ -2,6 +2,10 @@
 
 [![CI](https://github.com/TomiToivio/LaclauGPT-Data-Collection/actions/workflows/ci.yml/badge.svg)](https://github.com/TomiToivio/LaclauGPT-Data-Collection/actions/workflows/ci.yml)
 
+> **Part of the [LaclauGPT](https://github.com/TomiToivio/LaclauGPT) project.** The main LaclauGPT repository is the **meta-repository** and project front door: it contains the scientific paper, theory, shared architecture, canonical data contract and complete-system documentation. This repository is only the **Data Collection** implementation stage.
+>
+> **Project map:** [LaclauGPT / paper + meta-repo](https://github.com/TomiToivio/LaclauGPT) → **Data Collection (you are here)** → [Data Analysis](https://github.com/TomiToivio/LaclauGPT-Data-Analysis) → [Data Visualization](https://github.com/TomiToivio/LaclauGPT-Data-Visualization)
+
 **LaclauGPT** is an open social-science research framework for **LLM-assisted computational discourse analysis** of large textual and multimodal corpora. It combines computational methods with interpretive political research while keeping model outputs traceable to source evidence, uncertainty, provenance and human review.
 
 The current flagship research programme is **[LaclauGPT: Ideological contestation over AI](https://github.com/TomiToivio/LaclauGPT/blob/main/paper/PAPER.md)**. The canonical theoretical and methodological contract is **[THEORY.md](https://github.com/TomiToivio/LaclauGPT/blob/main/THEORY.md)**.
@@ -39,6 +43,8 @@ See the **[scientific paper](https://github.com/TomiToivio/LaclauGPT/blob/main/p
 ## This repository
 
 **LaclauGPT Data Collection** is the public, reusable data-acquisition layer of the LaclauGPT ecosystem. This repository contains **collection, capture, normalization, provenance, scheduling and storage-adapter code only**. It prepares auditable source material for later analysis without performing discourse-theoretical interpretation itself.
+
+Its output is the shared canonical record consumed by **[LaclauGPT Data Analysis](https://github.com/TomiToivio/LaclauGPT-Data-Analysis)** and ultimately inspected in **[LaclauGPT Data Visualization](https://github.com/TomiToivio/LaclauGPT-Data-Visualization)**. Project-wide contracts and the scientific rationale belong in the **[LaclauGPT meta-repository](https://github.com/TomiToivio/LaclauGPT)**.
 
 Analysis, simulation, dashboards, research datasets, operational target lists, credentials and machine-specific secrets belong elsewhere.
 
@@ -184,4 +190,4 @@ The mypy gate covers the stable interoperability/configuration/storage core. Imp
 
 ## Development
 
-The repository uses a narrow package surface: collectors emit canonical records, storage adapters persist them, and orchestration composes the two. Analysis belongs in `LaclauGPT-Data-Analysis`, not here.
+The repository uses a narrow package surface: collectors emit canonical records, storage adapters persist them, and orchestration composes the two. Analysis belongs in **[LaclauGPT-Data-Analysis](https://github.com/TomiToivio/LaclauGPT-Data-Analysis)**; researcher-facing dashboards belong in **[LaclauGPT-Data-Visualization](https://github.com/TomiToivio/LaclauGPT-Data-Visualization)**; paper/theory and cross-module architecture belong in **[LaclauGPT](https://github.com/TomiToivio/LaclauGPT)**.
