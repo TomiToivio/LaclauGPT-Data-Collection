@@ -16,7 +16,7 @@ def _build_mongodb_store(settings: Settings) -> RecordStore:
         raise RuntimeError(
             "MongoDB storage requires LACLAUGPT_MONGODB_URI (or mongodb_uri in private config)"
         )
-    from .storage.remote import MongoRecordStore
+    from .storage.mongodb import MongoRecordStore
 
     store = MongoRecordStore(
         settings.mongodb_uri,
