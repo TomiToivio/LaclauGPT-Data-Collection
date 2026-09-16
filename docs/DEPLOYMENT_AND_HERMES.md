@@ -11,6 +11,8 @@ Collection uses one canonical implementation across machines. Machine, execution
 | Linux server, distributed | `linux-server` | `cron` or `systemd` | `none` | distributed |
 | Agent-operated variant | any | `agent` | configured browser mode | local or distributed |
 
+See [`TWO_MACHINE_SETUP.md`](TWO_MACHINE_SETUP.md) for the two-role deployment pattern where a manually operated researcher host runs browser capture and a separate unattended cron host runs network collectors against the same shared run.
+
 Checked-in examples are `configs/laptop.example.toml`, `configs/server-local.example.toml` and `configs/server.example.toml`. Real source lists, credentials, browser state and machine-specific settings remain below ignored `data/` or in external secret/configuration systems.
 
 ## Researcher laptop + Firefox
