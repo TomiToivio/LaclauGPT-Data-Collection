@@ -49,12 +49,21 @@ def apply_profile(settings: Settings, profile: DeploymentProfile) -> Settings:
 def validate_profile(settings: Settings) -> list[str]:
     """Return validation warnings/errors without contacting external services."""
     problems: list[str] = []
-    if settings.browser == "firefox-local" and settings.browser_host not in {"127.0.0.1", "localhost", "::1"}:
+    if settings.browser == "firefox-local" and settings.browser_host not in {
+        "127.0.0.1",
+        "localhost",
+        "::1",
+    }:
         problems.append("firefox-local browser capture must bind to localhost")
     if settings.record_backend == "mongodb" and not settings.mongodb_uri:
         problems.append("distributed records require a MongoDB URI")
-    if settings.cache_backend == "redis" and not settings.redis_url:
-        problems.append("distributed coordination requires a Redis URL")
+    redis_requested = (
+        settings.cache_backend == "redis"
+        or settings.messaging_backend == "redis"
+        or settings.task_queue_backend == "redis"
+    )
+    if redis_requested and not settings.redis_url:
+        problems.append("Redis features require LACLAUGPT_REDIS_URL")
     if settings.object_backend == "s3" and not settings.s3_bucket:
         problems.append("S3 object storage requires a bucket")
     return problems
@@ -65,7 +74,9 @@ def render_cron(command: str, *, schedule: str = "17 * * * *") -> str:
     return f"{schedule} flock -n data/runs/collection.lock {command} >> data/logs/collection.log 2>&1"
 
 
-def render_systemd_units(command: str, *, working_directory: Path = Path("/opt/laclaugpt-collection")) -> dict[str, str]:
+def render_systemd_units(
+    command: str, *, working_directory: Path = Path("/opt/laclaugpt-collection")
+) -> dict[str, str]:
     """Render placeholder service/timer units without touching systemd."""
     service = f"""[Unit]\nDescription=LaclauGPT Collection\n\n[Service]\nType=oneshot\nWorkingDirectory={working_directory}\nExecStart={command}\n"""
     timer = """[Unit]\nDescription=Run LaclauGPT Collection hourly\n\n[Timer]\nOnCalendar=hourly\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n"""
