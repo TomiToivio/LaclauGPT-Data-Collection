@@ -73,7 +73,7 @@ python -m pip install -e '.[distributed]'
 
 ## Deployment profiles
 
-Machine, execution, browser and storage are independent configuration dimensions. See [`docs/DEPLOYMENT_AND_HERMES.md`](docs/DEPLOYMENT_AND_HERMES.md).
+Machine, execution, browser and storage are independent configuration dimensions. See [`docs/DEPLOYMENT_AND_HERMES.md`](docs/DEPLOYMENT_AND_HERMES.md) and [`docs/TWO_MACHINE_SETUP.md`](docs/TWO_MACHINE_SETUP.md) for the manual-researcher-host + cron-collector-host pattern.
 
 Researcher laptop with Firefox capture:
 
