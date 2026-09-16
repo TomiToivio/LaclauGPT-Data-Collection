@@ -2,6 +2,8 @@
 
 Nested sections are encoded as deterministic JSON strings so CSV can round-trip
 into MongoDB without losing graph references, vector metadata or analysis fields.
+Graph/vector enrichments live in the canonical ``analysis`` namespace until the
+shared cross-module schema grows dedicated top-level fields.
 """
 from __future__ import annotations
 
@@ -21,8 +23,6 @@ CSV_FIELDS = [
     "source",
     "content",
     "intermediate",
-    "relationships",
-    "embeddings",
     "evidence",
     "analysis",
     "human_readable",
