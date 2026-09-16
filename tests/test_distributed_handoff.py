@@ -42,6 +42,7 @@ def settings(tmp_path: Path) -> Settings:
             _env_file=None,
             project_id="ai26",
             run_id="ai26-smoke-ready",
+            mongodb_uri="mongodb://example.invalid:27017",
             redis_url="redis://example.invalid:6379/0",
             s3_bucket="synthetic",
             private_config_dir=private,
