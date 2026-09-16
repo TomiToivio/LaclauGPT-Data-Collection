@@ -16,11 +16,16 @@ from laclaugpt_data_collection.plugins import (
 
 
 class SyntheticCollector:
-    def __init__(self, record: NormalizedRecord) -> None:
+    def __init__(self, record: NormalizedRecord, *, next_cursor: str | None = None) -> None:
         self.record = record
+        self.next_cursor = next_cursor
 
     def collect(self) -> CollectionResult:
-        return CollectionResult(records=[self.record], raw_items_seen=1)
+        return CollectionResult(
+            records=[self.record],
+            raw_items_seen=1,
+            next_cursor=self.next_cursor,
+        )
 
 
 class MemoryStore:
@@ -120,6 +125,34 @@ def test_runner_persists_before_notification_and_repeated_run_is_idempotent() ->
     assert second.records_written == 0
     assert second.duplicates_skipped == 1
     assert events == [("store", source_url), ("notify", source_url)]
+
+
+def test_runner_accepts_resume_cursor_and_returns_next_checkpoint() -> None:
+    observed_cursors: list[str | None] = []
+    spec = PluginSpec(
+        plugin_id="cursor-source",
+        version="1.0.0",
+        source_type="api",
+        modes=("polling",),
+    )
+
+    def factory(context: CollectionContext) -> SyntheticCollector:
+        observed_cursors.append(context.cursor)
+        return SyntheticCollector(
+            _record("api", "urn:synthetic:cursor-item"),
+            next_cursor="cursor-2",
+        )
+
+    registry = PluginRegistry()
+    registry.register(adapt_collector(spec, factory))
+    runner = CollectionRunner(registry, MemoryStore())
+    result = runner.run(
+        "cursor-source",
+        CollectionContext(collection_id="SYNTH26", cursor="cursor-1"),
+    )
+
+    assert observed_cursors == ["cursor-1"]
+    assert result.next_cursor == "cursor-2"
 
 
 def test_default_registry_is_lazy_and_declares_versioned_source_contracts() -> None:
