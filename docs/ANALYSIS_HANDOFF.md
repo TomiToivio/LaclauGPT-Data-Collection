@@ -38,7 +38,7 @@ A simple polling deployment can run Collection/media jobs and then let Data Anal
 
 ## Distributed mode
 
-When Collection writes through the distributed sink, MongoDB records contain queryable routing fields plus the same `handoff` envelope. Text-only/otherwise-ready records also emit a lightweight Redis event on:
+When Collection writes through the distributed sink, MongoDB records contain queryable routing fields plus the same `handoff` envelope. Ready records also emit a lightweight Redis event on:
 
 ```text
 laclaugpt:<project_id>:stream:analysis-ready
@@ -62,16 +62,37 @@ The MongoDB index orders efficient readiness queries by handoff status, source p
 
 A record with media references stays `waiting_media` until the downloader has durable completed state (or the canonical reference already contains a local/object reference or checksum). The local handoff exporter reads the existing media index, so no second queue database is required.
 
-Distributed records with media remain `waiting_media` until a distributed media worker persists the object/reference and refreshes the canonical MongoDB record. Text-only records can already flow end-to-end in the first distributed smoke test.
+In distributed mode, run the bounded media worker after collection/sync:
+
+```bash
+laclaugpt-distributed-media \
+  --study-config "$LACLAUGPT_PRIVATE_CONFIG_DIR/ai26.yaml" \
+  --data-root ./data/browser-ai26 \
+  --workers 4 \
+  --limit 25
+```
+
+The worker:
+
+1. uses the existing source-agnostic media queue and retry state;
+2. writes completed files to the configured S3/CSC Allas project namespace;
+3. adds `object_ref`, checksum and download metadata to the canonical media reference;
+4. re-upserts the affected record to MongoDB;
+5. recalculates its handoff state; and
+6. emits `analysis-ready` only when the record has become ready.
+
+All operations are bounded and use deterministic media/object identities, so the smoke test does not require a full-corpus media run.
 
 ## First distributed smoke path
 
-For the first test, use a small text-only AI26 sample:
+A small AI26 sample can now exercise both text-only and multimodal records:
 
 ```text
 Firefox localhost capture
   → distributed-sync
-  → MongoDB canonical record + handoff.status=ready
+  → MongoDB + raw Allas + Redis collected reference
+  → distributed-media (only when media is pending)
+  → MongoDB handoff.status=ready
   → Redis analysis-ready reference
   → Data Analysis worker / cron
 ```
