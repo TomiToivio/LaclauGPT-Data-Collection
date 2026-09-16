@@ -14,7 +14,7 @@ From the researcher's workstation:
 ssh laskin
 ```
 
-Use your existing SSH configuration/key setup. No root access is required for the normal user-level deployment.
+Use the existing SSH configuration/key setup. No root access is required for the normal user-level deployment.
 
 On Laskin:
 
@@ -27,6 +27,7 @@ pip install -e '.[distributed,feeds,youtube,documents]'
 mkdir -p data/config data/logs data/tmp
 cp configs/studies/ai26.example.yaml data/config/ai26.yaml
 cp configs/studies/ai26.sources.example.toml data/config/ai26.sources.toml
+cp configs/studies/ai26.collection-codebook.yaml data/config/ai26.collection-codebook.yaml
 cp .env.example data/config/ai26-laskin.env
 ```
 
@@ -96,7 +97,7 @@ The existing distributed media worker downloads pending media referenced by cano
 
 ### Current cross-machine limitation
 
-Redis task queueing is intentionally disabled for AI26 at present, matching issue #50. Therefore Laskin does **not yet magically consume every laptop-only browser media reference from a central Redis queue**. Browser captures first need to reach a canonical record path visible to the distributed media workflow. Keep this limitation explicit until the repository's shared MongoDB/Redis download-job reader is implemented; do not pretend the existing local media index is a distributed queue.
+Redis task queueing is intentionally disabled for AI26 at present, matching issue #50. Therefore Laskin does **not yet automatically consume every laptop-only browser media reference from a central Redis queue**. Browser captures first need to reach a canonical record path visible to the distributed media workflow. Keep this limitation explicit until the repository's shared MongoDB/Redis download-job reader is implemented.
 
 ## 5. Hourly cron jobs
 
@@ -117,48 +118,67 @@ Both commands run once and exit. Cron is the scheduler. No nested long-lived sch
 
 Secrets are loaded from `data/config/ai26-laskin.env`; never place credentials directly in crontab.
 
-## 6. Optional "dumb Hermes" helper
+## 6. Hermes for AI26
 
-Hermes is optional. The server collection must continue to function when Hermes and Ollama are completely absent.
+Hermes is an optional orchestration/research agent. Collection must remain operable without Hermes, but Hermes itself is not intentionally reduced in capability.
 
-A public-safe low-resource profile is provided at:
-
-```text
-configs/hermes-ai26-low-resource.example.toml
-```
-
-It was distilled from the older Hermes collection agent and predecessor Ollama usage, but deliberately strips out obsolete autonomous-research architecture, personas, old project theory and all private operational values.
-
-Useful recovered patterns were:
-
-- a **60-minute** idle/research cadence;
-- local Ollama accessed through the ordinary HTTP API;
-- short bounded research loops rather than unlimited crawling;
-- JSON-shaped research plans;
-- a small seed set around LessWrong, Alignment Forum, Hacker News, arXiv, technology journalism and ML commentary;
-- Ollama health checking before attempting inference;
-- keeping only a bounded amount of source text in each prompt.
-
-For the current Collection module, Hermes is intentionally much dumber:
+The public-safe profile is:
 
 ```text
-cron/canonical collector decides what actually runs
-Hermes may inspect redacted config
-Hermes may validate/plan/suggest
-Hermes may optionally invoke canonical collectors when explicitly enabled later
-Hermes does not own a separate crawler
-Hermes does not infer final ideology
-Hermes does not rewrite the AI26 codebook
-Hermes does not silently expand private target lists
+configs/hermes-ai26.example.toml
 ```
 
-The example uses a small `llama3.2:3b` model with deterministic low-resource defaults. Override the model privately if Laskin has a different installed Ollama model. The AI26 public study/source/codebook files remain authoritative regardless of model choice.
+Current Hermes model:
 
-### Legacy-security note
+```text
+deepseek-v4.1-flash:cloud
+```
 
-The old private Hermes prototype included hard-coded operational connection material. **None of those values are copied into this repository or documentation.** Treat the old file only as historical evidence for architecture and source-family ideas. Rotate any legacy credentials independently if they are still valid.
+The important constraint is not model capability. It is **configuration retrieval**: Hermes must load the AI26 study design, source manifest and codebook from the repository instead of trying to remember or reconstruct them.
 
-## 7. AI26 settings shared with the laptop
+Before Hermes plans AI26 collection, it must inspect:
+
+```text
+configs/studies/ai26.example.yaml
+configs/studies/ai26.sources.example.toml
+configs/studies/ai26.collection-codebook.yaml
+```
+
+If private runtime copies exist, they normally live at:
+
+```text
+data/config/ai26.yaml
+data/config/ai26.sources.toml
+data/config/ai26.collection-codebook.yaml
+```
+
+The checked-in templates remain the public methodological baseline. Private runtime files may extend them but must not be committed.
+
+### Why this is explicit
+
+Historical Hermes/CyborgAnthropology code contained useful source lists, codebook ideas and monitoring patterns, but an agent should not have to discover them by guessing repository history. Current canonical AI26 files come first. Legacy repositories are consulted only to recover useful public-safe items that are genuinely missing from current configuration.
+
+Useful recovered source families include rationalist/alignment, AI safety/x-risk, acceleration/techno-optimist discourse, Critical AI/political economy, labour and creative-rights debates, policy/regulation, frontier labs, scholarly AI research and technology journalism. These are sampling/discovery families, not automatic ideology labels.
+
+### Hermes operation
+
+Hermes may inspect redacted configuration, compare source coverage, identify possible gaps, propose bounded source additions, validate deployment profiles and plan or invoke canonical collectors when explicitly permitted.
+
+Hermes must not create a second crawler architecture, invent a replacement AI26 taxonomy, silently modify private target lists, or perform final ideological classification in the Collection module.
+
+## 7. Analysis model handoff
+
+Collection and Hermes orchestration are distinct from downstream discourse analysis. The current default analytics model family is:
+
+```text
+gemma4:12b
+gemma4:31b-cloud
+gemma4:e2b
+```
+
+When an agent works across Collection and Analysis, do not silently use the Hermes model in place of these analytical models. Preserve model/prompt provenance for any persisted model-assisted result.
+
+## 8. AI26 settings shared with the laptop
 
 Do not fork the research design for Laskin. Both machines use the same logical configuration:
 
@@ -172,7 +192,7 @@ Operational copies live under ignored `data/config/`.
 
 The bounded source design covers contrasting AI imaginaries and arenas, including acceleration/techno-optimism, x-risk/safety, Critical AI, labour/rights, pause/anti-AI mobilisation, policy/parliamentary discourse and frontier-lab/industry discourse. These are sampling/sensitizing categories, not labels automatically assigned to actors or documents.
 
-## 8. Inspect status over SSH
+## 9. Inspect status over SSH
 
 Recent logs:
 
@@ -197,7 +217,7 @@ laclaugpt-collect distributed-check --study-config data/config/ai26.yaml
 
 Lock files live under `data/tmp/`. Their presence alone does not mean a process is active; `flock` ownership is authoritative.
 
-## 9. Update safely
+## 10. Update safely
 
 ```bash
 cd /path/to/LaclauGPT-Data-Collection
@@ -208,7 +228,7 @@ pip install -e '.[distributed,feeds,youtube,documents]'
 
 Then rerun the profile check and one manual collection cycle before relying on the next cron invocation.
 
-## 10. Smoke test
+## 11. Smoke test
 
 1. SSH login succeeds.
 2. Virtual environment/package loads.
@@ -222,4 +242,4 @@ Then rerun the profile check and one manual collection cycle before relying on t
 10. `crontab -l` shows both hourly jobs.
 11. A deliberately overlapping wrapper invocation exits via `flock`.
 12. Logs contain status information without credentials/tokens.
-13. Optional Hermes profile can be inspected without enabling Hermes or contacting Ollama.
+13. Hermes can locate the three canonical AI26 files and report their roles without using model memory as the source of truth.
