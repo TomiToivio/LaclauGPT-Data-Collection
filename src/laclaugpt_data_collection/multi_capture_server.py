@@ -12,7 +12,6 @@ import json
 import threading
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
