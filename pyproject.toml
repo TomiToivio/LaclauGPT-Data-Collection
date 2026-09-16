@@ -20,6 +20,10 @@ dependencies = [
 [project.optional-dependencies]
 distributed = [
   "boto3>=1.35,<2",
+  # boto3 normally pulls botocore transitively, but declaring it explicitly
+  # prevents partially installed/broken distributed environments from leaving
+  # the S3 adapter with boto3 present but botocore unavailable.
+  "botocore>=1.35,<2",
   "pymongo>=4.9,<5",
   "redis>=5.1,<6",
 ]
