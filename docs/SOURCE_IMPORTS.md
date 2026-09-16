@@ -41,6 +41,12 @@ Private code was treated as a review source, not as publishable content. Generic
 
 Real study configuration, account lists, researcher data, machine-specific paths, credentials and anything under private-only boundaries are deliberately not copied.
 
+## vasama-osint archaeology
+
+Historical `TomiToivio/vasama-osint` was audited for generic Collection infrastructure only. Reusable lessons are limited to single-machine cron/systemd orchestration, logging/restart patterns, and preserving factual source location metadata for later geospatial enrichment. OSINT prompts, geopolitical semantics, private source lists, credentials, generated corpora and geocoder/model-derived locations are explicitly excluded.
+
+See [`VASAMA_REUSE_AUDIT.md`](VASAMA_REUSE_AUDIT.md) for the path/commit-level audit and acceptance status for issue #19.
+
 ## Component-level migration map (issue #2, 2026-09-15)
 
 Full audit of `LaclauGPT-Discourse-Analysis/collector/` (~3.5k lines incl. JS)
