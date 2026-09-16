@@ -75,7 +75,7 @@ The profile consolidates conservative settings seen repeatedly in predecessor La
 ## 3. Start Firefox backend
 
 ```bash
-./scripts/run_firefox_study.sh data/config/ai26.yaml data 8765
+bash scripts/run_firefox_study.sh data/config/ai26.yaml data 8765
 ```
 
 The backend binds to `127.0.0.1:8765` only. Keep that default.
@@ -91,7 +91,7 @@ Use the extension with the AI26 study/backend. Captures are persisted locally fi
 Run a manual sync:
 
 ```bash
-./scripts/run_ai26_localhost_sync.sh
+bash scripts/run_ai26_localhost_sync.sh
 ```
 
 Re-running it is safe: the existing distributed sync/lease logic is responsible for deduplication.
@@ -101,7 +101,7 @@ Re-running it is safe: the existing distributed sync/lease logic is responsible 
 The current unattended non-browser worker intentionally starts with RSS/Atom, the highest-value low-friction source family already implemented for the distributed AI26 test.
 
 ```bash
-./scripts/run_ai26_localhost_collect.sh
+bash scripts/run_ai26_localhost_collect.sh
 ```
 
 It uses `data/config/ai26.sources.toml`, applies bounded per-feed/batch limits and writes through the existing distributed sink to the same AI26 MongoDB/Redis/S3 namespace.
@@ -111,7 +111,7 @@ Other source collectors should be added to the same bounded runner as their cano
 ## 6. Download media/files and upload to Allas
 
 ```bash
-./scripts/run_ai26_localhost_media.sh
+bash scripts/run_ai26_localhost_media.sh
 ```
 
 The existing distributed media worker scans locally captured canonical records, downloads pending media, stores deterministic objects in CSC Allas/S3, persists checksums/status in downloader state, and refreshes affected canonical records in MongoDB.
@@ -123,9 +123,9 @@ All wrappers use `flock`, so overlapping invocations exit cleanly instead of dou
 Example crontab:
 
 ```cron
-*/10 * * * * cd /path/to/LaclauGPT-Data-Collection && ./scripts/run_ai26_localhost_sync.sh >> data/logs/ai26-sync.log 2>&1
-17 * * * * cd /path/to/LaclauGPT-Data-Collection && ./scripts/run_ai26_localhost_collect.sh >> data/logs/ai26-collect.log 2>&1
-27 * * * * cd /path/to/LaclauGPT-Data-Collection && ./scripts/run_ai26_localhost_media.sh >> data/logs/ai26-media.log 2>&1
+*/10 * * * * cd /path/to/LaclauGPT-Data-Collection && bash scripts/run_ai26_localhost_sync.sh >> data/logs/ai26-sync.log 2>&1
+17 * * * * cd /path/to/LaclauGPT-Data-Collection && bash scripts/run_ai26_localhost_collect.sh >> data/logs/ai26-collect.log 2>&1
+27 * * * * cd /path/to/LaclauGPT-Data-Collection && bash scripts/run_ai26_localhost_media.sh >> data/logs/ai26-media.log 2>&1
 ```
 
 Do not put secrets directly in crontab. The wrappers load the ignored `data/config/ai26-localhost.env` file.
@@ -149,9 +149,9 @@ Use only public-safe/synthetic material when testing:
 1. `laclaugpt-collect doctor --profile configs/ai26.localhost-remote.example.toml` succeeds.
 2. `laclaugpt-collect distributed-check --study-config data/config/ai26.yaml` confirms configured remote services.
 3. Start the Firefox backend and capture one public-safe page.
-4. Run `run_ai26_localhost_sync.sh`; verify the canonical record in MongoDB has AI26 routing metadata.
-5. Run `run_ai26_localhost_collect.sh`; verify at least one public RSS item is written or safely deduplicated.
-6. Run `run_ai26_localhost_media.sh` against one small public-safe downloadable object.
+4. Run `bash scripts/run_ai26_localhost_sync.sh`; verify the canonical record in MongoDB has AI26 routing metadata.
+5. Run `bash scripts/run_ai26_localhost_collect.sh`; verify at least one public RSS item is written or safely deduplicated.
+6. Run `bash scripts/run_ai26_localhost_media.sh` against one small public-safe downloadable object.
 7. Verify the object under the AI26 Allas/S3 project prefix and the corresponding checksum/object metadata in canonical state.
 8. Repeat the sync/collection/media commands and confirm no duplicate canonical records or duplicate object identities are created.
 
@@ -161,4 +161,4 @@ Inspect logs under `data/logs/`. If a cron wrapper reports that another run is a
 
 If MongoDB/Redis/Allas checks fail, first re-run `distributed-check` with the same sourced environment. Keep Redis authenticated and network-restricted. Do not expose the Firefox backend publicly.
 
-If Firefox capture works locally but remote MongoDB is unchanged, run `run_ai26_localhost_sync.sh`; browser capture and remote synchronization are deliberately separated in the current architecture rather than making browser JavaScript perform storage work.
+If Firefox capture works locally but remote MongoDB is unchanged, run `bash scripts/run_ai26_localhost_sync.sh`; browser capture and remote synchronization are deliberately separated in the current architecture rather than making browser JavaScript perform storage work.
