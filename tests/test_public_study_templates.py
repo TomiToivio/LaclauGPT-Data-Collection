@@ -4,7 +4,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_ai26_public_template_is_synthetic_and_loadable() -> None:
+def test_ai26_public_reference_template_is_safe_and_loadable() -> None:
     from laclaugpt_data_collection.study import load_config
 
     path = ROOT / "configs" / "studies" / "ai26.example.yaml"
@@ -16,7 +16,9 @@ def test_ai26_public_template_is_synthetic_and_loadable() -> None:
     assert {"x", "bluesky", "mastodon", "youtube", "rss", "web", "scholarly"} <= set(
         cfg.platforms
     )
-    assert "example_" in text
+    assert "reference_case: true" in text
+    assert "source_manifest: ai26.sources.example.toml" in text
+    assert "Credentials, cookies, browser profiles, private endpoints" in text
     assert "password" not in text.casefold()
     assert "token:" not in text.casefold()
 
