@@ -14,35 +14,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from .distributed import ProjectNamespace
 
 DATA_SUBDIRS = (
-    "logs",
-    "database",
-    "config",
-    "files",
-    "csv",
-    "jsonl",
-    "codebooks",
-    "sources",
-    "downloads",
-    "media",
-    "models/ollama",
-    "models/whisper",
-    "cache",
-    "tmp",
-    "exports",
-    "artifacts",
-    "runs",
-    "browser",
-    "transcripts",
-    "frames",
+    "logs", "database", "config", "files", "csv", "jsonl", "codebooks", "sources",
+    "downloads", "media", "models/ollama", "models/whisper", "cache", "tmp", "exports",
+    "artifacts", "runs", "browser", "transcripts", "frames",
 )
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_prefix="LACLAUGPT_",
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
+        env_prefix="LACLAUGPT_", env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
 
     project_id: str = "default"
@@ -56,27 +36,31 @@ class Settings(BaseSettings):
 
     data_root: Path = Path("./data")
     sqlite_path: Path = Path("./data/database/collection.sqlite3")
+    csv_path: Path = Path("./data/csv/records.csv")
 
-    record_backend: Literal["sqlite", "mongodb"] = "sqlite"
+    # auto is the preferred deployment contract: MongoDB is considered only when
+    # explicitly configured; otherwise collection stays entirely local in CSV.
+    # sqlite remains supported for backwards compatibility with existing deployments.
+    record_backend: Literal["auto", "csv", "sqlite", "mongodb"] = "auto"
     object_backend: Literal["filesystem", "s3"] = "filesystem"
     cache_backend: Literal["memory", "redis"] = "memory"
 
-    # Direct/no-Redis is intentionally the simplest default. Messaging and task
-    # dispatch can be selected independently, matching the umbrella contract.
     messaging_backend: Literal["none", "redis"] = "none"
     task_queue_backend: Literal["direct", "redis"] = "direct"
 
     browser_host: str = "127.0.0.1"
     browser_port: int = 8765
 
-    mongodb_uri: str = "mongodb://localhost:27017"
+    # Empty by default so auto mode never sends data to an unconfigured service.
+    mongodb_uri: str = ""
     mongodb_database: str = "laclaugpt"
-    # Redis values are private runtime configuration. Empty means not configured.
+    mongodb_collection: str = ""
+    mongodb_connect_timeout_ms: int = 2000
+    mongodb_graph_max_depth: int = 3
+
     redis_url: str = ""
     redis_key_prefix: str = "laclaugpt"
 
-    # Preferred names match the umbrella distributed-run contract. The *_url and
-    # AWS-style credential names remain accepted for backwards compatibility.
     s3_endpoint: str = ""
     s3_endpoint_url: str = ""
     s3_region: str = ""
@@ -87,8 +71,6 @@ class Settings(BaseSettings):
     s3_secret_key: str = ""
     s3_secret_access_key: str = ""
 
-    # Optional graph/vector RAG integration. Disabled by default and intentionally
-    # free of credentials/endpoints in committed configuration.
     rag_enabled: bool = False
     rag_backend: Literal["none", "neo4j", "queue", "custom"] = "none"
     rag_dataset: str = ""
@@ -115,7 +97,6 @@ class Settings(BaseSettings):
 
     @property
     def distributed_namespace(self) -> ProjectNamespace:
-        """Return the shared project namespace for Redis, MongoDB and S3."""
         return ProjectNamespace(
             project_id=self.project_id,
             redis_prefix=self.redis_key_prefix,
@@ -124,9 +105,14 @@ class Settings(BaseSettings):
         )
 
     @property
+    def effective_mongodb_collection(self) -> str:
+        return self.mongodb_collection or self.distributed_namespace.mongo_collection("records")
+
+    @property
     def distributed_requested(self) -> bool:
         return (
             self.record_backend == "mongodb"
+            or (self.record_backend == "auto" and bool(self.mongodb_uri))
             or self.object_backend == "s3"
             or self.cache_backend == "redis"
             or self.messaging_backend == "redis"
@@ -134,20 +120,19 @@ class Settings(BaseSettings):
         )
 
     def data_path(self, *parts: str) -> Path:
-        """Return a path below the private runtime data root."""
         return self.data_root.joinpath(*parts)
 
     def ensure_local_directories(self) -> None:
         self.data_root.mkdir(parents=True, exist_ok=True)
         for relative in DATA_SUBDIRS:
             self.data_path(*relative.split("/")).mkdir(parents=True, exist_ok=True)
-        if self.record_backend == "sqlite":
+        if self.record_backend in {"sqlite", "auto", "csv"}:
             self.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+            self.csv_path.parent.mkdir(parents=True, exist_ok=True)
         if self.rag_enabled:
             self.rag_failure_log.parent.mkdir(parents=True, exist_ok=True)
 
     def safe_summary(self) -> dict[str, str]:
-        """Return non-secret operational settings suitable for logs/doctor output."""
         namespace = self.distributed_namespace
         return {
             "project_id": self.project_id,
@@ -164,10 +149,12 @@ class Settings(BaseSettings):
             "task_queue_backend": self.task_queue_backend,
             "data_root": str(self.data_root),
             "sqlite_path": str(self.sqlite_path),
+            "csv_path": str(self.csv_path),
             "private_config_dir_configured": str(self.private_config_dir is not None),
             "redis_namespace": namespace.redis_base,
+            "mongodb_configured": str(bool(self.mongodb_uri)),
             "mongodb_database": self.mongodb_database,
-            "mongodb_records_collection": namespace.mongo_collection("records"),
+            "mongodb_records_collection": self.effective_mongodb_collection,
             "s3_bucket": self.s3_bucket,
             "s3_project_prefix": namespace.s3_key("raw"),
             "browser_host": self.browser_host,
