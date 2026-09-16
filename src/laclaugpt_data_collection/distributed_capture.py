@@ -82,7 +82,14 @@ class DistributedCaptureSink:
 
     def ingest(self, record_data: dict[str, Any]) -> CanonicalRecord:
         """Persist idempotently and publish a lightweight collected-record event."""
-        record = CanonicalRecord.model_validate(record_data)
+        collection_id = str(record_data.get("collection_id") or self.settings.project_id)
+        arena = str(record_data.get("arena") or "")
+        canonical_data = {
+            key: value
+            for key, value in record_data.items()
+            if key in CanonicalRecord.model_fields
+        }
+        record = CanonicalRecord.model_validate(canonical_data)
         raw_ref = self._raw_object(record)
 
         if not record.provenance:
@@ -91,14 +98,22 @@ class DistributedCaptureSink:
             if not provenance.run_id:
                 provenance.run_id = self.settings.run_id
             provenance.metadata.setdefault("project_id", self.settings.project_id)
+            provenance.metadata.setdefault("collection_id", collection_id)
+            if arena:
+                provenance.metadata.setdefault("arena", arena)
             provenance.metadata.setdefault("machine", self.settings.machine)
             provenance.metadata.setdefault("execution", self.settings.execution)
+        record.source.raw_metadata.setdefault("collection_id", collection_id)
+        if arena:
+            record.source.raw_metadata.setdefault("arena", arena)
 
         self.records.upsert(record)
         self.redis.publish_stream(
             "collected",
             {
                 "project_id": self.settings.project_id,
+                "collection_id": collection_id,
+                "arena": arena,
                 "run_id": self.settings.run_id,
                 "source_url": record.source_url,
                 "record_collection": self.settings.distributed_namespace.mongo_collection("records"),
