@@ -1,140 +1,200 @@
-"""Optional media downloading — queued, checksummed, deduplicated.
+"""Source-agnostic multimodal media downloader.
 
-Adapted from the public `collector/backend/media.py` in
-TomiToivio/LaclauGPT-Discourse-Analysis. Media downloading is asynchronous
-relative to browser capture: capture never waits for large files. Each
-MediaReference carries status/failure metadata so the record stays usable
-even when a signed CDN URL has expired (TikTok/Instagram common case).
-
-Storage behind an interface: filesystem today, Allas/S3 via the storage
-adapters later. Downloaded research media are NEVER committed to Git.
+Browser and non-browser collectors can hand canonical records to this module.
+Download state is persisted through :class:`CollectionStore`, so short cron
+runs are idempotent and failed assets can be retried without blocking others.
+The local filesystem is the default backend; object storage can implement the
+same small backend interface.
 """
 from __future__ import annotations
 
 import hashlib
-import json
-import logging
-import urllib.request
-from datetime import datetime, timezone
+import mimetypes
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Callable, Iterable
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
-logger = logging.getLogger(__name__)
+from .store import CollectionStore
 
-_UA = {"User-Agent": "Mozilla/5.0 (LaclauGPT collector; research)"}
-
-
-def media_filename(platform: str, post_id: str, media_index: int,
-                   ext: str = "") -> str:
-    """Deterministic collision-resistant name (never use captions)."""
-    return f"{platform}_{post_id}_{media_index:03d}{ext}"
+USER_AGENT = "Mozilla/5.0 (LaclauGPT collector; research)"
 
 
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with open(path, "rb") as fh:
-        for chunk in iter(lambda: fh.read(65536), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+class MediaBackend:
+    """Storage interface for local files, S3/Allas or another object store."""
+
+    def save(self, key: str, data: bytes, mime_type: str) -> str:
+        raise NotImplementedError
+
+    def exists(self, key: str) -> bool:
+        raise NotImplementedError
 
 
-def _ext_for(url: str, media_kind: str) -> str:
-    tail = url.split("?")[0].rsplit(".", 1)
-    if len(tail) == 2 and tail[1].lower() in {"jpg", "jpeg", "png", "webp",
-                                              "mp4", "webm", "gif"}:
-        return "." + tail[1].lower()
-    return {"video": ".mp4", "image": ".jpg", "thumbnail": ".jpg"}.get(
-        media_kind, ".bin")
-
-
-class MediaStore:
-    """Local filesystem media storage (swap for object storage later)."""
-
-    def __init__(self, root: str | Path):
+class FilesystemBackend(MediaBackend):
+    def __init__(self, root: str | Path, reference_root: str | Path | None = None) -> None:
         self.root = Path(root)
+        self.reference_root = Path(reference_root) if reference_root else self.root.parent
         self.root.mkdir(parents=True, exist_ok=True)
 
-    def path_for(self, platform: str, post_id: str, media_index: int,
-                 ext: str) -> Path:
-        directory = self.root / platform
-        directory.mkdir(parents=True, exist_ok=True)
-        return directory / media_filename(platform, post_id, media_index, ext)
-
-    def exists_verified(self, path: Path, sha: str | None) -> bool:
-        if not path.exists():
-            return False
-        return sha is None or sha256_file(path) == sha
-
-
-class MediaQueue:
-    """Serial queue worker; capture loops enqueue and move on."""
-
-    def __init__(self, store: MediaStore):
-        self.store = store
-
-    def download(self, ref: dict[str, Any]) -> dict[str, Any]:
-        """Download one media-reference dict; dedupe by path; never raise.
-
-        Input keys: platform, post_id, media_index, url, kind.
-        Output keys add: status, local_path, byte_size, sha256, mime_type,
-        http_status, failure_reason, downloaded_at.
-        """
-        if ref.get("status") == "downloaded":
-            return ref
-        url = str(ref.get("url") or "")
-        if not url.startswith("http"):
-            ref["status"] = "failed"
-            ref["failure_reason"] = "missing or non-http url"
-            return ref
-        dest = self.store.path_for(
-            ref["platform"], str(ref["post_id"]), int(ref.get("media_index") or 0),
-            _ext_for(url, str(ref.get("kind") or "")),
-        )
-        # dedupe: retry must not create a second copy
-        if dest.exists():
-            self._mark_downloaded(ref, dest)
-            return ref
+    def save(self, key: str, data: bytes, mime_type: str) -> str:
+        del mime_type
+        path = self.root / key
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(path.suffix + ".part")
+        temporary.write_bytes(data)
+        temporary.replace(path)
         try:
-            req = urllib.request.Request(url, headers=_UA)
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                data = resp.read()
-                ref["http_status"] = resp.status
-                ref["mime_type"] = resp.headers.get("Content-Type")
-            tmp = dest.with_suffix(dest.suffix + ".part")
-            tmp.write_bytes(data)
-            tmp.rename(dest)
-            self._mark_downloaded(ref, dest)
-        except Exception as exc:  # noqa: BLE001 — failures recorded, never fatal
-            ref["status"] = "failed"
-            ref["failure_reason"] = str(exc)[:200]
-        return ref
+            return path.relative_to(self.reference_root).as_posix()
+        except ValueError:
+            return str(path)
+
+    def exists(self, key: str) -> bool:
+        return (self.root / key).exists()
+
+
+@dataclass(frozen=True)
+class MediaJob:
+    media_key: str
+    collection_id: str
+    platform: str
+    source_id: str
+    media_index: int
+    kind: str
+    url: str
+
+
+class MediaDownloader:
+    """Persistent queue worker with checksums, retries and collection isolation."""
+
+    def __init__(
+        self,
+        store: CollectionStore,
+        backend: MediaBackend | None = None,
+        workers: int = 4,
+        fetcher: Callable[[str], tuple[bytes, str]] | None = None,
+    ) -> None:
+        self.store = store
+        self.backend = backend or FilesystemBackend(store.media_dir, store.root)
+        self.workers = max(1, workers)
+        self._fetcher = fetcher
 
     @staticmethod
-    def _mark_downloaded(ref: dict[str, Any], dest: Path) -> None:
-        ref["local_path"] = str(dest)
-        ref["byte_size"] = dest.stat().st_size
-        ref["sha256"] = sha256_file(dest)
-        ref["status"] = "downloaded"
-        ref["downloaded_at"] = datetime.now(timezone.utc).isoformat()
+    def _record_fields(record: dict) -> tuple[str, str, str, list[dict]]:
+        source = record.get("source") or {}
+        content = record.get("content") or {}
+        native = record.get("source_native_ids") or {}
+        provenance = record.get("provenance") or []
+        platform = str(record.get("platform") or source.get("platform") or "source")
+        source_id = str(
+            record.get("source_url")
+            or record.get("document_id")
+            or native.get("document_id")
+            or ""
+        )
+        if not source_id:
+            raise ValueError("media record requires source_url or source-native identifier")
+        collection_id = str(record.get("collection_id") or record.get("study") or "")
+        if not collection_id and provenance and isinstance(provenance[-1], dict):
+            latest = provenance[-1]
+            metadata = latest.get("metadata") or {}
+            collection_id = str(
+                metadata.get("collection_id")
+                or metadata.get("study")
+                or latest.get("collection_id")
+                or latest.get("study")
+                or ""
+            )
+        collection_id = collection_id or "default"
+        refs = record.get("media_references") or content.get("media_references") or []
+        return collection_id, platform, source_id, list(refs)
 
+    def enqueue_from_records(self, records: Iterable[dict]) -> list[MediaJob]:
+        jobs: list[MediaJob] = []
+        queued: set[str] = set()
+        for record in records:
+            collection_id, platform, source_id, refs = self._record_fields(record)
+            source_hash = hashlib.sha256(source_id.encode()).hexdigest()[:16]
+            for position, ref in enumerate(refs):
+                url = str(ref.get("url") or "")
+                if not url:
+                    continue
+                media_index = int(ref.get("media_index", position))
+                media_key = f"{collection_id}:{platform}:{source_hash}:{media_index}"
+                if media_key in queued:
+                    continue
+                known = self.store.media_known(media_key)
+                if known and known.get("status") in {"completed", "ok", "downloaded"}:
+                    continue
+                queued.add(media_key)
+                jobs.append(MediaJob(
+                    media_key=media_key,
+                    collection_id=collection_id,
+                    platform=platform,
+                    source_id=source_id,
+                    media_index=media_index,
+                    kind=str(ref.get("kind") or "unknown"),
+                    url=url,
+                ))
+        return jobs
 
-def process_queue(refs: list[dict[str, Any]], store: MediaStore) -> list[dict[str, Any]]:
-    """Drain the queue (serial today; threads later if needed)."""
-    queue = MediaQueue(store)
-    return [queue.download(ref) for ref in refs]
+    def run_queue(self, jobs: list[MediaJob]) -> list[dict]:
+        results: list[dict] = []
+        lock = threading.Lock()
 
+        def work(job: MediaJob) -> None:
+            outcome = self._download_one(job)
+            with lock:
+                results.append(outcome)
 
-def media_manifest(refs: list[dict[str, Any]], manifest_dir: Path) -> Path:
-    """Write one media-run manifest; returns the manifest path."""
-    manifest_dir.mkdir(parents=True, exist_ok=True)
-    path = manifest_dir / f"media_{datetime.now(timezone.utc):%Y%m%dT%H%M%S}.json"
-    payload = {
-        "at": datetime.now(timezone.utc).isoformat(),
-        "downloads": [
-            {k: ref.get(k) for k in (
-                "platform", "post_id", "status", "sha256", "local_path",
-                "failure_reason")} for ref in refs],
-    }
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=1),
-                    encoding="utf-8")
-    return path
+        with ThreadPoolExecutor(max_workers=self.workers) as pool:
+            list(pool.map(work, jobs))
+        return results
+
+    def _download_one(self, job: MediaJob) -> dict:
+        # Persist queued/running state before network I/O. The collection id is
+        # part of media_key, so simultaneous AI26/Brazil26 jobs never collide.
+        self.store.record_media(
+            job.media_key, job.platform, job.source_id, job.media_index, job.url,
+            None, None, None, "", "running", None, None,
+        )
+        try:
+            body, mime = self._fetch(job.url)
+        except Exception as exc:  # noqa: BLE001
+            status = exc.code if isinstance(exc, HTTPError) else None
+            self.store.record_media(
+                job.media_key, job.platform, job.source_id, job.media_index, job.url,
+                None, None, None, "", "failed", str(exc)[:300], status,
+            )
+            return {"media_key": job.media_key, "collection_id": job.collection_id,
+                    "status": "failed", "error": str(exc)[:300], "http_status": status}
+
+        mime = (mime or "application/octet-stream").split(";", 1)[0].strip()
+        checksum = hashlib.sha256(body).hexdigest()
+        extension = (mimetypes.guess_extension(mime) or "").replace(".jpe", ".jpg")
+        collection_dir = hashlib.sha256(job.collection_id.encode()).hexdigest()[:10]
+        filename = f"{collection_dir}/{job.platform}/{job.media_key.replace(':', '_')}{extension}"
+        path = self.backend.save(filename, body, mime)
+        self.store.record_media(
+            job.media_key, job.platform, job.source_id, job.media_index, job.url,
+            path, checksum, len(body), mime, "completed", None, 200,
+        )
+        return {
+            "media_key": job.media_key,
+            "collection_id": job.collection_id,
+            "status": "completed",
+            "local_path": path,
+            "sha256": checksum,
+            "byte_size": len(body),
+            "mime_type": mime,
+            "http_status": 200,
+        }
+
+    def _fetch(self, url: str) -> tuple[bytes, str]:
+        if self._fetcher is not None:
+            return self._fetcher(url)
+        request = Request(url, headers={"User-Agent": USER_AGENT})
+        with urlopen(request, timeout=120) as response:
+            return response.read(), response.headers.get("Content-Type", "application/octet-stream")

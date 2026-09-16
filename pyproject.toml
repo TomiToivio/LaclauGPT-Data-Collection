@@ -50,6 +50,7 @@ dev = [
 [project.scripts]
 laclaugpt-collect = "laclaugpt_data_collection.cli:main"
 laclaugpt-capture = "laclaugpt_data_collection.capture_server:main"
+laclaugpt-media-download = "laclaugpt_data_collection.media_runner:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/laclaugpt_data_collection"]
