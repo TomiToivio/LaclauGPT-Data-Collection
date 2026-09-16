@@ -1,42 +1,138 @@
-# SYNTHETIC PUBLIC EXAMPLE ONLY.
-# Copy to an ignored/private runtime location and replace every placeholder.
-# Never commit the real AI26 watch list, account handles, browser profile,
-# credentials, private backend URLs, or collected records.
+# Public-safe AI26 reference study.
+# This is publication-facing methodology, not the private operational watch list.
+# Copy/extend it under ignored runtime configuration for actual collection.
+# Never commit credentials, cookies, browser profiles, private backend URLs,
+# unpublished watch lists, row-level collected data, or machine-specific secrets.
+
 study: ai26
+title: Ideological contestation over AI
 timezone: UTC
+reference_case: true
+paper: https://github.com/TomiToivio/LaclauGPT/blob/main/paper/PAPER.md
+
 window:
   start: 2026-01-01
   end: 2026-12-31
 
-platforms:
-  x:
-    enabled: true
-    base_urls:
-      - "https://x.com/{handle}"
-  tiktok:
-    enabled: true
-    base_urls:
-      - "https://www.tiktok.com/@{handle}"
-  instagram:
-    enabled: true
-    base_urls:
-      - "https://www.instagram.com/{handle}/"
+relevance:
+  # Preserve uncertain material for later human/theory-guided assessment.
+  mode: retain_unjudged
 
-# Groups are sampling provenance, not automatic labels for captured posts.
-groups:
-  - id: synthetic_ai_labs
-    name: Synthetic AI labs
-    arena: elites
-    formation_seed: ""
-    accounts:
-      x: [example_ai_lab]
-      tiktok: [example_ai_lab]
-      instagram: [example_ai_lab]
-  - id: synthetic_civil_society
-    name: Synthetic civil society
-    arena: grassroots
-    formation_seed: ""
-    accounts:
-      x: [example_civic_group]
-      tiktok: [example_civic_group]
-      instagram: [example_civic_group]
+# Arenas mirror the public paper and the private study configuration. They are
+# sampling provenance, not automatic ideological labels for captured records.
+arenas:
+  elites:
+    title: AI elites
+    platforms: [web, rss, podcast, x]
+    languages: [en]
+    regions: [US, EU]
+    description: >-
+      Entrepreneurs, researchers, intellectuals, major AI labs and adjacent
+      ideological movements. Collect public blogs, statements, interviews,
+      podcasts, forums and social-media material where permitted.
+    public_source_examples:
+      - https://openai.com/
+      - https://www.anthropic.com/
+      - https://deepmind.google/
+      - https://ai.meta.com/
+      - https://www.miri.org/
+      - https://www.dair-institute.org/
+
+  grassroots:
+    title: Grassroots mobilisation around and against AI
+    platforms: [web, rss, tiktok, x, instagram]
+    languages: [en, fi]
+    regions: [FI, EU, US]
+    description: >-
+      Public mobilisation and conflict around employment, creative work,
+      surveillance, data extraction, data centres, environment, regulation,
+      AI safety, local resistance and broader support/opposition to AI.
+    public_source_examples:
+      - https://pauseai.info/
+
+  parliamentary:
+    title: Parliamentary and electoral politics
+    platforms: [web, rss, tiktok, x]
+    languages: [en, fi]
+    regions: [FI, EU, US]
+    description: >-
+      AI-related parliamentary debates, policy documents, election material,
+      party/government discourse and news. The EU AI Act is one governance
+      anchor, not the sole frame for the arena.
+    public_source_examples:
+      - https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai
+      - https://www.europarl.europa.eu/
+
+# Collection hints support discovery only. They are not analysis results and
+# must never be written into records as inferred formations or discourse roles.
+discovery_hints:
+  signifiers:
+    - artificial intelligence
+    - AGI
+    - AI safety
+    - AI regulation
+    - safety
+    - pacing
+    - competition
+    - innovation
+    - China
+    - control
+    - liability
+    - independent evaluation
+    - standards
+    - existential risk
+    - abundance
+    - stagnation
+    - deceleration
+    - labour
+    - job displacement
+    - automation
+    - ownership
+    - public interest AI
+    - open source
+    - surveillance
+    - data extraction
+    - copyright
+    - creative work
+    - data centres
+    - energy
+    - environment
+    - democracy
+    - pause
+
+  public_actor_examples:
+    - OpenAI
+    - Anthropic
+    - Google DeepMind
+    - Meta AI
+    - Machine Intelligence Research Institute
+    - Distributed AI Research Institute
+    - PauseAI
+    - European Commission AI Office
+
+# These are reproducibility anchors for downstream Analysis, never labels that
+# Collection assigns to people, organizations or posts.
+formation_vocabulary:
+  - accelerationism
+  - doomerism
+  - left-wing accelerationism
+  - ai safety
+  - ai critical
+  - anti-ai
+
+collection_policy:
+  preserve_exact_raw_payload: true
+  preserve_source_url: true
+  preserve_native_ids: true
+  download_public_media_only_when_permitted: true
+  attach_project_metadata:
+    project: ai26
+    arena_from_collection_job: true
+  infer_ideology_during_collection: false
+
+# Local/distributed backends are configured separately. Values here are
+# intentionally non-secret and backend-neutral.
+storage:
+  canonical_records: configured_runtime_backend
+  raw_media: configured_runtime_object_store
+  redis_required: false
