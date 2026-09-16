@@ -8,6 +8,16 @@ This file is the canonical shared contract. Agent-specific files such as `CLAUDE
 
 Keep this repository limited to data collection: source/browser/network capture, platform parsers, normalization, provenance, collection state, media/raw persistence, scheduling, and storage adapters. Analysis, dashboards, simulations and other module responsibilities belong elsewhere.
 
+## AI26 public reference study
+
+AI26 (`Ideological contestation over AI`) is the preferred realistic public example for this module because the current LaclauGPT architecture is being developed alongside the public AI26 paper. Use `configs/studies/ai26.example.yaml` when documenting or testing study-aware collection behavior.
+
+AI26 example configuration is allowed to contain public methodology: the three paper arenas (AI elites, grassroots mobilisation, parliamentary/electoral politics), public source-family examples, discovery terms, project metadata and secret-free collection/storage policies. These settings are sampling provenance only. Collection MUST NOT infer or assign ideological formations, discourse roles or actor ideology from the source list.
+
+The public example may track changing research-relevant terms such as safety, pacing, competition, innovation, China, control, liability, independent evaluation, regulation, labour, ownership, surveillance and data centres. These are discovery/context hints, not labels.
+
+Keep private credentials, cookies, browser profiles, private backend endpoints, unpublished watch lists/handles, private source-selection notes and row-level research data. The public/private rule is **public research design and examples, private operational state and data**.
+
 ## Canonical record contract
 
 All collectors and storage adapters MUST use the project-wide canonical LaclauGPT record contract.
@@ -26,9 +36,9 @@ All collectors and storage adapters MUST use the project-wide canonical LaclauGP
 
 ## Mandatory runtime data boundary
 
-All runtime and study-specific material belongs below `data/`, and the complete `data/` tree stays outside Git. Follow `docs/RUNTIME_DATA.md`.
+All runtime and operational study material belongs below `data/`, and the complete `data/` tree stays outside Git. Follow `docs/RUNTIME_DATA.md`.
 
-Logs, databases, local configuration, CSV/JSONL files, codebooks, source/target lists, downloads, media, browser state, transcripts, frames, exports, temporary files and local Ollama/Whisper model material all belong under `data/`.
+Logs, databases, local configuration, CSV/JSONL files, private codebooks, private source/target lists, downloads, media, browser state, transcripts, frames, exports, temporary files and local Ollama/Whisper model material all belong under `data/`. Public-safe study examples such as `configs/studies/ai26.example.yaml` live outside `data/`.
 
 Never create new top-level runtime roots such as `logs/`, `database/`, `csv/`, `outputs/`, `downloads/` or model-cache directories. Derive paths from `Settings.data_root` and use `Settings.ensure_local_directories()` to initialize the standard tree.
 
