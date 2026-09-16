@@ -11,6 +11,18 @@ paper: https://github.com/TomiToivio/LaclauGPT/blob/main/paper/PAPER.md
 collection_codebook: ai26.collection-codebook.yaml
 source_manifest: ai26.sources.example.toml
 
+# Distributed control-plane policy for the current AI26 collection deployment.
+# Centralized Redis-backed project configuration is enabled conceptually now so
+# laptop/browser and server collectors can consume the same validated settings.
+# Messaging/events and distributed task queueing are implemented by the module
+# but intentionally remain inactive for AI26 until there is an operational need.
+distributed:
+  config_backend: redis
+  messaging_backend: none
+  task_queue_backend: direct
+  durable_config_snapshot: true
+  redis_url_from_environment: LACLAUGPT_REDIS_URL
+
 window:
   start: 2026-09-01
   end: 2026-12-31
