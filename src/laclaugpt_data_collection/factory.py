@@ -69,5 +69,7 @@ def build_object_store(settings: Settings) -> ObjectStore:
             access_key_id=settings.effective_s3_access_key,
             secret_access_key=settings.effective_s3_secret_key,
             prefix=prefix,
+            signature_version=settings.s3_signature_version,
+            addressing_style=settings.s3_addressing_style,
         )
     raise ValueError(f"Unsupported object backend: {settings.object_backend}")

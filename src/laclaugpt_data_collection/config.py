@@ -70,6 +70,15 @@ class Settings(BaseSettings):
     s3_access_key_id: str = ""
     s3_secret_key: str = ""
     s3_secret_access_key: str = ""
+    # CSC Allas (the documented deployment target) rejects signature v4 uploads
+    # with HTTP 411 and only accepts signature v2, so that is the default.
+    # AWS S3 and providers that have retired SigV2 override this with s3v4.
+    s3_signature_version: Literal["s3", "s3v4"] = "s3"
+    # Path-style addressing against Allas fails uploads with a misleading
+    # ``QuotaExceeded`` (HTTP 403) even when the bucket has free space. boto3's
+    # ``auto`` resolves to virtual-host style for DNS-compatible bucket names,
+    # which is what Allas requires, so ``path`` must stay opt-in.
+    s3_addressing_style: Literal["auto", "virtual", "path"] = "auto"
 
     rag_enabled: bool = False
     rag_backend: Literal["none", "neo4j", "queue", "custom"] = "none"
@@ -157,6 +166,8 @@ class Settings(BaseSettings):
             "mongodb_records_collection": self.effective_mongodb_collection,
             "s3_bucket": self.s3_bucket,
             "s3_project_prefix": namespace.s3_key("raw"),
+            "s3_signature_version": self.s3_signature_version,
+            "s3_addressing_style": self.s3_addressing_style,
             "browser_host": self.browser_host,
             "browser_port": str(self.browser_port),
             "rag_enabled": str(self.rag_enabled),
