@@ -44,6 +44,22 @@ projects/<project>/runs/
 
 The same layout works with CSC Allas or another S3-compatible provider. Bucket credentials and endpoint configuration remain private environment/deployment settings.
 
+### CSC Allas client configuration
+
+Allas is not fully S3-compatible in two ways that break uploads with the boto3
+defaults, while leaving reads working:
+
+| Symptom | Cause | Correct setting |
+|---|---|---|
+| `MissingContentLength` (HTTP 411) on PUT | Allas rejects signature version 4 uploads | `LACLAUGPT_S3_SIGNATURE_VERSION=s3` |
+| `QuotaExceeded` (HTTP 403) on PUT, even with an empty bucket | Allas rejects path-style addressing uploads | `LACLAUGPT_S3_ADDRESSING_STYLE=auto` |
+
+Both are the defaults, so an Allas deployment needs no extra configuration.
+`list`/`head`/`get` succeed with signature v4 and either addressing style, so a
+misconfigured client still appears healthy until the first object is written.
+Set `s3v4`/`path` only for real AWS S3 or another provider that has retired
+SigV2. `laclaugpt-collect doctor` prints the effective values.
+
 ## Isolation rule
 
 A worker configured for one `project_id` must reject messages or records labelled with another project. Never derive project routing from source platform, filename or a human-readable study title.

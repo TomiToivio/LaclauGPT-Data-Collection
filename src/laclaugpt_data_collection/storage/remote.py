@@ -145,19 +145,28 @@ class S3ObjectStore:
         access_key_id: str | None = None,
         secret_access_key: str | None = None,
         prefix: str = "",
+        signature_version: str = "s3",
+        addressing_style: str = "auto",
     ) -> None:
         try:
             import boto3
+            from botocore.config import Config
         except ImportError as exc:  # pragma: no cover - optional dependency
             raise RuntimeError("Install laclaugpt-data-collection[distributed] for S3") from exc
         self.bucket = bucket
         self.prefix = prefix.strip("/")
+        self.signature_version = signature_version
+        self.addressing_style = addressing_style
         self._client = boto3.client(
             "s3",
             endpoint_url=endpoint_url or None,
             region_name=region_name or None,
             aws_access_key_id=access_key_id or None,
             aws_secret_access_key=secret_access_key or None,
+            config=Config(
+                signature_version=signature_version,
+                s3={"addressing_style": addressing_style},
+            ),
         )
 
     def _key(self, key: str) -> str:

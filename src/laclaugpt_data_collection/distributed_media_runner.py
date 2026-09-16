@@ -102,6 +102,8 @@ def run_distributed_media(
             access_key_id=settings.effective_s3_access_key,
             secret_access_key=settings.effective_s3_secret_key,
             prefix=f"{settings.s3_prefix_root}/{settings.project_id}",
+            signature_version=settings.s3_signature_version,
+            addressing_style=settings.s3_addressing_style,
         )
         downloader = MediaDownloader(
             store,
