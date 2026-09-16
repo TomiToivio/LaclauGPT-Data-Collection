@@ -1,0 +1,216 @@
+# Public-safe AI26 source-family manifest.
+# Adapted from the private study configuration and updated for the public paper
+# and September 2026 situation. These entries document reproducible sampling
+# logic; source_family is a sensitising sampling heuristic, NEVER ideological
+# ground truth for individual documents or actors.
+#
+# Verify URLs before production runs. Operational watch lists, credentials,
+# cookies, private endpoints and collection state belong in ignored runtime data.
+
+[[feed]]
+name = "lesswrong_frontpage"
+feed_url = "https://www.lesswrong.com/feed.xml?view=frontpage"
+homepage = "https://www.lesswrong.com"
+source_family = "x-risk / rationalist / alignment"
+sampling_rationale = "Public essays on existential risk, alignment, decision theory and adjacent AGI imaginaries."
+priority = "P1"
+
+[[feed]]
+name = "miri_blog"
+feed_url = "https://intelligence.org/feed/"
+homepage = "https://intelligence.org"
+source_family = "x-risk / alignment"
+sampling_rationale = "Institutional alignment and AGI-risk discourse."
+priority = "P1"
+
+[[feed]]
+name = "future_of_life"
+feed_url = "https://futureoflife.org/feed/"
+homepage = "https://futureoflife.org"
+source_family = "x-risk / governance"
+sampling_rationale = "AI-risk advocacy and governance proposals bridging safety discourse and public policy."
+priority = "P1"
+
+[[feed]]
+name = "metr"
+feed_url = "https://metr.org/feed.xml"
+homepage = "https://metr.org"
+source_family = "evaluations / safety"
+sampling_rationale = "Frontier-model evaluation and autonomy/safety research."
+priority = "P1"
+
+[[feed]]
+name = "ai_now"
+feed_url = "https://ainowinstitute.org/category/news/feed"
+homepage = "https://ainowinstitute.org"
+source_family = "critical AI / political economy"
+sampling_rationale = "Power, labour, inequality, surveillance, rights and AI-industry governance."
+priority = "P1"
+
+[[feed]]
+name = "algorithmwatch"
+feed_url = "https://algorithmwatch.org/en/feed/"
+homepage = "https://algorithmwatch.org"
+source_family = "critical AI / algorithmic accountability"
+sampling_rationale = "European accountability, automation, discrimination and governance discourse."
+priority = "P1"
+
+[[feed]]
+name = "data_society"
+feed_url = "https://datasociety.net/feed/"
+homepage = "https://datasociety.net"
+source_family = "critical AI / sociotechnical research"
+sampling_rationale = "Research on data power, infrastructures and sociotechnical ordering."
+priority = "P2"
+
+[[feed]]
+name = "ada_lovelace"
+feed_url = "https://www.adalovelaceinstitute.org/feed/"
+homepage = "https://www.adalovelaceinstitute.org"
+source_family = "critical AI / governance"
+sampling_rationale = "Rights-oriented AI governance and public-interest research."
+priority = "P2"
+
+[[feed]]
+name = "marc_andreessen"
+feed_url = "https://pmarca.substack.com/feed/"
+homepage = "https://pmarca.substack.com"
+source_family = "techno-optimism / acceleration"
+sampling_rationale = "Public techno-optimist and acceleration-adjacent discourse; the paper discusses the Techno-Optimist Manifesto."
+priority = "P1"
+
+[[feed]]
+name = "interconnects"
+feed_url = "https://www.interconnects.ai/feed"
+homepage = "https://www.interconnects.ai"
+source_family = "frontier AI / open models / policy bridge"
+sampling_rationale = "Technical frontier-AI development, scaling, open-weights and policy debates."
+priority = "P1"
+
+[[feed]]
+name = "import_ai"
+feed_url = "https://importai.substack.com/feed"
+homepage = "https://importai.substack.com"
+source_family = "frontier AI elite / safety / policy"
+sampling_rationale = "Industry, safety and policy synthesis from an AI-lab insider perspective."
+priority = "P1"
+
+[[feed]]
+name = "tech_policy_press"
+feed_url = "https://www.techpolicy.press/rss/feed.xml"
+homepage = "https://www.techpolicy.press"
+source_family = "governance / institutional"
+sampling_rationale = "Policy, regulation, national-security, labour and platform-governance coverage."
+priority = "P1"
+
+[[feed]]
+name = "cset_georgetown"
+feed_url = "https://cset.georgetown.edu/feed/"
+homepage = "https://cset.georgetown.edu"
+source_family = "governance / national security / infrastructure"
+sampling_rationale = "Compute, national security, infrastructure and regulation discourse."
+priority = "P1"
+
+[[feed]]
+name = "works_in_progress"
+feed_url = "https://worksinprogress.co/rss.xml"
+homepage = "https://worksinprogress.co"
+source_family = "progress imaginary"
+sampling_rationale = "Broad progress-oriented technological imaginaries; relevance must be assessed at document level."
+priority = "P2"
+
+[[feed]]
+name = "gary_marcus"
+feed_url = "https://garymarcus.substack.com/feed"
+homepage = "https://garymarcus.substack.com"
+source_family = "AI skepticism / hype critique / governance"
+sampling_rationale = "Public criticism of AI hype, limitations and governance from within elite AI debate."
+priority = "P1"
+
+[[feed]]
+name = "realtime_techpocalypse"
+feed_url = "https://www.realtimetechpocalypse.com/feed"
+homepage = "https://www.realtimetechpocalypse.com"
+source_family = "critical AI / TESCREAL critique"
+sampling_rationale = "Public critique of TESCREAL, longtermism and existential-risk ideologies."
+priority = "P1"
+
+[[feed]]
+name = "yudkowsky"
+feed_url = "https://www.yudkowsky.net/feed/"
+homepage = "https://www.yudkowsky.net"
+source_family = "x-risk / alignment"
+sampling_rationale = "Existential-risk and alignment writing outside LessWrong."
+priority = "P1"
+
+[[feed]]
+name = "petteri_jarvinen"
+feed_url = "https://www.petterijarvinen.fi/feed/"
+homepage = "https://www.petterijarvinen.fi"
+source_family = "Finland public AI discourse"
+sampling_rationale = "Finnish-language expert/public discourse on AI and digital technology."
+priority = "P1"
+
+[[feed]]
+name = "kai_fu_lee"
+feed_url = "https://kaifulee.medium.com/feed"
+homepage = "https://kaifulee.medium.com"
+source_family = "China / global AI competition / commercialization"
+sampling_rationale = "China-West AI competition, commercialization and future imaginaries."
+priority = "P1"
+
+[[web_source]]
+name = "dair_blog"
+homepage = "https://www.dair-institute.org/blog/"
+source_family = "critical AI / power / labour / justice"
+sampling_rationale = "Critical AI research on power, labour, inequality and community-centred alternatives."
+priority = "P1"
+
+[[web_source]]
+name = "dario_amodei_essays"
+homepage = "https://darioamodei.com/"
+source_family = "frontier AI / safety / x-risk / pacing"
+sampling_rationale = "Public essays on frontier capabilities, benefits, risk, safety, evaluation and pacing."
+priority = "P1"
+
+[[web_source]]
+name = "openai_policy"
+homepage = "https://openai.com/global-affairs/"
+source_family = "frontier AI / governance / safety"
+sampling_rationale = "Public AI-policy statements useful for tracking safety, regulation, competition and governance articulations."
+priority = "P1"
+
+[[web_source]]
+name = "anthropic_news"
+homepage = "https://www.anthropic.com/news"
+source_family = "frontier AI / safety / governance"
+sampling_rationale = "Public lab statements on models, safety, policy and frontier-AI governance."
+priority = "P1"
+
+[[web_source]]
+name = "google_deepmind"
+homepage = "https://deepmind.google/discover/blog/"
+source_family = "frontier AI / safety / science"
+sampling_rationale = "Public frontier-AI research and governance discourse."
+priority = "P1"
+
+[[web_source]]
+name = "meta_ai"
+homepage = "https://ai.meta.com/blog/"
+source_family = "frontier AI / open models / competition"
+sampling_rationale = "Public Meta AI research and product discourse, useful for open-model, competition and safety articulations."
+priority = "P1"
+
+[[web_source]]
+name = "pause_ai"
+homepage = "https://pauseai.info/"
+source_family = "grassroots AI safety / pause movement"
+sampling_rationale = "Public movement discourse around slowing/pausing frontier AI and political mobilisation."
+priority = "P1"
+
+[[web_source]]
+name = "eu_ai_policy"
+homepage = "https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai"
+source_family = "EU governance / parliamentary-policy arena"
+sampling_rationale = "Public EU AI regulatory material; governance anchor rather than ideological ground truth."
+priority = "P1"
