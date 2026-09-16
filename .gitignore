@@ -98,6 +98,7 @@ state/
 # Local deployment / cloud tooling
 .allas/
 .s3cfg
+.s3cfg.*
 .aws/
 openrc*
 clouds.yaml

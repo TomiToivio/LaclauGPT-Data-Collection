@@ -60,7 +60,22 @@ FORBIDDEN_PARTS = {
     "private",
     "playwright/.auth",
 }
-FORBIDDEN_PREFIXES = ("openrc", "kubeconfig", "id_rsa", "id_ed25519")
+FORBIDDEN_PREFIXES = (
+    "openrc",
+    "kubeconfig",
+    "id_rsa",
+    "id_ed25519",
+    # Cloud/OpenStack credential bundles. `allas_conf` is the CSC Allas helper, but any
+    # `*-conf` cloud credential file belongs outside the public repository.
+    "allas_conf",
+    "allas-conf",
+)
+FORBIDDEN_EXACT_NAMES = {
+    "allas_conf",
+    "allas-conf",
+    "gcloud_conf",
+    "az_conf",
+}
 ALLOWED_EXACT = {
     ".env.example",
     "configs/laptop.example.toml",
@@ -77,6 +92,15 @@ SECRET_PATTERNS = [
     ),
     # Catch credential-bearing URLs such as scheme://user:password@host.
     re.compile(r"(?i)\b(?:mongodb(?:\+srv)?|redis|https?|s3)://[^\s/:@]+:[^\s/@]+@[^\s/]+"),
+    # OpenStack/CSC-style credential bundles such as `export OS_AUTH_TOKEN=<value>`.
+    # A bare variable reference (OS_AUTH_TOKEN="$OS_AUTH_TOKEN") or a placeholder is
+    # plumbing, not a secret, and must stay allowed. Only horizontal whitespace is
+    # consumed after the separator, so a match can never run on to the next line and
+    # treat a following variable *name* as a value.
+    re.compile(
+        r"(?i)\b(?:export[ \t]+)?OS_(?:AUTH_TOKEN|PASSWORD|AUTH_DATA|SECRET_KEY|ACCESS_KEY)"
+        r"[ \t]*[:=][ \t]*[\"']?(?!\$|<|replace|example|changeme)[^\s\"'\r\n]{12,}"
+    ),
 ]
 
 
@@ -97,6 +121,8 @@ def path_policy_violations(path: Path) -> list[str]:
         violations.append(f"forbidden data/secret suffix: {path}")
     if path.name.casefold() in FORBIDDEN_NAMES:
         violations.append(f"forbidden private/config filename: {path}")
+    if path.name.casefold() in FORBIDDEN_EXACT_NAMES:
+        violations.append(f"forbidden cloud credential bundle: {path}")
     if path.name.casefold().startswith(FORBIDDEN_PREFIXES):
         violations.append(f"forbidden operational credential/config filename: {path}")
     if any(part in lowered for part in FORBIDDEN_PARTS):

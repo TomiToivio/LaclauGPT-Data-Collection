@@ -52,3 +52,39 @@ aws_secret_access_key=secret_access_key
 mongodb_uri = os.environ["LACLAUGPT_MONGODB_URI"]
 '''
     assert POLICY.content_policy_violations(Path("example.py"), safe) == []
+
+
+def test_cloud_credential_bundles_are_rejected_by_name() -> None:
+    """`allas_conf` (CSC Allas helper) was once committed; it must never pass again."""
+    for name in (
+        "allas_conf",
+        "allas-conf",
+        "nested/allas_conf",
+        "gcloud_conf",
+        "az_conf",
+    ):
+        assert POLICY.path_policy_violations(Path(name)), name
+
+
+def test_openstack_credential_values_are_rejected() -> None:
+    """A populated OS_* credential slot is secret material, not plumbing."""
+    token_var = "OS_AUTH" + "_TOKEN"
+    leaked = f"export {token_var}=gAAAAABabc123def456ghi789jkl012mno345\n"
+    assert POLICY.content_policy_violations(Path("allas_conf"), leaked)
+
+    password_var = "OS_" + "PASSWORD"
+    leaked_pw = f'{password_var}="hunter2hunter2"\n'
+    assert POLICY.content_policy_violations(Path("clouds.sh"), leaked_pw)
+
+
+def test_openstack_plumbing_is_not_a_false_positive() -> None:
+    """Empty slots and variable references are how a script reads its environment."""
+    token_var = "OS_AUTH" + "_TOKEN"
+    password_var = "OS_" + "PASSWORD"
+    safe = (
+        f"export {token_var}=\n"
+        f'{token_var}="${token_var}"\n'
+        f"{token_var}=${{{token_var}:-}}\n"
+        f"{password_var}=replace-locally\n"
+    )
+    assert POLICY.content_policy_violations(Path("allas_conf.example.sh"), safe) == []
