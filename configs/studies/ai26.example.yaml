@@ -35,11 +35,12 @@ arenas:
     platforms: [rss, web, youtube, x, bluesky, mastodon, scholarly]
     sampling_focus:
       - frontier-lab and industry discourse
-      - acceleration and techno-optimism
-      - existential-risk and alignment discourse
-      - AI safety, evaluation and pacing
+      - accelerationism and techno-optimism
+      - existential-risk and catastrophic-risk discourse
+      - AI safety, alignment, evaluation and pacing
       - Critical AI and political-economy critique
-      - open-source and public-interest alternatives
+      - open-source, open-weights and public-interest alternatives
+      - left-wing and postcapitalist techno-optimism
 
   grassroots:
     title: Grassroots mobilisation around and against AI
@@ -66,23 +67,21 @@ arenas:
       - labour, rights and public-interest AI
       - safety standards, liability and independent evaluation
 
-# Stable aggregation vocabulary. These are sampling anchors only. Collection
-# must never stamp a document or actor with one of these formations merely
-# because it came from a particular source.
+# Sampling anchors only. The paper treats these as provisional formations,
+# not actor identities or labels to stamp onto documents during collection.
 formation_vocabulary:
   - accelerationism
-  - doomerism
-  - left-wing accelerationism
+  - techno-optimism
+  - existential-risk discourse
   - ai safety
   - ai critical
-  - anti-ai
+  - anti-ai and deployment resistance
+  - left-wing techno-optimism
 
-# Cross-cutting dimensions prevent the source plan from collapsing into six
-# ideological boxes. They are useful for discovery and later stratification.
 sampling_dimensions:
   political_economy: [ownership, labour, concentration, redistribution, public infrastructure]
   governance: [regulation, liability, audits, standards, democratic control]
-  capability_risk: [alignment, catastrophic risk, loss of control, autonomous agents]
+  capability_risk: [alignment, catastrophic risk, existential risk, loss of control, autonomous agents]
   techno_optimism: [abundance, growth, innovation, human flourishing, post-work]
   rights_and_harms: [discrimination, surveillance, copyright, creator rights, data extraction]
   infrastructure: [compute, data centres, energy, water, chips, open weights]
@@ -98,8 +97,10 @@ discovery_hints:
     - abundance
     - growth
     - innovation
+    - progress
     - existential risk
     - catastrophic risk
+    - extinction
     - alignment
     - AI safety
     - pacing
@@ -114,7 +115,9 @@ discovery_hints:
     - China
     - labour
     - automation
+    - post-work
     - ownership
+    - redistribution
     - corporate concentration
     - surveillance
     - copyright
@@ -153,8 +156,8 @@ collector_defaults:
     respect_retry_after: true
     min_delay_seconds: 1
 
-# Conservative demo budgets. RSS/web/scholarly material is deliberately
-# prioritized over high-volume social collection.
+# Conservative public-demo budgets. RSS/web/scholarly material remains the
+# backbone; browser collection is a bounded discourse sample, not a firehose.
 source_budgets:
   rss_web:
     target_endpoints: 40
@@ -173,50 +176,82 @@ source_budgets:
     target_accounts: 10
     daily_record_cap: 75
   x:
-    target_accounts: 24
-    daily_record_cap: 200
+    target_accounts: 28
+    daily_record_cap: 240
     per_target_per_poll_cap: 4
+    browser_profile_visits_per_cycle: 1
+    sampling_mode: bounded_profile_tour
 
 platforms:
   rss: {enabled: true}
   web: {enabled: true}
   scholarly: {enabled: true}
   youtube: {enabled: true, transcripts_only: true}
-  x: {enabled: true, base_urls: ["https://x.com/{handle}"]}
+  x:
+    enabled: true
+    base_urls: ["https://x.com/{handle}"]
+    collection_mode: firefox_browser_graphql_capture
+    note: "The Firefox /tour endpoint expands every configured groups.accounts.x handle into a profile visit. Keep this list bounded."
   bluesky: {enabled: true, base_urls: ["https://bsky.app/profile/{handle}"]}
   mastodon: {enabled: true}
   tiktok: {enabled: false, note: "optional later grassroots extension"}
   instagram: {enabled: false, note: "optional later grassroots extension"}
 
-# Public demo targets. Inclusion is a sampling decision, NEVER an ideological
-# label. The same actor can contribute to several competing articulations.
+# Public browser targets. Inclusion is a sampling decision, NEVER an
+# ideological classification of an actor. Groups describe why material is
+# useful for collection coverage. Downstream analysis must infer positions
+# from documents and relations, not from source identity.
 groups:
-  - id: frontier_labs_demo
-    name: Frontier labs and industry
+  - id: frontier_labs_x
+    name: Frontier labs and AI industry
     arena: elites
-    rationale: capability, deployment, competition, safety and growth discourse
+    notes: capability, deployment, competition, safety, infrastructure and growth discourse
     accounts:
       x: [OpenAI, AnthropicAI, GoogleDeepMind, MetaAI, NVIDIAAI]
 
-  - id: critical_ai_demo
+  - id: techno_optimism_x
+    name: Techno-optimist and acceleration-adjacent discourse
+    arena: elites
+    notes: growth, abundance, acceleration, progress and human-flourishing articulations; do not treat these traditions as synonymous
+    accounts:
+      x: [pmarca, ylecun, sama]
+
+  - id: xrisk_safety_x
+    name: Existential-risk and AI-safety discourse
+    arena: elites
+    notes: catastrophic risk, alignment, loss of control, evaluation and pacing; "doomer" remains a situated label rather than collection metadata
+    accounts:
+      x: [ESYudkowsky, MIRI_AI, FLI_org]
+
+  - id: critical_ai_x
     name: Critical AI and political economy
     arena: elites
-    rationale: power, labour, inequality, surveillance and critique of AI imaginaries
+    notes: power, labour, inequality, discrimination, surveillance, extraction, concentration and hype critique
     accounts:
-      x: [timnitGebru]
+      x: [timnitGebru, emilymbender]
       bluesky: [timnitgebru.blacksky.app, emilymbender.bsky.social]
       mastodon: ["@TimnitGebru@mastodon.social", "@emilymbender@dair-community.social"]
 
-  - id: grassroots_demo
-    name: Labour, creator-rights and mobilisation
+  - id: grassroots_labour_creator_x
+    name: Labour and creator-rights mobilisation
     arena: grassroots
-    rationale: employment, copyright, pause/safety and deployment conflicts
-    discovery_entities: [PauseAI, SAG-AFTRA, Writers Guild, UNI Global Union, Teosto]
+    notes: employment, automation, copyright, consent and bargaining around generative AI
+    accounts:
+      x: [sagaftra, WGAWest, uniglobalunion]
 
-  - id: governance_demo
-    name: EU and Finland public governance
+  - id: grassroots_pause_resistance_x
+    name: Pause and deployment-resistance mobilisation
+    arena: grassroots
+    notes: collective mobilisation around slowing, pausing or resisting particular AI deployments
+    accounts:
+      x: [PauseAI]
+
+  - id: governance_institutions_x
+    name: Public governance institutions
     arena: parliamentary
-    rationale: regulation, competitiveness, public oversight and national AI policy
+    notes: regulation, standards, oversight, competitiveness and public policy; institutional accounts reduce party-political sampling bias in the public demo
+    accounts:
+      x: [EU_Commission, Europarl_EN, OECD_AI, NIST]
     discovery_entities:
       - European Commission AI Office
       - European Parliament
@@ -224,6 +259,13 @@ groups:
       - Parliament of Finland
       - Ministry of Economic Affairs and Employment of Finland
       - OECD.AI
+      - US National Institute of Standards and Technology
+
+  - id: left_techno_optimism_discovery
+    name: Public-interest and left techno-optimism discovery
+    arena: elites
+    notes: retain as an explicit discovery stratum so technology-positive egalitarian/post-work articulations are not collapsed into market accelerationism
+    discovery_terms: [post-work, postcapitalism, public AI, public compute, democratic AI, automation dividend, technological emancipation]
 
 storage:
   canonical_records: configured_runtime_backend
