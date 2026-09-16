@@ -37,10 +37,10 @@ class DistributedCaptureSink:
         )
         self.objects = S3ObjectStore(
             bucket=settings.s3_bucket,
-            endpoint_url=settings.s3_endpoint_url,
+            endpoint_url=settings.effective_s3_endpoint,
             region_name=settings.s3_region,
-            access_key_id=settings.s3_access_key_id,
-            secret_access_key=settings.s3_secret_access_key,
+            access_key_id=settings.effective_s3_access_key,
+            secret_access_key=settings.effective_s3_secret_key,
             prefix=f"{settings.s3_prefix_root}/{settings.project_id}",
         )
         self.redis = RedisCoordinator(settings.redis_url, namespace)
