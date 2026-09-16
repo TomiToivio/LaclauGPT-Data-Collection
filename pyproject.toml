@@ -51,6 +51,7 @@ dev = [
 [project.scripts]
 laclaugpt-collect = "laclaugpt_data_collection.cli:main"
 laclaugpt-config = "laclaugpt_data_collection.config_cli:main"
+laclaugpt-redis-config = "laclaugpt_data_collection.redis_config_cli:main"
 laclaugpt-capture = "laclaugpt_data_collection.capture_server:main"
 laclaugpt-multi-capture = "laclaugpt_data_collection.multi_capture_server:main"
 laclaugpt-media-download = "laclaugpt_data_collection.media_runner:main"
