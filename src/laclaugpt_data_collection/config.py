@@ -46,11 +46,13 @@ class Settings(BaseSettings):
     )
 
     project_id: str = "default"
+    run_id: str = ""
     profile: str = "local"
     machine: Literal["laptop", "linux-server", "custom"] = "laptop"
     execution: Literal["cli", "cron", "systemd", "agent", "custom"] = "cli"
     browser: Literal["firefox-local", "worker", "none", "custom"] = "firefox-local"
     caller: str = "human-cli"
+    private_config_dir: Path | None = None
 
     data_root: Path = Path("./data")
     sqlite_path: Path = Path("./data/database/collection.sqlite3")
@@ -73,11 +75,16 @@ class Settings(BaseSettings):
     redis_url: str = ""
     redis_key_prefix: str = "laclaugpt"
 
+    # Preferred names match the umbrella distributed-run contract. The *_url and
+    # AWS-style credential names remain accepted for backwards compatibility.
+    s3_endpoint: str = ""
     s3_endpoint_url: str = ""
     s3_region: str = ""
     s3_bucket: str = ""
     s3_prefix_root: str = "projects"
+    s3_access_key: str = ""
     s3_access_key_id: str = ""
+    s3_secret_key: str = ""
     s3_secret_access_key: str = ""
 
     # Optional graph/vector RAG integration. Disabled by default and intentionally
@@ -95,6 +102,18 @@ class Settings(BaseSettings):
     embedding_model: str = ""
 
     @property
+    def effective_s3_endpoint(self) -> str:
+        return self.s3_endpoint or self.s3_endpoint_url
+
+    @property
+    def effective_s3_access_key(self) -> str:
+        return self.s3_access_key or self.s3_access_key_id
+
+    @property
+    def effective_s3_secret_key(self) -> str:
+        return self.s3_secret_key or self.s3_secret_access_key
+
+    @property
     def distributed_namespace(self) -> ProjectNamespace:
         """Return the shared project namespace for Redis, MongoDB and S3."""
         return ProjectNamespace(
@@ -102,6 +121,16 @@ class Settings(BaseSettings):
             redis_prefix=self.redis_key_prefix,
             mongo_database=self.mongodb_database,
             s3_prefix_root=self.s3_prefix_root,
+        )
+
+    @property
+    def distributed_requested(self) -> bool:
+        return (
+            self.record_backend == "mongodb"
+            or self.object_backend == "s3"
+            or self.cache_backend == "redis"
+            or self.messaging_backend == "redis"
+            or self.task_queue_backend == "redis"
         )
 
     def data_path(self, *parts: str) -> Path:
@@ -122,6 +151,7 @@ class Settings(BaseSettings):
         namespace = self.distributed_namespace
         return {
             "project_id": self.project_id,
+            "run_id": self.run_id,
             "profile": self.profile,
             "machine": self.machine,
             "execution": self.execution,
@@ -134,6 +164,7 @@ class Settings(BaseSettings):
             "task_queue_backend": self.task_queue_backend,
             "data_root": str(self.data_root),
             "sqlite_path": str(self.sqlite_path),
+            "private_config_dir_configured": str(self.private_config_dir is not None),
             "redis_namespace": namespace.redis_base,
             "mongodb_database": self.mongodb_database,
             "mongodb_records_collection": namespace.mongo_collection("records"),

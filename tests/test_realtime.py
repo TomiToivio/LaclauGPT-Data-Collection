@@ -1,5 +1,3 @@
-from datetime import UTC, datetime
-
 from laclaugpt_data_collection.realtime import (
     RealtimePolicy,
     analysis_eligibility,
