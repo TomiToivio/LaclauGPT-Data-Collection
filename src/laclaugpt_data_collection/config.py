@@ -75,11 +75,16 @@ class Settings(BaseSettings):
     redis_url: str = ""
     redis_key_prefix: str = "laclaugpt"
 
+    # Preferred names match the umbrella distributed-run contract. The *_url and
+    # AWS-style credential names remain accepted for backwards compatibility.
+    s3_endpoint: str = ""
     s3_endpoint_url: str = ""
     s3_region: str = ""
     s3_bucket: str = ""
     s3_prefix_root: str = "projects"
+    s3_access_key: str = ""
     s3_access_key_id: str = ""
+    s3_secret_key: str = ""
     s3_secret_access_key: str = ""
 
     # Optional graph/vector RAG integration. Disabled by default and intentionally
@@ -95,6 +100,18 @@ class Settings(BaseSettings):
     embedding_provider: Literal["none", "ollama", "remote", "custom"] = "none"
     embedding_endpoint: str = ""
     embedding_model: str = ""
+
+    @property
+    def effective_s3_endpoint(self) -> str:
+        return self.s3_endpoint or self.s3_endpoint_url
+
+    @property
+    def effective_s3_access_key(self) -> str:
+        return self.s3_access_key or self.s3_access_key_id
+
+    @property
+    def effective_s3_secret_key(self) -> str:
+        return self.s3_secret_key or self.s3_secret_access_key
 
     @property
     def distributed_namespace(self) -> ProjectNamespace:
