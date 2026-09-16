@@ -1,3 +1,4 @@
+from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -10,7 +11,11 @@ def test_ai26_public_template_is_synthetic_and_loadable() -> None:
     text = path.read_text(encoding="utf-8")
     cfg = load_config(path)
     assert cfg.study == "ai26"
+    assert cfg.start == date(2026, 9, 1)
     assert cfg.accounts()
+    assert {"x", "bluesky", "mastodon", "youtube", "rss", "web", "scholarly"} <= set(
+        cfg.platforms
+    )
     assert "example_" in text
     assert "password" not in text.casefold()
     assert "token:" not in text.casefold()
