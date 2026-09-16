@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -107,6 +108,39 @@ def collect_rss_records(
     return records, warnings
 
 
+def _priority_rank(feed: dict[str, Any]) -> int:
+    """Order feeds by declared sampling priority (unknown defaults to P2)."""
+    return {"P1": 1, "P2": 2, "P3": 3}.get(
+        str(feed.get("priority") or "").strip().upper(), 2
+    )
+
+
+def select_feed_window(
+    feeds: list[dict[str, Any]],
+    *,
+    max_feeds: int,
+    rotation: int = 0,
+) -> list[dict[str, Any]]:
+    """Pick a bounded feed window without permanently starving the manifest tail.
+
+    A plain ``feeds[:max_feeds]`` slice means the same first rows are polled on
+    every tick and everything after them is never collected, which silently
+    narrows the study's source mix. Rotating the priority-ordered list by
+    ``rotation`` positions guarantees that across successive ticks every
+    manifest entry is eventually polled, while high-priority feeds stay at the
+    front of each cycle. ``sorted`` is stable, so equal priorities keep their
+    manifest order.
+    """
+    if max_feeds < 1:
+        raise ValueError("max_feeds must be at least 1")
+    if not feeds:
+        return []
+    ordered = sorted(feeds, key=_priority_rank)
+    shift = rotation % len(ordered)
+    rotated = ordered[shift:] + ordered[:shift]
+    return rotated[:max_feeds]
+
+
 def run_distributed_rss(
     settings: Settings,
     *,
@@ -116,6 +150,7 @@ def run_distributed_rss(
     max_feeds: int = 10,
     per_feed_limit: int = 10,
     limit: int = 50,
+    rotation: int | None = None,
 ) -> dict[str, Any]:
     """Run a bounded RSS batch and write eligible records to shared backends."""
     if max_feeds < 1 or per_feed_limit < 1 or limit < 1:
@@ -123,7 +158,15 @@ def run_distributed_rss(
     sink = DistributedCaptureSink(settings)
     sink.assert_private_config(source_manifest)
     routed_collection = collection_id or settings.project_id
-    feeds = load_feed_manifest(source_manifest)[:max_feeds]
+    if rotation is None:
+        # Advance the window once per hour so a hourly cron covers the whole
+        # manifest over successive ticks without persisting extra state.
+        rotation = int(time.time() // 3600) * max_feeds
+    feeds = select_feed_window(
+        load_feed_manifest(source_manifest),
+        max_feeds=max_feeds,
+        rotation=rotation,
+    )
     records, warnings = collect_rss_records(
         feeds,
         collection_id=routed_collection,
@@ -169,6 +212,7 @@ def run_distributed_rss(
         "run_id": settings.run_id,
         "worker_id": worker_id,
         "feeds_considered": len(feeds),
+        "feed_names": [str(feed.get("name") or "") for feed in feeds],
         "records_collected": len(records),
         "records_excluded": excluded,
         "records_synced": synced,
@@ -186,6 +230,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-feeds", type=int, default=10)
     parser.add_argument("--per-feed-limit", type=int, default=10)
     parser.add_argument("--limit", type=int, default=50)
+    parser.add_argument(
+        "--rotation",
+        type=int,
+        default=None,
+        help="feed-window rotation offset; defaults to an hourly advancing offset",
+    )
     args = parser.parse_args(argv)
     result = run_distributed_rss(
         Settings(),
@@ -195,6 +245,7 @@ def main(argv: list[str] | None = None) -> int:
         max_feeds=args.max_feeds,
         per_feed_limit=args.per_feed_limit,
         limit=args.limit,
+        rotation=args.rotation,
     )
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     return 0 if result["status"] == "ok" else 1

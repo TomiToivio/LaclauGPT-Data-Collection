@@ -1,9 +1,15 @@
 from pathlib import Path
 
+import pytest
+
 from laclaugpt_data_collection.collectors.base import CollectionResult
 from laclaugpt_data_collection.models import CollectionProvenance, NormalizedRecord
 from laclaugpt_data_collection.realtime import parse_source_time
-from laclaugpt_data_collection.server_runner import load_feed_manifest, run_distributed_rss
+from laclaugpt_data_collection.server_runner import (
+    load_feed_manifest,
+    run_distributed_rss,
+    select_feed_window,
+)
 
 
 class FakeRedis:
@@ -74,6 +80,50 @@ def test_manifest_loader_uses_feed_array(tmp_path: Path) -> None:
     assert load_feed_manifest(path) == [
         {"name": "one", "feed_url": "https://example.org/feed", "priority": "P1"}
     ]
+
+
+def _feed(name: str, priority: str, url: str = "https://example.org/feed") -> dict:
+    return {"name": name, "feed_url": url, "priority": priority}
+
+
+def test_feed_window_prefers_high_priority_and_bounds_the_batch() -> None:
+    feeds = [
+        _feed("late", "P3"),
+        _feed("first", "P1"),
+        _feed("second", "P2"),
+        _feed("third", "P1"),
+    ]
+    window = select_feed_window(feeds, max_feeds=2)
+    assert [feed["name"] for feed in window] == ["first", "third"]
+
+
+def test_feed_window_equal_priority_keeps_manifest_order() -> None:
+    feeds = [_feed("a", "P1"), _feed("b", "P1"), _feed("c", "P1")]
+    window = select_feed_window(feeds, max_feeds=2)
+    assert [feed["name"] for feed in window] == ["a", "b"]
+
+
+def test_feed_window_rotation_eventually_covers_the_whole_manifest() -> None:
+    feeds = [_feed(f"f{index}", "P1") for index in range(6)]
+    seen: set[str] = set()
+    # 6 feeds / window of 2 = 3 distinct offsets before the rotation wraps.
+    for step in range(3):
+        window = select_feed_window(feeds, max_feeds=2, rotation=step * 2)
+        seen.update(feed["name"] for feed in window)
+    # Every manifest entry is polled across one rotation; a plain
+    # feeds[:max_feeds] slice would only ever yield f0 and f1.
+    assert seen == {f"f{index}" for index in range(6)}
+
+
+def test_feed_window_rotation_wraps_instead_of_starving_tail() -> None:
+    feeds = [_feed(f"f{index}", "P1") for index in range(6)]
+    # Offsets beyond the manifest length wrap rather than returning nothing.
+    assert len(select_feed_window(feeds, max_feeds=2, rotation=8)) == 2
+
+
+def test_feed_window_rejects_non_positive_window() -> None:
+    with pytest.raises(ValueError, match="max_feeds must be at least 1"):
+        select_feed_window([_feed("a", "P1")], max_feeds=0)
 
 
 def test_rfc_rss_timestamp_is_supported() -> None:
