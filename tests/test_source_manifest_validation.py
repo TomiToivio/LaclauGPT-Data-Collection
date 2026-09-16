@@ -20,7 +20,7 @@ def test_disabled_feed_is_ignored(tmp_path: Path) -> None:
     "content, message",
     [
         ('[[feed]]\nfeed_url="https://example.org/feed"\n', "requires a name"),
-        ('[[feed]]\nname="bad"\nfeed_url="file:///tmp/feed"\n', "http(s) feed_url"),
+        ('[[feed]]\nname="bad"\nfeed_url="file:///tmp/feed"\n', r"http\(s\) feed_url"),
         (
             '[[feed]]\nname="bad"\nfeed_url="https://example.org/feed"\npriority="urgent"\n',
             "priority must be P1, P2 or P3",
