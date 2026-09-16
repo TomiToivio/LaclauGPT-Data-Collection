@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "LaclauGPT Data Collection",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Public social-media API response capture for LaclauGPT research. Sends captures to a local collector backend. Academic research use only.",
   "author": "Tomi Toivio / LaclauGPT",
   "homepage_url": "https://github.com/TomiToivio/LaclauGPT-Data-Collection",
@@ -10,13 +10,15 @@
     "webRequest",
     "webRequestBlocking",
     "tabs",
+    "http://127.0.0.1/*",
+    "http://localhost/*",
     "*://*.tiktok.com/*",
     "*://*.instagram.com/*",
     "*://*.x.com/*",
     "*://*.twitter.com/*"
   ],
   "background": {
-    "scripts": ["capture.js", "navigation.js"],
+    "scripts": ["background.js", "capture.js", "navigation.js"],
     "persistent": true
   },
   "content_scripts": [

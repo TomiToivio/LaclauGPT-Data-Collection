@@ -49,21 +49,37 @@ class DistributedCaptureSink:
         self.redis = RedisCoordinator(settings.redis_url, namespace)
 
     def assert_private_config(self, study_config: str | Path) -> Path:
-        """Fail closed unless distributed study config comes from the private root."""
+        """Require distributed study config to live in an ignored runtime config root.
+
+        ``LACLAUGPT_PRIVATE_CONFIG_DIR`` remains the explicit private root.  The
+        repository's documented ``data/config`` directory is also accepted because
+        the whole ``data/`` tree is gitignored and is the standard localhost runtime
+        location used by the AI26 setup guide and wrappers.
+        """
         private_root = self.settings.private_config_dir
         if private_root is None:  # validate_profile should already reject this
             raise ValueError("LACLAUGPT_PRIVATE_CONFIG_DIR is required")
-        root = private_root.expanduser().resolve()
+
         candidate = Path(study_config).expanduser().resolve()
         if not candidate.is_file():
             raise ValueError(f"study config does not exist: {candidate}")
-        try:
-            candidate.relative_to(root)
-        except ValueError as exc:
-            raise ValueError(
-                "distributed study config must live below LACLAUGPT_PRIVATE_CONFIG_DIR"
-            ) from exc
-        return candidate
+
+        roots = {
+            private_root.expanduser().resolve(),
+            self.settings.data_path("config").expanduser().resolve(),
+        }
+        for root in roots:
+            try:
+                candidate.relative_to(root)
+                return candidate
+            except ValueError:
+                continue
+
+        allowed = ", ".join(str(root) for root in sorted(roots, key=str))
+        raise ValueError(
+            "distributed study config must live below an ignored runtime config root "
+            f"(LACLAUGPT_PRIVATE_CONFIG_DIR or data/config); allowed roots: {allowed}"
+        )
 
     def _raw_object(self, record: CanonicalRecord) -> str:
         payload = record.raw_capture.payload

@@ -1,38 +1,56 @@
-const DEFAULT_ENDPOINT = "http://127.0.0.1:8765/capture";
+/*
+ * Shared localhost-backend helper for the Firefox extension.
+ *
+ * Firefox extension pages need an explicit host permission for cross-origin
+ * requests even when the target is loopback. manifest.json grants access to
+ * 127.0.0.1/localhost and loads this helper before capture.js/navigation.js.
+ */
 
-async function endpoint() {
-  const stored = await browser.storage.local.get("captureEndpoint");
-  return stored.captureEndpoint || DEFAULT_ENDPOINT;
-}
+(() => {
+  "use strict";
 
-async function sendCapture(payload) {
-  const target = await endpoint();
-  const response = await fetch(target, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
+  const DEFAULT_BACKEND_URL = "http://127.0.0.1:8765";
+  const ALLOWED_HOSTS = new Set(["127.0.0.1", "localhost"]);
+
+  function normalizeBackendUrl(value) {
+    const candidate = (value || DEFAULT_BACKEND_URL).toString().trim();
+    try {
+      const url = new URL(candidate);
+      if (url.protocol !== "http:" || !ALLOWED_HOSTS.has(url.hostname)) {
+        throw new Error("backend must use HTTP on localhost/127.0.0.1");
+      }
+      return url.origin;
+    } catch (error) {
+      console.warn("[laclaugpt-collector] invalid backend URL; using localhost default", error);
+      return DEFAULT_BACKEND_URL;
+    }
+  }
+
+  async function backendUrl() {
+    const stored = await browser.storage.local.get({
+      backend_url: DEFAULT_BACKEND_URL,
+      captureEndpoint: "",
+    });
+    // Keep compatibility with the older background.js captureEndpoint setting.
+    const legacy = stored.captureEndpoint
+      ? stored.captureEndpoint.toString().replace(/\/capture\/?$/, "")
+      : "";
+    return normalizeBackendUrl(stored.backend_url || legacy || DEFAULT_BACKEND_URL);
+  }
+
+  async function request(path, options = {}) {
+    const base = await backendUrl();
+    const target = `${base}${path.startsWith("/") ? path : `/${path}`}`;
+    return fetch(target, {
+      cache: "no-store",
+      credentials: "omit",
+      ...options,
+    });
+  }
+
+  globalThis.LaclauGPTBackend = Object.freeze({
+    DEFAULT_BACKEND_URL,
+    backendUrl,
+    request,
   });
-  if (!response.ok) {
-    throw new Error(`capture backend returned ${response.status}`);
-  }
-  return response.json().catch(() => ({ ok: true }));
-}
-
-async function captureActiveTab() {
-  const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-  const tab = tabs[0];
-  if (!tab?.id) throw new Error("no active tab");
-  const payload = await browser.tabs.sendMessage(tab.id, { type: "capture-current-page" });
-  return sendCapture(payload);
-}
-
-browser.browserAction.onClicked.addListener(() => {
-  captureActiveTab().catch((error) => console.warn("LaclauGPT capture failed", error));
-});
-
-browser.runtime.onMessage.addListener((message) => {
-  if (message?.type === "capture-payload" && message.payload) {
-    return sendCapture(message.payload);
-  }
-  return undefined;
-});
+})();
