@@ -22,10 +22,11 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from . import __version__
 from .capture import BrowserCapture
 from .collectors.platforms import PARSERS, tiktok_extras
-from .models import CollectionProvenance, MediaReference, NormalizedRecord
+from .models import CanonicalRecord, CollectionProvenance, MediaReference, NormalizedRecord
 from .normalize import normalise
 from .store import CollectionStore, utc_stamp
 from .study import StudyConfig, load_config
+from .web_fetch import external_urls_for_record, fetch_web_child
 
 COLLECTOR_VERSION = f"laclaugpt-data-collection-{__version__}"
 _git_commit_cache: str | None = None
@@ -106,7 +107,14 @@ class CaptureServer(ThreadingHTTPServer):
             raise ValueError("Firefox local capture server must bind to localhost")
         self.cfg: StudyConfig = load_config(study_config)
         self.store = CollectionStore(data_root)
-        self.stats = {"captures": 0, "posts": 0, "errors": 0, "skipped": 0}
+        self.stats = {
+            "captures": 0,
+            "posts": 0,
+            "errors": 0,
+            "skipped": 0,
+            "web_children": 0,
+            "web_fetch_errors": 0,
+        }
         self.run_id = utc_stamp()
         self.lock = threading.RLock()
         self._tz = self._load_timezone(self.cfg.timezone)
@@ -250,6 +258,7 @@ class Handler(BaseHTTPRequestHandler):
             return 0
 
         payload = _decode_platform_body(body)
+        account = self._account_for(platform, platform_url)
         meta = {
             "captured_at": captured_at,
             "collector_version": COLLECTOR_VERSION,
@@ -258,7 +267,7 @@ class Handler(BaseHTTPRequestHandler):
             "source_url": api_url,
             "run_id": self.server.run_id,
             "study": self.server.cfg.study,
-            "account": self._account_for(platform, platform_url),
+            "account": account,
         }
 
         with self.server.lock:
@@ -269,13 +278,47 @@ class Handler(BaseHTTPRequestHandler):
                 "data": payload,
             })
             new_posts = 0
-            for record in self._records_for(
-                platform, payload, api_url, platform_url, meta, raw_ref
-            ):
+            new_records: list[dict] = []
+            records = self._records_for(platform, payload, api_url, platform_url, meta, raw_ref)
+            for record in records:
                 if self.server.store.upsert_post(record, raw_ref):
                     new_posts += 1
+                    new_records.append(record)
             self.server.stats["posts"] += new_posts
+
+        if (
+            platform == "x"
+            and new_records
+            and self.server.cfg.fetch_external_links_as_web_sources
+        ):
+            self._fetch_web_children(new_records)
         return new_posts
+
+    def _fetch_web_children(self, parent_records: list[dict]) -> None:
+        """Fetch external X links after parent durability; failures stay non-fatal."""
+        for payload in parent_records:
+            try:
+                parent = CanonicalRecord.model_validate(payload)
+            except Exception:  # noqa: BLE001
+                continue
+            arena = str(parent.source.raw_metadata.get("arena") or "")
+            for url in external_urls_for_record(parent):
+                outcome = fetch_web_child(
+                    url,
+                    parent,
+                    collection_id=self.server.cfg.study,
+                    arena=arena,
+                )
+                if outcome.record is None:
+                    with self.server.lock:
+                        self.server.stats["web_fetch_errors"] += 1
+                    if self.server.cfg.link_fetch_failure_blocks_parent:
+                        raise RuntimeError(f"WEB child fetch failed for {url}: {outcome.error}")
+                    continue
+                child = outcome.record.model_dump(mode="json")
+                with self.server.lock:
+                    if self.server.store.upsert_post(child, ""):
+                        self.server.stats["web_children"] += 1
 
     def _records_for(
         self,
