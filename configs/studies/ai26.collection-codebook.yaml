@@ -1,17 +1,20 @@
 # AI26 collection codebook
-# Lightweight sampling taxonomy only. This file guides source/query selection;
+# Sampling taxonomy only. This guides source/query selection and provenance;
 # it does not perform discourse analysis or assign ideology to records/actors.
 
-version: ai26-collection-v1
+version: ai26-collection-v2
 study: ai26
 purpose: balanced_collection_discovery
+source_of_truth: https://github.com/TomiToivio/LaclauGPT/blob/main/paper/PAPER.md
 
 principles:
   - formations are provisional sensitising concepts, not fixed actor identities
-  - collect claims and relations across formations rather than classifying by source identity
+  - collect claims, articulations and relations across formations rather than classifying by source identity
   - allow documents to be relevant to several formations or none
-  - preserve ambiguous material for downstream human/theory-guided analysis
-  - institutional/corporate/policy/open-source/labour facets are modifiers, not new formations
+  - preserve ambiguous and contradictory material for downstream human/theory-guided analysis
+  - institutional, corporate, policy, open-source and labour facets are modifiers, not ideological classes
+  - source prominence is not evidence of hegemony and source frequency is not ideological importance
+  - balance means discursive coverage, not equal quotas for artificially symmetric camps
 
 arenas:
   elites:
@@ -23,27 +26,27 @@ arenas:
 
 formation_sampling_cues:
   accelerationism:
-    discovery_terms: [abundance, growth, innovation, acceleration, progress, AI race]
-    note: Includes techno-optimist and e/acc-adjacent material, but these terms are not synonyms.
+    discovery_terms: [abundance, growth, innovation, acceleration, progress, AI race, techno-optimism]
+    note: Includes e/acc-adjacent and market-oriented techno-optimist material as discovery targets; these traditions are not synonyms.
 
   doomerism:
     discovery_terms: [existential risk, extinction, catastrophic risk, loss of control, superintelligence]
-    note: "Doomer" is a situated label; use x-risk/catastrophic-risk language for neutral discovery.
+    note: "Doomer" is a situated label. Prefer x-risk/catastrophic-risk language for neutral retrieval and preserve self-description where available.
 
   left-wing accelerationism:
-    discovery_terms: [post-work, automation, public ownership, redistribution, technological emancipation]
-    note: Seek technology-positive projects tied to egalitarian, postcapitalist or redistributive politics.
+    discovery_terms: [post-work, automation, public ownership, redistribution, technological emancipation, postcapitalism]
+    note: Seek technology-positive projects tied to egalitarian, postcapitalist, public-interest or redistributive politics.
 
   ai safety:
-    discovery_terms: [alignment, evaluation, guardrails, pacing, slowdown, standards, incident reporting]
-    note: AI-safety discourse is broader than existential-risk discourse and may overlap with other formations.
+    discovery_terms: [alignment, evaluation, guardrails, pacing, slowdown, standards, incident reporting, audits]
+    note: AI-safety discourse is broader than existential-risk discourse and may overlap with accelerationist, institutional or critical positions.
 
   ai critical:
-    discovery_terms: [power, labour, inequality, discrimination, surveillance, extraction, ownership, corporate concentration]
-    note: Includes Critical AI and adjacent political-economy/accountability critique.
+    discovery_terms: [power, labour, inequality, discrimination, surveillance, extraction, ownership, corporate concentration, hype]
+    note: Includes Critical AI and adjacent political-economy/accountability critique without assuming a single unified doctrine.
 
   anti-ai:
-    discovery_terms: [pause, ban, resistance, job displacement, creator rights, data centre opposition]
+    discovery_terms: [pause, ban, resistance, job displacement, creator rights, data centre opposition, refusal]
     note: Opposition to a specific deployment must not automatically be treated as opposition to AI in general.
 
 cross_cutting_facets:
@@ -51,27 +54,55 @@ cross_cutting_facets:
   - institutional
   - policy_governance
   - open_source
+  - open_weights
   - labour_rights
   - creator_rights
   - national_security
-  - China_competition
+  - geopolitical_competition
+  - AI_sovereignty
   - data_centres
+  - energy
   - environment
   - surveillance
   - copyright
   - democratic_control
   - public_interest_ai
   - anti_hype
+  - compute_governance
+  - military_use
+  - automated_decision_making
 
+# Candidate relations to make visible in collection. These are retrieval hooks,
+# not theoretical conclusions. Analysis must decide whether they constitute
+# equivalence, difference, antagonism, nodal/floating signification, etc.
 current_watch_relations:
-  # September 2026: collect the emerging pacing/safety/competition dispute as
-  # relations among claims, not as permanent actor labels.
   - [AI safety, pacing]
   - [AI safety, independent evaluation]
+  - [AI safety, incident reporting]
   - [innovation, competition]
   - [AI race, China]
   - [regulation, liability]
-  - [data centres, national security]
+  - [regulation, democratic control]
+  - [open weights, innovation]
+  - [open weights, safety]
+  - [automation, labour]
+  - [generative AI, copyright]
+  - [data centres, energy]
+  - [data centres, local opposition]
+  - [AI, public infrastructure]
+  - [AI, corporate concentration]
+
+minimum_discursive_coverage:
+  - frontier_lab_and_industry
+  - acceleration_and_techno_optimism
+  - xrisk_and_catastrophic_risk
+  - safety_alignment_and_pacing
+  - critical_ai_and_political_economy
+  - labour_and_creator_rights
+  - anti_ai_or_deployment_resistance
+  - public_interest_or_left_techno_optimism
+  - parliamentary_and_regulatory_governance
+  - open_source_open_weights
 
 collection_boundary:
   allowed:
@@ -80,8 +111,11 @@ collection_boundary:
     - balanced sampling
     - arena metadata
     - source-family provenance
+    - public source-list maintenance
+    - bounded current-event vocabulary updates
   forbidden:
     - assigning a formation from actor identity alone
     - treating source_family as ideological ground truth
     - running Laclau/Mouffe/Palonen interpretation in Collection
-    - copying private target lists or secrets into exported provenance
+    - inferring an Us/Frontier relation from sentiment or polarity
+    - copying private target lists, corpus-derived labels, credentials or secrets into exported provenance

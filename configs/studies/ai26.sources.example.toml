@@ -1,15 +1,23 @@
-# Public-safe, deliberately bounded AI26 source-family manifest.
-# Sources are selected to expose contrasting AI imaginaries and arenas, not to
-# pre-classify every document or actor ideologically. Private runtime configs
-# may extend this list without changing the public methodology.
+# Public, bounded AI26 source manifest for the demo/reference case.
+# Inclusion is a sampling decision, not an ideological classification of an
+# actor. `source_family` describes why a source is sampled and MUST NOT be
+# copied into analysis as ground-truth ideology.
+#
+# The current Linux-server runner executes the [[feed]] entries directly.
+# Other tables document public targets for the browser/social collectors and
+# future adapters. Runtime configuration may extend this manifest privately.
+
+# ---------------------------------------------------------------------------
+# Executable RSS / Atom backbone
+# ---------------------------------------------------------------------------
 
 [[feed]]
 name = "lesswrong_frontpage"
 feed_url = "https://www.lesswrong.com/feed.xml?view=frontpage"
 homepage = "https://www.lesswrong.com"
 arena = "elites"
-source_family = "existential-risk / rationalist / alignment"
-sampling_rationale = "Public essays on alignment, x-risk and adjacent AGI imaginaries."
+source_family = "rationalist / alignment / x-risk / AI futures"
+sampling_rationale = "Public essays spanning alignment, x-risk, capabilities and competing AGI imaginaries."
 priority = "P1"
 
 [[feed]]
@@ -17,8 +25,8 @@ name = "miri_blog"
 feed_url = "https://intelligence.org/feed/"
 homepage = "https://intelligence.org"
 arena = "elites"
-source_family = "existential-risk / alignment"
-sampling_rationale = "Institutional alignment and catastrophic-risk discourse."
+source_family = "alignment / catastrophic-risk discourse"
+sampling_rationale = "Institutional alignment and catastrophic-risk arguments."
 priority = "P1"
 
 [[feed]]
@@ -26,8 +34,8 @@ name = "future_of_life"
 feed_url = "https://futureoflife.org/feed/"
 homepage = "https://futureoflife.org"
 arena = "elites"
-source_family = "AI safety / x-risk / governance"
-sampling_rationale = "Safety advocacy and governance proposals connecting risk to public policy."
+source_family = "AI safety / governance / catastrophic risk"
+sampling_rationale = "Safety advocacy and governance proposals linking technical risk to public policy."
 priority = "P1"
 
 [[feed]]
@@ -35,8 +43,8 @@ name = "ai_now"
 feed_url = "https://ainowinstitute.org/category/news/feed"
 homepage = "https://ainowinstitute.org"
 arena = "elites"
-source_family = "critical AI / political economy"
-sampling_rationale = "Power, labour, inequality, surveillance and AI-industry governance."
+source_family = "Critical AI / political economy / governance"
+sampling_rationale = "Power, labour, inequality, surveillance and concentration in AI governance."
 priority = "P1"
 
 [[feed]]
@@ -44,8 +52,8 @@ name = "algorithmwatch"
 feed_url = "https://algorithmwatch.org/en/feed/"
 homepage = "https://algorithmwatch.org"
 arena = "grassroots"
-source_family = "critical AI / accountability"
-sampling_rationale = "European accountability, discrimination, labour and governance conflicts."
+source_family = "accountability / rights / European AI governance"
+sampling_rationale = "European accountability, discrimination, labour and automated-decision conflicts."
 priority = "P1"
 
 [[feed]]
@@ -53,8 +61,8 @@ name = "marc_andreessen"
 feed_url = "https://pmarca.substack.com/feed/"
 homepage = "https://pmarca.substack.com"
 arena = "elites"
-source_family = "techno-optimism / acceleration"
-sampling_rationale = "Prominent market-oriented techno-optimist and acceleration-adjacent discourse."
+source_family = "market techno-optimism / acceleration-adjacent"
+sampling_rationale = "Prominent market-oriented technological optimism and abundance/growth discourse."
 priority = "P1"
 
 [[feed]]
@@ -62,8 +70,8 @@ name = "tech_policy_press"
 feed_url = "https://www.techpolicy.press/rss/feed.xml"
 homepage = "https://www.techpolicy.press"
 arena = "parliamentary"
-source_family = "governance / policy"
-sampling_rationale = "Regulation, national security, labour and platform-governance debate."
+source_family = "AI governance / policy / institutions"
+sampling_rationale = "Regulation, rights, national security, labour and platform-governance debate."
 priority = "P1"
 
 [[feed]]
@@ -71,55 +79,75 @@ name = "gary_marcus"
 feed_url = "https://garymarcus.substack.com/feed"
 homepage = "https://garymarcus.substack.com"
 arena = "elites"
-source_family = "AI skepticism / hype critique / governance"
-sampling_rationale = "Elite criticism of capabilities claims, hype and governance choices."
+source_family = "capability skepticism / hype critique / governance"
+sampling_rationale = "Elite criticism of capability claims, hype, deployment and governance choices."
 priority = "P2"
 
+# ---------------------------------------------------------------------------
+# Public web endpoints without a stable feed in this demo
+# ---------------------------------------------------------------------------
+
 [[web_source]]
-name = "dair_blog"
-homepage = "https://www.dair-institute.org/blog/"
+name = "openai_news"
+homepage = "https://openai.com/news/"
 arena = "elites"
-source_family = "critical AI / power / labour / justice"
-sampling_rationale = "Critical AI research centred on power, labour, inequality and community interests."
+source_family = "frontier lab / deployment / governance / safety"
+sampling_rationale = "Major frontier-lab discourse around capabilities, products, safety and policy."
+priority = "P1"
+
+[[web_source]]
+name = "anthropic_news"
+homepage = "https://www.anthropic.com/news"
+arena = "elites"
+source_family = "frontier lab / safety / policy"
+sampling_rationale = "Frontier-AI capability, safety, evaluation and governance discourse."
 priority = "P1"
 
 [[web_source]]
 name = "dario_amodei_essays"
 homepage = "https://darioamodei.com/"
 arena = "elites"
-source_family = "frontier AI / safety / pacing"
-sampling_rationale = "Public frontier-AI essays on capability, benefits, catastrophic risk and pacing."
+source_family = "frontier AI / safety / capability futures"
+sampling_rationale = "Long-form elite arguments about capability, benefits, catastrophic risk and pacing."
 priority = "P1"
 
 [[web_source]]
-name = "openai_global_affairs"
-homepage = "https://openai.com/global-affairs/"
+name = "google_deepmind_blog"
+homepage = "https://deepmind.google/discover/blog/"
 arena = "elites"
-source_family = "frontier AI / governance / competition"
-sampling_rationale = "Lab policy discourse spanning safety, standards, competition and deployment."
+source_family = "frontier lab / science / capability / safety"
+sampling_rationale = "Research, capability and safety discourse from a major AI lab."
 priority = "P1"
 
 [[web_source]]
 name = "meta_ai"
 homepage = "https://ai.meta.com/blog/"
 arena = "elites"
-source_family = "frontier AI / open models / techno-optimism"
+source_family = "frontier AI / open models / competition"
 sampling_rationale = "Open-model, competition, innovation and safety discourse from a major lab."
+priority = "P1"
+
+[[web_source]]
+name = "dair_blog"
+homepage = "https://www.dair-institute.org/blog/"
+arena = "elites"
+source_family = "Critical AI / power / labour / justice"
+sampling_rationale = "Critical AI research centred on power, labour, inequality and community interests."
 priority = "P1"
 
 [[web_source]]
 name = "pause_ai"
 homepage = "https://pauseai.info/"
 arena = "grassroots"
-source_family = "grassroots AI safety / pause movement"
-sampling_rationale = "Mobilisation around slowing or pausing frontier AI development."
+source_family = "grassroots safety / pause mobilisation"
+sampling_rationale = "Mobilisation advocating slowing or pausing frontier AI development."
 priority = "P1"
 
 [[web_source]]
 name = "sag_aftra_ai"
 homepage = "https://www.sagaftra.org/contracts-industry-resources/contracts/artificial-intelligence"
 arena = "grassroots"
-source_family = "labour / creative work / AI"
+source_family = "labour / creative work / generative AI"
 sampling_rationale = "Labour and creative-rights conflict around generative AI and automation."
 priority = "P1"
 
@@ -135,6 +163,157 @@ priority = "P1"
 name = "finland_government"
 homepage = "https://valtioneuvosto.fi/en"
 arena = "parliamentary"
-source_family = "Finland government / policy"
-sampling_rationale = "Finnish public-policy material for the national component of AI26."
+source_family = "Finland government / AI policy"
+sampling_rationale = "Finnish national-policy material for AI26's Finland component."
+priority = "P1"
+
+[[web_source]]
+name = "fcai"
+homepage = "https://fcai.fi/"
+arena = "elites"
+source_family = "Finland AI research / public-interest innovation"
+sampling_rationale = "Finnish research and innovation discourse connecting AI science and society."
+priority = "P2"
+
+# ---------------------------------------------------------------------------
+# Bounded social targets
+# ---------------------------------------------------------------------------
+
+[[x_account]]
+name = "OpenAI"
+handle = "OpenAI"
+arena = "elites"
+source_family = "frontier lab"
+priority = "P1"
+
+[[x_account]]
+name = "Anthropic"
+handle = "AnthropicAI"
+arena = "elites"
+source_family = "frontier lab / safety"
+priority = "P1"
+
+[[x_account]]
+name = "Google DeepMind"
+handle = "GoogleDeepMind"
+arena = "elites"
+source_family = "frontier lab / research"
+priority = "P1"
+
+[[x_account]]
+name = "Meta AI"
+handle = "MetaAI"
+arena = "elites"
+source_family = "frontier lab / open models"
+priority = "P1"
+
+[[x_account]]
+name = "NVIDIA AI"
+handle = "NVIDIAAI"
+arena = "elites"
+source_family = "AI infrastructure / industry"
+priority = "P2"
+
+[[x_account]]
+name = "Timnit Gebru"
+handle = "timnitGebru"
+arena = "elites"
+source_family = "Critical AI / political economy"
+priority = "P1"
+
+[[bluesky_account]]
+name = "Timnit Gebru"
+handle = "timnitgebru.blacksky.app"
+profile_url = "https://bsky.app/profile/timnitgebru.blacksky.app"
+arena = "elites"
+source_family = "Critical AI / political economy"
+priority = "P1"
+
+[[bluesky_account]]
+name = "Emily M. Bender"
+handle = "emilymbender.bsky.social"
+profile_url = "https://bsky.app/profile/emilymbender.bsky.social"
+arena = "elites"
+source_family = "Critical AI / language-model critique"
+priority = "P1"
+
+[[mastodon_account]]
+name = "Timnit Gebru"
+acct = "@TimnitGebru@mastodon.social"
+arena = "elites"
+source_family = "Critical AI / political economy"
+priority = "P1"
+
+[[mastodon_account]]
+name = "Emily M. Bender"
+acct = "@emilymbender@dair-community.social"
+arena = "elites"
+source_family = "Critical AI / language-model critique"
+priority = "P1"
+
+# ---------------------------------------------------------------------------
+# Long-form and scholarly discovery
+# ---------------------------------------------------------------------------
+
+[[youtube_source]]
+name = "OpenAI"
+arena = "elites"
+source_family = "frontier lab / capability / deployment"
+mode = "transcript_only"
+priority = "P1"
+
+[[youtube_source]]
+name = "Anthropic"
+arena = "elites"
+source_family = "frontier lab / safety / policy"
+mode = "transcript_only"
+priority = "P1"
+
+[[youtube_source]]
+name = "Google DeepMind"
+arena = "elites"
+source_family = "frontier lab / research / safety"
+mode = "transcript_only"
+priority = "P1"
+
+[[youtube_source]]
+name = "AI Now Institute"
+arena = "elites"
+source_family = "Critical AI / policy / political economy"
+mode = "transcript_only"
+priority = "P1"
+
+[[youtube_source]]
+name = "European Commission AI policy events"
+arena = "parliamentary"
+source_family = "institutional governance"
+mode = "transcript_only"
+priority = "P2"
+
+[[scholarly_query]]
+name = "frontier_ai_safety"
+services = ["arxiv", "openalex", "semantic_scholar"]
+query = "(AGI OR frontier AI OR superintelligence) AND (safety OR alignment OR catastrophic risk OR existential risk)"
+arena = "elites"
+priority = "P1"
+
+[[scholarly_query]]
+name = "critical_ai_political_economy"
+services = ["openalex", "semantic_scholar", "socArxiv"]
+query = "artificial intelligence AND (labour OR inequality OR discrimination OR surveillance OR political economy OR ownership)"
+arena = "elites"
+priority = "P1"
+
+[[scholarly_query]]
+name = "ai_governance"
+services = ["arxiv", "openalex", "semantic_scholar"]
+query = "artificial intelligence AND (governance OR regulation OR audit OR evaluation OR liability OR standards)"
+arena = "parliamentary"
+priority = "P1"
+
+[[scholarly_query]]
+name = "ai_creative_labour"
+services = ["openalex", "semantic_scholar", "socArxiv"]
+query = "generative AI AND (copyright OR creative work OR artists OR labour OR automation)"
+arena = "grassroots"
 priority = "P2"

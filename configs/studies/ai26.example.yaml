@@ -1,7 +1,7 @@
 # Public AI26 reference study.
-# Publication-facing methodology and bounded sampling logic only.
-# Operational credentials, cookies, browser profiles, private endpoints,
-# unpublished annotations and machine-specific secrets stay outside Git.
+# Publication-facing methodology plus a bounded public demo source plan.
+# Credentials, cookies, browser profiles, private endpoints, unpublished
+# annotations and machine-specific secrets stay outside Git.
 
 study: ai26
 title: Ideological contestation over AI
@@ -11,11 +11,6 @@ paper: https://github.com/TomiToivio/LaclauGPT/blob/main/paper/PAPER.md
 collection_codebook: ai26.collection-codebook.yaml
 source_manifest: ai26.sources.example.toml
 
-# Distributed control-plane policy for the current AI26 collection deployment.
-# Centralized Redis-backed project configuration is enabled conceptually now so
-# laptop/browser and server collectors can consume the same validated settings.
-# Messaging/events and distributed task queueing are implemented by the module
-# but intentionally remain inactive for AI26 until there is an operational need.
 distributed:
   config_backend: redis
   messaging_backend: none
@@ -30,11 +25,8 @@ window:
   missing_publication_time: retain_but_mark_unresolved
 
 relevance:
-  # Preserve ambiguous material for later human/theory-guided assessment.
   mode: retain_unjudged
 
-# These are the three empirical arenas in the paper. They are dimensions of one
-# AI26 dataset, not separate databases or ideological classes.
 arenas:
   elites:
     title: AI elites
@@ -47,6 +39,7 @@ arenas:
       - existential-risk and alignment discourse
       - AI safety, evaluation and pacing
       - Critical AI and political-economy critique
+      - open-source and public-interest alternatives
 
   grassroots:
     title: Grassroots mobilisation around and against AI
@@ -58,7 +51,8 @@ arenas:
       - creative work and copyright
       - surveillance and data extraction
       - data centres, energy and environmental conflict
-      - pause/safety mobilisation and broader opposition to AI deployments
+      - pause/safety mobilisation and opposition to particular AI deployments
+      - public-interest and emancipatory uses of automation
 
   parliamentary:
     title: Parliamentary and electoral politics
@@ -68,13 +62,13 @@ arenas:
     sampling_focus:
       - regulation and public oversight
       - innovation, competitiveness and the AI race
-      - national security and China
+      - national security and geopolitical competition
       - labour, rights and public-interest AI
       - safety standards, liability and independent evaluation
 
-# Canonical aggregation vocabulary from the paper/private AI26 pipeline.
-# Collection NEVER assigns these labels to records. They are sampling anchors
-# for balanced discovery; document-level interpretation belongs to Analysis.
+# Stable aggregation vocabulary. These are sampling anchors only. Collection
+# must never stamp a document or actor with one of these formations merely
+# because it came from a particular source.
 formation_vocabulary:
   - accelerationism
   - doomerism
@@ -83,13 +77,23 @@ formation_vocabulary:
   - ai critical
   - anti-ai
 
-# Small discovery vocabulary reflecting the paper and the September 2026
-# pacing/safety/competition controversy. These are query/source-discovery terms,
-# not a keyword classifier.
+# Cross-cutting dimensions prevent the source plan from collapsing into six
+# ideological boxes. They are useful for discovery and later stratification.
+sampling_dimensions:
+  political_economy: [ownership, labour, concentration, redistribution, public infrastructure]
+  governance: [regulation, liability, audits, standards, democratic control]
+  capability_risk: [alignment, catastrophic risk, loss of control, autonomous agents]
+  techno_optimism: [abundance, growth, innovation, human flourishing, post-work]
+  rights_and_harms: [discrimination, surveillance, copyright, creator rights, data extraction]
+  infrastructure: [compute, data centres, energy, water, chips, open weights]
+  geopolitics: [AI race, China, sovereignty, national security, export controls]
+
 discovery_hints:
   signifiers:
     - artificial intelligence
+    - AI
     - AGI
+    - frontier AI
     - superintelligence
     - abundance
     - growth
@@ -106,6 +110,7 @@ discovery_hints:
     - liability
     - competition
     - AI race
+    - sovereignty
     - China
     - labour
     - automation
@@ -113,9 +118,12 @@ discovery_hints:
     - corporate concentration
     - surveillance
     - copyright
+    - creator rights
     - data centres
     - public interest AI
-    - democracy
+    - democratic AI
+    - open source
+    - open weights
 
 collection_policy:
   preserve_exact_raw_payload: true
@@ -128,9 +136,9 @@ collection_policy:
   web_source_type: WEB
   link_fetch_failure_blocks_parent: false
   youtube_transcript_only_by_default: true
+  preserve_quote_reply_context_when_relevant: true
+  deduplicate_by_native_id_and_canonical_url: true
 
-# Conservative defaults for a laptop/small Linux server. These are guardrails,
-# not scientific quotas. Private runtime config may lower them further.
 collector_defaults:
   retry:
     max_attempts: 3
@@ -145,26 +153,28 @@ collector_defaults:
     respect_retry_after: true
     min_delay_seconds: 1
 
+# Conservative demo budgets. RSS/web/scholarly material is deliberately
+# prioritized over high-volume social collection.
 source_budgets:
   rss_web:
-    target_endpoints: 30
-    daily_relevant_items_soft_cap: 180
+    target_endpoints: 40
+    daily_relevant_items_soft_cap: 240
   scholarly:
-    daily_candidate_cap: 30
-    daily_full_analysis_target: 12
+    daily_candidate_cap: 40
+    daily_full_analysis_target: 15
   youtube:
-    target_channels: 12
+    target_channels: 15
     daily_transcript_cap: 8
     download_media: false
   bluesky:
     target_accounts: 12
-    daily_record_cap: 80
+    daily_record_cap: 100
   mastodon:
     target_accounts: 10
-    daily_record_cap: 60
+    daily_record_cap: 75
   x:
     target_accounts: 24
-    daily_record_cap: 180
+    daily_record_cap: 200
     per_target_per_poll_cap: 4
 
 platforms:
@@ -175,22 +185,45 @@ platforms:
   x: {enabled: true, base_urls: ["https://x.com/{handle}"]}
   bluesky: {enabled: true, base_urls: ["https://bsky.app/profile/{handle}"]}
   mastodon: {enabled: true}
-  tiktok: {enabled: true, base_urls: ["https://www.tiktok.com/@{handle}"]}
-  instagram: {enabled: true, base_urls: ["https://www.instagram.com/{handle}/"]}
+  tiktok: {enabled: false, note: "optional later grassroots extension"}
+  instagram: {enabled: false, note: "optional later grassroots extension"}
 
-# Synthetic executable fixtures only. Real operational source lists may extend
-# this through private runtime configuration.
+# Public demo targets. Inclusion is a sampling decision, NEVER an ideological
+# label. The same actor can contribute to several competing articulations.
 groups:
-  - id: example_ai_elite
-    name: Example AI elite fixture
+  - id: frontier_labs_demo
+    name: Frontier labs and industry
     arena: elites
+    rationale: capability, deployment, competition, safety and growth discourse
     accounts:
-      x: [example_ai_researcher]
-  - id: example_grassroots
-    name: Example grassroots fixture
+      x: [OpenAI, AnthropicAI, GoogleDeepMind, MetaAI, NVIDIAAI]
+
+  - id: critical_ai_demo
+    name: Critical AI and political economy
+    arena: elites
+    rationale: power, labour, inequality, surveillance and critique of AI imaginaries
+    accounts:
+      x: [timnitGebru]
+      bluesky: [timnitgebru.blacksky.app, emilymbender.bsky.social]
+      mastodon: ["@TimnitGebru@mastodon.social", "@emilymbender@dair-community.social"]
+
+  - id: grassroots_demo
+    name: Labour, creator-rights and mobilisation
     arena: grassroots
-    accounts:
-      x: [example_civic_group]
+    rationale: employment, copyright, pause/safety and deployment conflicts
+    discovery_entities: [PauseAI, SAG-AFTRA, Writers Guild, UNI Global Union, Teosto]
+
+  - id: governance_demo
+    name: EU and Finland public governance
+    arena: parliamentary
+    rationale: regulation, competitiveness, public oversight and national AI policy
+    discovery_entities:
+      - European Commission AI Office
+      - European Parliament
+      - Finnish Government
+      - Parliament of Finland
+      - Ministry of Economic Affairs and Employment of Finland
+      - OECD.AI
 
 storage:
   canonical_records: configured_runtime_backend
