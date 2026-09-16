@@ -4,6 +4,7 @@ import json
 
 import pytest
 
+from laclaugpt_data_collection.distributed import ProjectNamespace
 from laclaugpt_data_collection.messaging import (
     DirectPublisher,
     DurableRef,
@@ -12,7 +13,6 @@ from laclaugpt_data_collection.messaging import (
     idempotency_key,
     publisher_from_environment,
 )
-from laclaugpt_data_collection.distributed import ProjectNamespace
 
 
 class FakeRedis:
