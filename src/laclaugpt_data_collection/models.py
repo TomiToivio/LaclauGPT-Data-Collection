@@ -350,6 +350,12 @@ class NormalizedRecord(CanonicalRecord):
         return int(value or 0)
 
     @property
+    def parent_document_id(self) -> str | None:
+        """Legacy flat-envelope compatibility for reply/comment parent identity."""
+        value = self.source.raw_metadata.get("parent_document_id")
+        return None if value in (None, "") else str(value)
+
+    @property
     def text(self) -> str:
         return self.content.text
 
