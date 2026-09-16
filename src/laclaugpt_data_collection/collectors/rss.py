@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timezone
 from typing import Any
 
 from ..models import CollectionProvenance, NormalizedRecord
@@ -40,11 +39,9 @@ def _entry_to_record(feed_url: str, entry: Any) -> NormalizedRecord | None:
     link = str(getattr(entry, "link", "") or "")
     title = str(getattr(entry, "title", "") or "")
     summary = str(getattr(entry, "summary", "") or "")
-    published = str(
-        getattr(entry, "published", "")
-        or getattr(entry, "updated", "")
-        or datetime.now(timezone.utc).isoformat()
-    )
+    # Preserve a genuinely missing publication time as missing. Collection time
+    # must never masquerade as source publication time in realtime scheduling.
+    published = str(getattr(entry, "published", "") or getattr(entry, "updated", "") or "")
     source_id = str(getattr(entry, "id", "") or link or f"{title}|{published}")
     document_id = hashlib.sha256(source_id.encode("utf-8")).hexdigest()
     if not (link or title or summary):
@@ -65,5 +62,6 @@ def _entry_to_record(feed_url: str, entry: Any) -> NormalizedRecord | None:
             visited_url=feed_url,
             api_url=link,
             transformations=["rss-atom-parse", "map-entry"],
+            metadata={"source_publication_time_present": bool(published)},
         ),
     )

@@ -1,17 +1,21 @@
 # AI26 distributed collection smoke test
 
-This is the first bounded step of the three-machine distributed test from issue #16.
-It keeps the Firefox backend bound to localhost, then mirrors a small batch of the
-canonical capture output to the shared MongoDB + S3/CSC Allas + Redis plane.
+This is the bounded Collection-side path for the three-machine distributed test from issue #16. The laptop keeps Firefox bound to localhost while both laptop and Linux-server workers write into the same MongoDB + S3/CSC Allas + Redis project/run namespace.
 
-The public repository contains no AI26 source lists, credentials, researcher notes,
-or unpublished study settings. The real study YAML must live below the runtime path
-set in `LACLAUGPT_PRIVATE_CONFIG_DIR`.
+The public repository contains no private AI26 credentials, researcher notes, or unpublished operational source lists. Real study/source configuration must live below the runtime path set in `LACLAUGPT_PRIVATE_CONFIG_DIR`.
 
 ## 1. Install the distributed extras
 
+On the laptop:
+
 ```bash
 python -m pip install -e '.[distributed]'
+```
+
+On the Linux server, add RSS support for the first non-browser worker:
+
+```bash
+python -m pip install -e '.[distributed,feeds]'
 ```
 
 ## 2. Export the shared run contract
@@ -28,7 +32,7 @@ export LACLAUGPT_OBJECT_BACKEND=s3
 export LACLAUGPT_CACHE_BACKEND=redis
 export LACLAUGPT_MESSAGING_BACKEND=redis
 
-export LACLAUGPT_MONGODB_URI='mongodb://...'
+export LACLAUGPT_MONGODB_URI='mongodb://...:27017/...'
 export LACLAUGPT_REDIS_URL='redis://...'
 export LACLAUGPT_S3_ENDPOINT='https://object-storage.example'
 export LACLAUGPT_S3_BUCKET='...'
@@ -40,16 +44,22 @@ Do not paste these values into tracked files.
 
 ## 3. Validate before collecting
 
+On both machines:
+
 ```bash
 laclaugpt-collect doctor
+```
+
+On the laptop, validate the browser study configuration:
+
+```bash
 laclaugpt-collect distributed-check \
   --study-config "$LACLAUGPT_PRIVATE_CONFIG_DIR/ai26.yaml"
 ```
 
-Distributed mode fails closed when the project ID, run ID, private config root, Redis,
-or S3 bucket is missing. The study config must resolve inside the private config root.
+Distributed mode fails closed when the project ID, run ID, private config root, Redis, or S3 bucket is missing. Private configuration paths must resolve below `LACLAUGPT_PRIVATE_CONFIG_DIR`.
 
-## 4. Run Firefox collection locally
+## 4. Laptop: run Firefox collection locally
 
 The browser extension still talks only to localhost.
 
@@ -63,9 +73,7 @@ laclaugpt-collect capture-server \
 
 Collect only a bounded private smoke sample. Do not start the full AI26 corpus run.
 
-## 5. Mirror a bounded batch to the distributed plane
-
-In another terminal:
+In another laptop terminal, mirror a bounded batch to the shared plane:
 
 ```bash
 laclaugpt-collect distributed-sync \
@@ -74,32 +82,77 @@ laclaugpt-collect distributed-sync \
   --limit 25
 ```
 
-The worker:
-
-- reads canonical JSONL emitted by the Firefox backend;
-- uploads inline raw payloads to `projects/ai26/runs/<run_id>/raw/...` in S3/Allas;
-- upserts canonical records idempotently by canonical `source_url` into `ai26__records`;
-- publishes only `project_id`, `run_id`, `source_url`, MongoDB collection name, and raw object reference to the Redis `collected` stream;
-- uses a run-scoped Redis lease to avoid repeatedly re-emitting the same record during frequent cron polling.
-
-A one-minute laptop bridge can be rendered with:
+If the sample contains media, immediately persist the pending files to Allas/S3 and refresh MongoDB readiness:
 
 ```bash
-laclaugpt-collect schedule cron \
-  --schedule '* * * * *' \
-  --command-line "laclaugpt-collect distributed-sync --study-config $LACLAUGPT_PRIVATE_CONFIG_DIR/ai26.yaml --data-root ./data/browser-ai26 --limit 25"
+laclaugpt-distributed-media \
+  --study-config "$LACLAUGPT_PRIVATE_CONFIG_DIR/ai26.yaml" \
+  --data-root ./data/browser-ai26 \
+  --workers 4 \
+  --limit 25
 ```
 
-## 6. Linux-server half
+## 5. Linux server: join the same run with RSS
 
-Use the same environment contract and `LACLAUGPT_RUN_ID` for non-browser collectors on
-the Linux server. Their canonical records should target the same `ai26__records` MongoDB
-collection and project-scoped Redis/S3 namespaces. Source identity remains the dedup key,
-so simultaneous laptop/server writes converge on one logical record.
+The first non-browser distributed worker reads the standard `[[feed]]` TOML source-manifest convention. Point it at a private bounded AI26 manifest under the private config root:
 
-## Current boundary
+```bash
+laclaugpt-server-rss \
+  --source-manifest "$LACLAUGPT_PRIVATE_CONFIG_DIR/ai26.sources.toml" \
+  --collection-id ai26 \
+  --worker-id linux-server-rss-01 \
+  --max-feeds 5 \
+  --per-feed-limit 5 \
+  --limit 20
+```
 
-This implementation intentionally uses a local-to-distributed bridge for Firefox as the
-first smoke-test step. The capture server itself remains localhost-only and preserves its
-local SQLite/JSONL recovery copy. A later iteration can call the same distributed sink
-directly after each capture, without changing the MongoDB/Redis/Allas contract.
+The worker uses the same `project_id=ai26` and `LACLAUGPT_RUN_ID` as the laptop. It:
+
+- collects a bounded RSS/Atom sample using the existing generic RSS collector;
+- accepts ISO timestamps and normal RSS/RFC publication timestamps;
+- applies the AI26 source-publication floor before distributed ingestion;
+- sorts eligible records by the shared handoff priority/newest-first contract;
+- stamps collection, source-manifest and worker provenance without copying the private manifest into MongoDB or logs;
+- acquires a run-scoped Redis lease for each source revision;
+- writes canonical/raw state through the same MongoDB + Allas/S3 distributed sink as Firefox; and
+- emits the same lightweight `collected` and `analysis-ready` references.
+
+For frequent server polling, a conservative cron example is:
+
+```cron
+*/5 * * * * cd /opt/LaclauGPT-Data-Collection && laclaugpt-server-rss --source-manifest "$LACLAUGPT_PRIVATE_CONFIG_DIR/ai26.sources.toml" --collection-id ai26 --worker-id linux-server-rss-01 --max-feeds 5 --per-feed-limit 5 --limit 20 >> data/logs/server-rss.log 2>&1
+```
+
+Keep secrets/environment loading outside the tracked crontab command when possible, for example via the service account's private environment or an ignored wrapper script.
+
+## 6. What should appear in the shared backends
+
+Both machines target the same project namespace:
+
+```text
+MongoDB: ai26__records
+Redis:   laclaugpt:ai26:...
+Allas:   projects/ai26/...
+```
+
+MongoDB identity is collection-aware and canonical-source based, so simultaneous laptop/server writes converge safely rather than creating port-specific datasets. Redis carries references/leases/events, not large source payloads. Large/raw/media objects go to S3/Allas.
+
+Ready records expose the Collection → Analysis handoff contract in MongoDB and optionally the Redis `analysis-ready` stream. The Analysis worker can therefore start independently on another machine without changing Collection's storage contract.
+
+## 7. Minimal first-test sequence
+
+Use one shared run ID and keep every bound small:
+
+```text
+Laptop Firefox capture
+        ↓
+laptop distributed-sync ───────┐
+        ↓                       │
+optional distributed-media     │
+                                ├─→ MongoDB / Redis / Allas
+Linux-server RSS collector ─────┘
+                                ↓
+                         analysis-ready records
+```
+
+Verify counts and a few source identities in MongoDB/Allas before increasing limits. This smoke test is deliberately not a full-corpus run.
