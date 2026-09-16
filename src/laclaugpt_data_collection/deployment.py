@@ -19,6 +19,10 @@ class DeploymentProfile:
         return cls("laptop", "cli", "local", "firefox-local")
 
     @classmethod
+    def laptop_firefox_distributed(cls) -> "DeploymentProfile":
+        return cls("laptop", "cli", "distributed", "firefox-local")
+
+    @classmethod
     def linux_server_local(cls) -> "DeploymentProfile":
         return cls("linux-server", "cron", "local", "none")
 
@@ -66,6 +70,15 @@ def validate_profile(settings: Settings) -> list[str]:
         problems.append("Redis features require LACLAUGPT_REDIS_URL")
     if settings.object_backend == "s3" and not settings.s3_bucket:
         problems.append("S3 object storage requires a bucket")
+    if settings.distributed_requested:
+        if not settings.run_id:
+            problems.append("distributed collection requires LACLAUGPT_RUN_ID")
+        if settings.project_id == "default":
+            problems.append("distributed collection requires an explicit LACLAUGPT_PROJECT_ID")
+        if settings.private_config_dir is None:
+            problems.append("distributed collection requires LACLAUGPT_PRIVATE_CONFIG_DIR")
+        elif not settings.private_config_dir.is_dir():
+            problems.append("LACLAUGPT_PRIVATE_CONFIG_DIR must point to an existing directory")
     return problems
 
 
