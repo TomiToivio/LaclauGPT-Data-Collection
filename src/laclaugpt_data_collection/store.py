@@ -178,6 +178,43 @@ class CollectionStore:
                 return None
             return {"local_path": row[0], "sha256": row[1], "status": row[2]}
 
+    def media_states(self, source_id: str, *, collection_id: str | None = None) -> list[dict]:
+        """Return durable downloader state for one canonical source.
+
+        The current media table predates an explicit ``collection_id`` column,
+        so campaign isolation is recovered from the collection-prefixed
+        ``media_key`` written by :class:`MediaDownloader`.
+        """
+        with self._db_lock:
+            rows = self._db.execute(
+                """
+                SELECT media_key, media_index, url, local_path, sha256, byte_size,
+                       mime_type, status, failure_reason, http_status, downloaded_at
+                FROM media_index WHERE document_id=? ORDER BY media_index, media_key
+                """,
+                (source_id,),
+            ).fetchall()
+        states = [
+            {
+                "media_key": row[0],
+                "media_index": row[1],
+                "url": row[2],
+                "local_path": row[3],
+                "sha256": row[4],
+                "byte_size": row[5],
+                "mime_type": row[6],
+                "status": row[7],
+                "failure_reason": row[8],
+                "http_status": row[9],
+                "downloaded_at": row[10],
+            }
+            for row in rows
+        ]
+        if collection_id:
+            prefix = f"{collection_id}:"
+            states = [state for state in states if str(state["media_key"]).startswith(prefix)]
+        return states
+
     def record_media(
         self,
         media_key: str,

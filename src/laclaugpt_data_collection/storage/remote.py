@@ -5,6 +5,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 from ..distributed import ProjectNamespace
+from ..handoff import build_handoff
 from ..models import CanonicalRecord, canonicalize_source_url
 
 
@@ -19,6 +20,12 @@ def _routing_metadata(record: CanonicalRecord, project_id: str) -> tuple[str, st
     collection_id = collection_id or str(record.source.raw_metadata.get("collection_id") or "")
     arena = arena or str(record.source.raw_metadata.get("arena") or "")
     return collection_id or project_id, arena
+
+
+def _run_id(record: CanonicalRecord) -> str:
+    if record.provenance:
+        return str(record.provenance[-1].run_id or "")
+    return ""
 
 
 class MongoRecordStore:
@@ -51,6 +58,19 @@ class MongoRecordStore:
         self._collection.create_index([("project_id", 1)], name="project_id")
         self._collection.create_index([("collection_id", 1)], name="collection_id")
         self._collection.create_index([("arena", 1)], name="arena")
+        self._collection.create_index(
+            [
+                ("handoff.status", 1),
+                ("handoff.source_priority", 1),
+                ("handoff.published_at", -1),
+                ("source_url", 1),
+            ],
+            name="analysis_ready_order",
+        )
+        self._collection.create_index(
+            [("handoff.handoff_key", 1)],
+            name="handoff_key",
+        )
 
     def _payload(self, record: CanonicalRecord) -> dict[str, Any]:
         payload = record.model_dump(mode="json")
@@ -58,6 +78,11 @@ class MongoRecordStore:
         payload["project_id"] = self.project_id
         payload["collection_id"] = collection_id
         payload["arena"] = arena
+        payload["handoff"] = build_handoff(
+            payload,
+            project_id=self.project_id,
+            run_id=_run_id(record),
+        )
         return payload
 
     def _query(self, record: CanonicalRecord) -> dict[str, str]:
@@ -100,12 +125,12 @@ class MongoRecordStore:
 
     @staticmethod
     def from_document(document: dict[str, Any]) -> CanonicalRecord:
-        """Reconstruct canonical semantics without backend routing metadata."""
+        """Reconstruct canonical semantics without backend routing/handoff metadata."""
         return CanonicalRecord.model_validate(
             {
                 key: value
                 for key, value in document.items()
-                if key not in {"_id", "project_id", "collection_id", "arena"}
+                if key not in {"_id", "project_id", "collection_id", "arena", "handoff"}
             }
         )
 
