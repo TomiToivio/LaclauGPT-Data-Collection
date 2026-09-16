@@ -87,7 +87,6 @@ class MediaDownloader:
         content = record.get("content") or {}
         native = record.get("source_native_ids") or {}
         provenance = record.get("provenance") or []
-
         platform = str(record.get("platform") or source.get("platform") or "source")
         source_id = str(
             record.get("source_url")
@@ -97,7 +96,6 @@ class MediaDownloader:
         )
         if not source_id:
             raise ValueError("media record requires source_url or source-native identifier")
-
         collection_id = str(record.get("collection_id") or record.get("study") or "")
         if not collection_id and provenance and isinstance(provenance[-1], dict):
             latest = provenance[-1]
@@ -128,7 +126,7 @@ class MediaDownloader:
                 if media_key in queued:
                     continue
                 known = self.store.media_known(media_key)
-                if known and known.get("status") == "completed":
+                if known and known.get("status") in {"completed", "ok", "downloaded"}:
                     continue
                 queued.add(media_key)
                 jobs.append(MediaJob(
@@ -156,15 +154,20 @@ class MediaDownloader:
         return results
 
     def _download_one(self, job: MediaJob) -> dict:
-        self.store.mark_media_attempt(
-            job.media_key, job.collection_id, job.platform, job.source_id,
-            job.media_index, job.kind, job.url,
+        # Persist queued/running state before network I/O. The collection id is
+        # part of media_key, so simultaneous AI26/Brazil26 jobs never collide.
+        self.store.record_media(
+            job.media_key, job.platform, job.source_id, job.media_index, job.url,
+            None, None, None, "", "running", None, None,
         )
         try:
             body, mime = self._fetch(job.url)
         except Exception as exc:  # noqa: BLE001
             status = exc.code if isinstance(exc, HTTPError) else None
-            self.store.record_media_failure(job.media_key, str(exc)[:300], status)
+            self.store.record_media(
+                job.media_key, job.platform, job.source_id, job.media_index, job.url,
+                None, None, None, "", "failed", str(exc)[:300], status,
+            )
             return {"media_key": job.media_key, "collection_id": job.collection_id,
                     "status": "failed", "error": str(exc)[:300], "http_status": status}
 
@@ -174,8 +177,9 @@ class MediaDownloader:
         collection_dir = hashlib.sha256(job.collection_id.encode()).hexdigest()[:10]
         filename = f"{collection_dir}/{job.platform}/{job.media_key.replace(':', '_')}{extension}"
         path = self.backend.save(filename, body, mime)
-        self.store.record_media_success(
-            job.media_key, path, checksum, len(body), mime, 200
+        self.store.record_media(
+            job.media_key, job.platform, job.source_id, job.media_index, job.url,
+            path, checksum, len(body), mime, "completed", None, 200,
         )
         return {
             "media_key": job.media_key,
