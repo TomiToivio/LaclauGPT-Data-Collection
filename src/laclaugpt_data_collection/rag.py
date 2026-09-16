@@ -10,11 +10,13 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
 from .models import CanonicalRecord
+from .storage.base import RecordStore
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +139,55 @@ def index_after_save(
             with failure_log.open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(event, sort_keys=True) + "\n")
         return IndexResult("failed", record.source_url, key, error)
+
+
+class IndexingRecordStore:
+    """RecordStore decorator that performs optional indexing strictly after persistence.
+
+    This gives collectors a single safe extension point without changing existing storage
+    implementations. Canonical storage is always attempted first; index failures are
+    converted into ``IndexResult`` values/log entries by ``index_after_save``.
+    """
+
+    def __init__(
+        self,
+        store: RecordStore,
+        *,
+        enabled: bool,
+        indexer: RecordIndexer | None,
+        dataset: str = "",
+        failure_log: Path | None = None,
+    ) -> None:
+        self.store = store
+        self.enabled = enabled
+        self.indexer = indexer
+        self.dataset = dataset
+        self.failure_log = failure_log
+
+    def upsert(self, record: CanonicalRecord) -> None:
+        self.store.upsert(record)
+        index_after_save(
+            record,
+            enabled=self.enabled,
+            indexer=self.indexer,
+            dataset=self.dataset,
+            failure_log=self.failure_log,
+        )
+
+    def upsert_many(self, records: Iterable[CanonicalRecord]) -> None:
+        materialized = list(records)
+        self.store.upsert_many(materialized)
+        for record in materialized:
+            index_after_save(
+                record,
+                enabled=self.enabled,
+                indexer=self.indexer,
+                dataset=self.dataset,
+                failure_log=self.failure_log,
+            )
+
+    def contains(self, source_url: str) -> bool:
+        return self.store.contains(source_url)
 
 
 def validate_collection_relations(payload: dict[str, Any]) -> None:
