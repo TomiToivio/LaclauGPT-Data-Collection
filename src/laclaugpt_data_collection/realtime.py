@@ -6,9 +6,9 @@ remote MongoDB/Redis workers can implement the same observable semantics.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Iterable
 from urllib.parse import urlsplit
 
 from .models import canonicalize_source_url
