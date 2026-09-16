@@ -54,6 +54,7 @@ def distributed_settings(tmp_path: Path) -> Settings:
             _env_file=None,
             project_id="ai26",
             run_id="ai26-smoke-001",
+            mongodb_uri="mongodb://example.invalid:27017",
             redis_url="redis://example.invalid:6379/0",
             s3_bucket="laclaugpt-test",
             private_config_dir=private,
@@ -64,7 +65,13 @@ def distributed_settings(tmp_path: Path) -> Settings:
 
 def test_distributed_profile_fails_closed_without_run_or_private_config() -> None:
     settings = apply_profile(
-        Settings(_env_file=None, project_id="ai26", redis_url="redis://example.invalid", s3_bucket="x"),
+        Settings(
+            _env_file=None,
+            project_id="ai26",
+            mongodb_uri="mongodb://example.invalid:27017",
+            redis_url="redis://example.invalid",
+            s3_bucket="x",
+        ),
         DeploymentProfile.laptop_firefox_distributed(),
     )
     problems = validate_profile(settings)

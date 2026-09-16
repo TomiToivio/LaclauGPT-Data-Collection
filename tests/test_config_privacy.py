@@ -1,15 +1,28 @@
 from pathlib import Path
 
 from laclaugpt_data_collection.config import Settings
+from laclaugpt_data_collection.factory import build_record_store
+from laclaugpt_data_collection.storage.csv import CSVRecordStore
 
 
 def test_default_configuration_is_local_first() -> None:
     settings = Settings(_env_file=None)
-    assert settings.record_backend == "sqlite"
+    assert settings.record_backend == "auto"
+    assert settings.mongodb_uri == ""
     assert settings.object_backend == "filesystem"
     assert settings.cache_backend == "memory"
     assert settings.data_root == Path("data")
-    assert settings.sqlite_path == Path("data/database/collection.sqlite3")
+    assert settings.csv_path == Path("data/csv/records.csv")
+
+
+def test_default_auto_mode_never_contacts_unconfigured_mongodb(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_root=tmp_path / "data",
+        csv_path=tmp_path / "data" / "csv" / "records.csv",
+    )
+    store = build_record_store(settings)
+    assert isinstance(store, CSVRecordStore)
 
 
 def test_standard_runtime_tree_is_created_under_data(tmp_path: Path) -> None:

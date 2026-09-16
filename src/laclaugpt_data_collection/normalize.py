@@ -78,7 +78,7 @@ def normalise(
         transformations=["laclaugpt-network-capture", "map-item-normalise"],
     )
 
-    return NormalizedRecord(
+    record = NormalizedRecord(
         document_id=document_id,
         platform=platform,
         author=str(mapped.get("author") or ""),
@@ -98,6 +98,10 @@ def normalise(
         raw_content_type=raw_content_type,
         collection_provenance=provenance,
     )
+    external_urls = _split_list(mapped.get("urls"))
+    if external_urls:
+        record.source.raw_metadata["external_urls"] = external_urls
+    return record
 
 
 def normalise_aux(
