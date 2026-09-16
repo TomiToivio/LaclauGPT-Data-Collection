@@ -9,6 +9,7 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from urllib.parse import urlsplit
 
 from .models import canonicalize_source_url
@@ -48,7 +49,7 @@ class RealtimePolicy:
 
 
 def parse_source_time(value: object) -> datetime | None:
-    """Parse a source publication timestamp without substituting collection time."""
+    """Parse ISO or RFC/RSS source time without substituting collection time."""
     if value in (None, ""):
         return None
     if isinstance(value, datetime):
@@ -57,12 +58,14 @@ def parse_source_time(value: object) -> datetime | None:
         text = str(value).strip()
         if not text:
             return None
-        if text.endswith("Z"):
-            text = text[:-1] + "+00:00"
+        iso_text = text[:-1] + "+00:00" if text.endswith("Z") else text
         try:
-            dt = datetime.fromisoformat(text)
+            dt = datetime.fromisoformat(iso_text)
         except ValueError:
-            return None
+            try:
+                dt = parsedate_to_datetime(text)
+            except (TypeError, ValueError, OverflowError):
+                return None
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=UTC)
     return dt.astimezone(UTC)
