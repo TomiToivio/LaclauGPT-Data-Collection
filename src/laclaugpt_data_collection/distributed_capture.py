@@ -13,6 +13,7 @@ from typing import Any
 
 from .config import Settings
 from .deployment import validate_profile
+from .handoff import build_handoff
 from .models import CanonicalRecord, CollectionProvenance
 from .storage.remote import MongoRecordStore, RedisCoordinator, S3ObjectStore
 
@@ -81,7 +82,7 @@ class DistributedCaptureSink:
         return uri
 
     def ingest(self, record_data: dict[str, Any]) -> CanonicalRecord:
-        """Persist idempotently and publish a lightweight collected-record event."""
+        """Persist idempotently and publish lightweight collection/handoff events."""
         collection_id = str(record_data.get("collection_id") or self.settings.project_id)
         arena = str(record_data.get("arena") or "")
         canonical_data = {
@@ -108,18 +109,35 @@ class DistributedCaptureSink:
             record.source.raw_metadata.setdefault("arena", arena)
 
         self.records.upsert(record)
+        common = {
+            "project_id": self.settings.project_id,
+            "collection_id": collection_id,
+            "arena": arena,
+            "run_id": self.settings.run_id,
+            "source_url": record.source_url,
+            "record_collection": self.settings.distributed_namespace.mongo_collection("records"),
+        }
         self.redis.publish_stream(
             "collected",
-            {
-                "project_id": self.settings.project_id,
-                "collection_id": collection_id,
-                "arena": arena,
-                "run_id": self.settings.run_id,
-                "source_url": record.source_url,
-                "record_collection": self.settings.distributed_namespace.mongo_collection("records"),
-                "raw_ref": raw_ref,
-            },
+            {**common, "raw_ref": raw_ref},
         )
+
+        handoff = build_handoff(
+            record.model_dump(mode="json"),
+            project_id=self.settings.project_id,
+            run_id=self.settings.run_id,
+        )
+        if handoff["status"] == "ready":
+            self.redis.publish_stream(
+                "analysis-ready",
+                {
+                    **common,
+                    "handoff_key": str(handoff["handoff_key"]),
+                    "revision": str(handoff["revision"]),
+                    "published_at": str(handoff.get("published_at") or ""),
+                    "source_priority": str(handoff["source_priority"]),
+                },
+            )
         return record
 
     def smoke_check(self) -> dict[str, str]:
