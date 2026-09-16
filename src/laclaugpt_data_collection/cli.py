@@ -49,6 +49,38 @@ def _doctor(args: argparse.Namespace) -> int:
     return 0 if not problems else 2
 
 
+def _distributed_check(args: argparse.Namespace) -> int:
+    from .distributed_capture import DistributedCaptureSink
+
+    settings = Settings()
+    problems = validate_profile(settings)
+    if problems:
+        print(json.dumps({"status": "invalid", "problems": problems}, indent=2))
+        return 2
+    sink = DistributedCaptureSink(settings)
+    sink.assert_private_config(args.study_config)
+    print(json.dumps({"status": "ok", **sink.smoke_check()}, indent=2, sort_keys=True))
+    return 0
+
+
+def _distributed_sync(args: argparse.Namespace) -> int:
+    from .distributed_sync import sync_normalized_records
+
+    settings = Settings()
+    problems = validate_profile(settings)
+    if problems:
+        print(json.dumps({"status": "invalid", "problems": problems}, indent=2))
+        return 2
+    result = sync_normalized_records(
+        settings,
+        study_config=args.study_config,
+        data_root=Path(args.data_root),
+        limit=args.limit,
+    )
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return 0
+
+
 def _schedule(args: argparse.Namespace) -> int:
     command = args.command_line
     if args.kind == "cron":
@@ -69,6 +101,35 @@ def _build_parser() -> argparse.ArgumentParser:
     doctor = sub.add_parser("doctor", help="validate a safe local/server profile")
     doctor.add_argument("--profile", help="path to a checked-in example or ignored local TOML profile")
     doctor.set_defaults(func=_doctor)
+
+    check = sub.add_parser(
+        "distributed-check",
+        help="validate distributed AI26-style backends without exposing secrets",
+    )
+    check.add_argument(
+        "--study-config",
+        required=True,
+        help="private study YAML below LACLAUGPT_PRIVATE_CONFIG_DIR",
+    )
+    check.set_defaults(func=_distributed_check)
+
+    sync = sub.add_parser(
+        "distributed-sync",
+        help="mirror locally captured canonical JSONL records to MongoDB/S3/Redis",
+    )
+    sync.add_argument(
+        "--study-config",
+        required=True,
+        help="private study YAML below LACLAUGPT_PRIVATE_CONFIG_DIR",
+    )
+    sync.add_argument("--data-root", required=True, help="Firefox capture data root")
+    sync.add_argument(
+        "--limit",
+        type=int,
+        default=25,
+        help="bounded number of records per invocation (default: 25)",
+    )
+    sync.set_defaults(func=_distributed_sync)
 
     schedule = sub.add_parser("schedule", help="render cron/systemd examples without installing them")
     schedule.add_argument("kind", choices=("cron", "systemd"))
