@@ -1,0 +1,32 @@
+profile = "ai26-laskin-remote"
+machine = "linux-server"
+execution = "cron"
+browser = "none"
+
+# Runtime secrets and endpoints are supplied through an ignored .env or shell
+# environment on Laskin. This checked-in file only declares backend roles.
+[storage]
+records = "mongodb"
+objects = "s3"
+cache = "memory"
+
+[paths]
+data_root = "./data"
+sqlite_path = "./data/database/collection.sqlite3"
+
+[collector]
+mode = "laskin-remote"
+workers = 1
+download_media = true
+
+[distributed]
+# Match the AI26 localhost profile: distributed configuration is active, while
+# Redis messaging/task queues remain available but are not required yet.
+config_backend = "redis"
+messaging_backend = "none"
+task_queue_backend = "direct"
+
+[interoperability]
+schema_version = "1.1.0"
+emit_jsonl = true
+emit_csv = true
