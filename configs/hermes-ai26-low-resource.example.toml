@@ -1,0 +1,77 @@
+# Public-safe AI26 helper profile for a deliberately small/simple Hermes runtime.
+# Hermes is optional and must use the same canonical collectors/configuration as
+# human/cron operation. It is not a second crawler and does not classify ideology.
+
+profile = "hermes-ai26-low-resource"
+enabled = false
+project_id = "ai26"
+caller = "hermes-agent"
+execution = "agent"
+
+[ollama]
+base_url = "http://127.0.0.1:11434"
+model = "llama3.2:3b"
+timeout_seconds = 60
+stream = false
+
+# Conservative deterministic settings distilled from predecessor LaclauGPT
+# Ollama usage. Keep the helper cheap enough for an ordinary server/laptop.
+[ollama.options]
+temperature = 0.0
+num_ctx = 8192
+num_predict = 512
+top_p = 0.9
+repeat_penalty = 1.1
+
+[agent]
+# Legacy Hermes used a 60-minute idle research interval. Keep that cadence only
+# as a bounded advisory cycle; cron remains the real collection scheduler.
+interval_minutes = 60
+structured_json = true
+human_review_required = true
+max_queries_per_plan = 3
+max_pages_per_plan = 5
+max_chars_per_page = 3000
+max_input_chars = 8000
+
+[permissions]
+# Hermes may inspect/plan/summarise collection, but source acquisition still
+# goes through canonical collectors and final discourse interpretation belongs
+# in LaclauGPT-Data-Analysis.
+inspect_redacted_config = true
+validate_profile_offline = true
+plan_collection = true
+suggest_sources = true
+run_canonical_collectors = false
+mutate_distributed_config = false
+write_private_target_lists = false
+infer_final_ideology = false
+publish_research_claims = false
+
+[ai26]
+study_template = "configs/studies/ai26.example.yaml"
+source_manifest_template = "configs/studies/ai26.sources.example.toml"
+codebook_template = "configs/studies/ai26.collection-codebook.yaml"
+
+# Recovered public-safe seed families from the old Hermes monitor. Treat these
+# as discovery hints only. The current AI26 source manifest remains authoritative.
+seed_source_families = [
+  "rationalist / alignment",
+  "AI safety / x-risk",
+  "technical ML discourse",
+  "tech-industry discourse",
+  "scholarly AI research",
+  "mainstream technology journalism",
+]
+seed_sites = [
+  "LessWrong",
+  "Alignment Forum",
+  "Hacker News",
+  "arXiv cs.AI",
+  "MIT Technology Review AI",
+  "The Gradient",
+]
+
+[logging]
+audit_log = "./data/logs/hermes-ai26-actions.jsonl"
+redact_secrets = true
