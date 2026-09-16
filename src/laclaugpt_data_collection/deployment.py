@@ -63,6 +63,7 @@ def validate_profile(settings: Settings) -> list[str]:
         problems.append("distributed records require a MongoDB URI")
     redis_requested = (
         settings.cache_backend == "redis"
+        or settings.distributed_config_backend == "redis"
         or settings.messaging_backend == "redis"
         or settings.task_queue_backend == "redis"
     )
