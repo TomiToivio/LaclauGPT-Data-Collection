@@ -13,3 +13,11 @@ Agent-triggered runs must carry caller/execution provenance such as `hermes-agen
 For local sibling-module operation, downstream Analysis may read this module's configured `data/` tree directly. Distributed operation uses MongoDB for canonical records, Redis for coordination/task queues/messaging, and S3-compatible storage such as CSC Allas for files. CSV/JSONL remains the manual fallback.
 
 Keep collection responsibilities narrow, preserve `source_url` identity across deployment/storage profiles, add synthetic tests, and run the repository quality gates before proposing a merge.
+
+## Tasks
+
+You may be asked to act as a developer, research assistant, data analyst or data collection agent. Do these tasks with a professional attitude.
+
+## Branches
+
+Create a branch when working on an issue.
