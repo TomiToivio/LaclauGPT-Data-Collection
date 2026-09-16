@@ -49,7 +49,17 @@ def graph_ready_payload(record: CanonicalRecord, *, dataset: str = "") -> dict[s
     provenance = [item.model_dump(mode="json") for item in record.provenance]
     latest = provenance[-1] if provenance else {}
     source = record.source
-    return {
+    language = source.language or record.content.language or ""
+    relations = [
+        relation
+        for relation in (
+            {"type": "ON_PLATFORM", "target": source.platform} if source.platform else None,
+            {"type": "IN_DATASET", "target": dataset} if dataset else None,
+            {"type": "HAS_LANGUAGE", "target": language} if language else None,
+        )
+        if relation is not None
+    ]
+    payload = {
         "schema_version": record.schema_version,
         "record_id": record.source_url,
         "source_url": record.source_url,
@@ -57,7 +67,7 @@ def graph_ready_payload(record: CanonicalRecord, *, dataset: str = "") -> dict[s
         "dataset": dataset,
         "platform": source.platform,
         "source_type": source.source_type,
-        "language": source.language or record.content.language or "",
+        "language": language,
         "created_at": source.created_at,
         "collected_at": source.collected_at or latest.get("captured_at"),
         "collector": source.collector or latest.get("collector", "laclaugpt-data-collection"),
@@ -71,28 +81,14 @@ def graph_ready_payload(record: CanonicalRecord, *, dataset: str = "") -> dict[s
         "content": {
             "title": record.content.title,
             "text": record.content.text,
-            "media_references": [item.model_dump(mode="json") for item in record.content.media_references],
+            "media_references": [
+                item.model_dump(mode="json") for item in record.content.media_references
+            ],
         },
-        "factual_relations": [
-            {"type": "ON_PLATFORM", "target": source.platform} if source.platform else None,
-            {"type": "IN_DATASET", "target": dataset} if dataset else None,
-            {"type": "HAS_LANGUAGE", "target": source.language or record.content.language}
-            if (source.language or record.content.language)
-            else None,
-        ],
-    } | {
-        "factual_relations": [
-            relation
-            for relation in [
-                {"type": "ON_PLATFORM", "target": source.platform} if source.platform else None,
-                {"type": "IN_DATASET", "target": dataset} if dataset else None,
-                {"type": "HAS_LANGUAGE", "target": source.language or record.content.language}
-                if (source.language or record.content.language)
-                else None,
-            ]
-            if relation is not None
-        ]
+        "factual_relations": relations,
     }
+    validate_collection_relations(payload)
+    return payload
 
 
 def idempotency_key(record: CanonicalRecord, *, dataset: str = "") -> str:
@@ -132,8 +128,14 @@ def index_after_save(
         logger.warning("Optional RAG indexing failed for %s: %s", record.source_url, error)
         if failure_log is not None:
             failure_log.parent.mkdir(parents=True, exist_ok=True)
+            event = {
+                "record_id": record.source_url,
+                "idempotency_key": key,
+                "dataset": dataset,
+                "error": error,
+            }
             with failure_log.open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps({"record_id": record.source_url, "idempotency_key": key, "error": error}) + "\n")
+                handle.write(json.dumps(event, sort_keys=True) + "\n")
         return IndexResult("failed", record.source_url, key, error)
 
 
@@ -146,4 +148,6 @@ def validate_collection_relations(payload: dict[str, Any]) -> None:
     }
     forbidden = found & ANALYSIS_ONLY_RELATIONS
     if forbidden:
-        raise ValueError(f"analysis-only relations are not allowed in Collection: {sorted(forbidden)}")
+        raise ValueError(
+            f"analysis-only relations are not allowed in Collection: {sorted(forbidden)}"
+        )
