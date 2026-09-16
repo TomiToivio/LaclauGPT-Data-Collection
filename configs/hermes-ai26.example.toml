@@ -1,0 +1,90 @@
+# Public-safe Hermes profile for AI26 collection orchestration.
+# Hermes uses the same canonical study/source/codebook configuration and collectors
+# as human/cron operation. It is an orchestration/research agent, not a second crawler.
+
+profile = "hermes-ai26"
+enabled = false
+project_id = "ai26"
+caller = "hermes-agent"
+execution = "agent"
+
+[ollama]
+base_url = "http://127.0.0.1:11434"
+model = "deepseek-v4.1-flash:cloud"
+timeout_seconds = 180
+stream = false
+
+# Runtime model options may be overridden privately. Study/source/codebook settings
+# must never be reconstructed from model memory.
+[ollama.options]
+temperature = 0.0
+num_ctx = 8192
+top_p = 0.9
+repeat_penalty = 1.1
+
+[agent]
+structured_json = true
+human_review_required = true
+max_queries_per_plan = 3
+max_pages_per_plan = 5
+max_chars_per_page = 3000
+max_input_chars = 8000
+
+# These limits bound autonomous discovery/planning. They are not a statement that
+# Hermes is a low-capability model.
+interval_minutes = 60
+
+[permissions]
+inspect_redacted_config = true
+validate_profile_offline = true
+plan_collection = true
+suggest_sources = true
+run_canonical_collectors = false
+mutate_distributed_config = false
+write_private_target_lists = false
+infer_final_ideology = false
+publish_research_claims = false
+
+# Canonical AI26 configuration lookup. Hermes must inspect these files before
+# searching historical repositories or proposing a replacement taxonomy.
+[ai26]
+study_template = "configs/studies/ai26.example.yaml"
+source_manifest_template = "configs/studies/ai26.sources.example.toml"
+codebook_template = "configs/studies/ai26.collection-codebook.yaml"
+
+# Runtime copies are ignored/private and may extend the public templates.
+runtime_study = "data/config/ai26.yaml"
+runtime_source_manifest = "data/config/ai26.sources.toml"
+runtime_codebook = "data/config/ai26.collection-codebook.yaml"
+
+# Legacy repositories are archaeology only. Inspect them after current files, and
+# reuse only public-safe source/codebook ideas not already represented here.
+legacy_lookup_after_current_config = true
+
+# Recovered public-safe source families useful for gap checking. These are discovery
+# hints, not actor/document ideology labels and not a replacement for the manifest.
+seed_source_families = [
+  "rationalist / alignment",
+  "AI safety / x-risk",
+  "acceleration / techno-optimism",
+  "critical AI / political economy",
+  "labour / creative rights / automation",
+  "policy / parliamentary / regulation",
+  "frontier lab / industry",
+  "scholarly AI research",
+  "technology journalism",
+]
+
+[analysis_handoff]
+# Collection does not perform final discourse interpretation. When a cross-module
+# agent needs the current default analysis-model family, use one of these rather
+# than silently substituting the Hermes orchestration model.
+default_models = [
+  "gemma4:12b",
+  "gemma4:31b-cloud",
+  "gemma4:e2b",
+]
+
+[logging]
+audit_log = "./data/logs/hermes-ai26-actions.jsonl"
+redact_secrets = true
