@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import threading
 from pathlib import Path
 from typing import Any
@@ -17,7 +18,7 @@ from typing import Any
 from .capture_server import CaptureServer
 from .config import Settings
 from .distributed_capture import DistributedCaptureSink
-from .distributed_media_runner import run_distributed_media
+from .distributed_media_runner import MediaRunLockedError, run_distributed_media
 from .store import utc_stamp
 from .study import load_config
 
@@ -43,6 +44,9 @@ def _ai26_settings() -> Settings:
             f"LACLAUGPT_PROJECT_ID must be {PROJECT_ID!r} for AI26, "
             f"got {settings.project_id!r}"
         )
+    legacy_database = os.environ.get("AI26_MONGO_DATABASE", "").strip()
+    if legacy_database and "LACLAUGPT_MONGODB_DATABASE" not in os.environ:
+        settings.mongodb_database = legacy_database
     if not settings.run_id:
         settings.run_id = f"ai26-browser-{utc_stamp()}"
     return settings
@@ -286,8 +290,6 @@ def _parser() -> argparse.ArgumentParser:
 def _study_config(value: str | None) -> str:
     if value:
         return value
-    import os
-
     configured = os.environ.get("AI26_CONFIG", "").strip()
     if not configured:
         raise ValueError("AI26 study config is required via --study-config or AI26_CONFIG")
@@ -308,12 +310,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "check":
         return run_check(study_config=study_config)
     if args.command == "media":
-        return run_media(
-            study_config=study_config,
-            data_root=args.data_root,
-            workers=args.workers,
-            limit=args.limit,
-        )
+        try:
+            return run_media(
+                study_config=study_config,
+                data_root=args.data_root,
+                workers=args.workers,
+                limit=args.limit,
+            )
+        except MediaRunLockedError as exc:
+            print(json.dumps({"status": "locked", "study": PROJECT_ID, "error": str(exc)}))
+            return 75
     raise AssertionError(args.command)
 
 
