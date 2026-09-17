@@ -5,11 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from laclaugpt_data_collection import ai26_browser
-from laclaugpt_data_collection.distributed_media_runner import (
-    MediaRunLockedError,
-    media_run_lock,
-)
+from laclaugpt_data_collection import ai26_browser, distributed_media_runner
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -103,10 +99,10 @@ def test_ai26_mirror_rejects_cross_study_collection_id(
 
 
 def test_media_lock_prevents_overlapping_cron_runs(tmp_path: Path) -> None:
-    with media_run_lock(tmp_path) as lock_path:
+    with distributed_media_runner.media_run_lock(tmp_path) as lock_path:
         assert lock_path.exists()
-        with pytest.raises(MediaRunLockedError, match="already active"):
-            with media_run_lock(tmp_path):
+        with pytest.raises(distributed_media_runner.MediaRunLockedError, match="already active"):
+            with distributed_media_runner.media_run_lock(tmp_path):
                 pass
     assert not (tmp_path / ".distributed-media.lock").exists()
 
