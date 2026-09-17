@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 import json
 import threading
-import time
 from pathlib import Path
 from typing import Any
 
@@ -122,7 +121,6 @@ class JsonlDistributedMirror:
                     if not line:
                         break
                     if not line.endswith("\n"):
-                        # Writer may still be appending this line. Retry next scan.
                         handle.seek(line_start)
                         break
                     if not line.strip():
@@ -200,7 +198,6 @@ def run_backend(
         flush=True,
     )
 
-    # Flush any backlog from an earlier interrupted session before accepting new capture.
     mirror.scan_once()
     server = CaptureServer(study_config, data_root, host=host, port=port)
     mirror.start()
