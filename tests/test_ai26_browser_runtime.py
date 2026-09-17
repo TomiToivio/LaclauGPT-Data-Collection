@@ -6,7 +6,10 @@ from pathlib import Path
 import pytest
 
 from laclaugpt_data_collection import ai26_browser
-from laclaugpt_data_collection.distributed_media_runner import MediaRunLockedError, media_run_lock
+from laclaugpt_data_collection.distributed_media_runner import (
+    MediaRunLockedError,
+    media_run_lock,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
