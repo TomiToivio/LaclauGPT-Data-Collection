@@ -35,6 +35,15 @@ telegram = ["telethon>=1.36,<2"]
 youtube = ["yt-dlp>=2025.1", "youtube-transcript-api>=0.6,<2"]
 documents = ["arxiv>=2.1,<3", "pypdf>=5,<7", "PyMuPDF>=1.24,<2"]
 x-apify = ["apify-client>=1.8,<3"]
+interop = ["pyarrow>=17"]
+web-mining = [
+  "beautifulsoup4>=4.12,<5",
+  "Scrapy>=2.11,<3",
+  "trafilatura>=2,<3",
+  "minet>=1",
+]
+bluesky-native = ["atproto>=0.0.55,<1"]
+reddit = ["praw>=7.8,<8"]
 legacy-sources = [
   "Mastodon.py>=2.0,<3",
   "telethon>=1.36,<2",
