@@ -7,6 +7,7 @@ from laclaugpt_data_collection.interchange import (
     from_flat_row,
     from_legacy_collection,
     from_mongo_document,
+    migrate_payload,
     read_csv,
     read_jsonl,
     to_flat_row,
@@ -24,6 +25,9 @@ from laclaugpt_data_collection.models import (
     canonicalize_source_url,
 )
 from laclaugpt_data_collection.storage.local import SQLiteRecordStore
+
+
+SHARED_PARITY_FIXTURE = Path(__file__).parent / "fixtures" / "canonical_parity_v1.json"
 
 
 def sample_record() -> CanonicalRecord:
@@ -96,6 +100,43 @@ def test_flat_csv_jsonl_mongo_and_sqlite_round_trip(tmp_path: Path) -> None:
     assert_same(record, from_mongo_document(mongo))
 
     sqlite_path = tmp_path / "records.sqlite3"
+    store = SQLiteRecordStore(sqlite_path)
+    store.upsert(record)
+    restored = store.get(record.source_url)
+    assert restored is not None
+    assert_same(record, restored)
+
+
+def test_shared_cross_module_parity_fixture_round_trips(tmp_path: Path) -> None:
+    import json
+
+    payload = json.loads(SHARED_PARITY_FIXTURE.read_text(encoding="utf-8"))
+    record = CanonicalRecord.model_validate(migrate_payload(payload))
+
+    assert record.source_url == "https://example.invalid/laclaugpt/synthetic/record-001"
+    assert record.source_native_ids["legacy_document_id"] == "legacy-001"
+    assert record.source.raw_metadata["legacy_optional_field"] == "must-survive-roundtrip"
+    assert record.content.transcripts[0]["text"] == "A synthetic transcript segment."
+    assert record.content.ocr[0]["text"] == "SYNTHETIC ONLY"
+    assert record.content.frames[0]["media_ref"].startswith("fixture://")
+    assert record.content.media_references[0].media_type == "video"
+    assert record.provenance[0].method == "synthetic_fixture"
+    assert record.provenance[0].input_refs == []
+
+    json_path = tmp_path / "record.json"
+    json_path.write_text(record.model_dump_json(indent=2), encoding="utf-8")
+    from_json = CanonicalRecord.model_validate_json(json_path.read_text(encoding="utf-8"))
+    assert_same(record, from_json)
+
+    jsonl_path = tmp_path / "record.jsonl"
+    write_jsonl(jsonl_path, [record])
+    assert_same(record, read_jsonl(jsonl_path)[0])
+
+    csv_path = tmp_path / "record.csv"
+    write_csv(csv_path, [record])
+    assert_same(record, read_csv(csv_path)[0])
+
+    sqlite_path = tmp_path / "record.sqlite3"
     store = SQLiteRecordStore(sqlite_path)
     store.upsert(record)
     restored = store.get(record.source_url)

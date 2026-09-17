@@ -21,11 +21,14 @@ from .models import (
 )
 
 NESTED_FIELDS = (
+    "fixture_version",
     "source_native_ids",
     "raw_capture",
     "source",
     "content",
     "intermediate",
+    "source_units",
+    "alignments",
     "evidence",
     "analysis",
     "human_readable",
@@ -114,7 +117,12 @@ def from_flat_row(row: Mapping[str, Any]) -> CanonicalRecord:
         "source_url": _scalar(row.get("source_url")),
     }
     for key in NESTED_FIELDS:
-        default: Any = [] if key in {"evidence", "provenance"} else {}
+        if key in {"evidence", "provenance", "source_units", "alignments"}:
+            default: Any = []
+        elif key == "fixture_version":
+            default = None
+        else:
+            default = {}
         payload[key] = _json_cell(row.get(key), default)
     return CanonicalRecord.model_validate(migrate_payload(payload))
 
@@ -224,7 +232,7 @@ def from_legacy_collection(record: Mapping[str, Any]) -> CanonicalRecord:
 
 
 def migrate_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
-    """Migrate 1.0-era records to the four-layer 1.1.0 contract without data loss."""
+    """Migrate compatible canonical payloads without losing shared fixture semantics."""
     data = dict(payload)
     version = str(data.get("schema_version") or "")
     if version in {"1.0", "1.0.0"}:
@@ -252,7 +260,8 @@ def migrate_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
         ).model_dump(mode="python")
         data["schema_version"] = SCHEMA_VERSION
         return data
-    if version == SCHEMA_VERSION:
+    if version in {SCHEMA_VERSION, "1.1.0-draft"}:
+        data["schema_version"] = SCHEMA_VERSION
         return data
     raise ValueError(f"unsupported canonical schema version: {version!r}")
 

@@ -1,0 +1,251 @@
+{
+  "fixture_version": "1.0.0",
+  "schema_version": "1.1.0-draft",
+  "source_url": "https://example.invalid/laclaugpt/synthetic/record-001",
+  "source_native_ids": {
+    "synthetic_id": "record-001",
+    "legacy_document_id": "legacy-001"
+  },
+  "source": {
+    "platform": "synthetic",
+    "source_type": "social_post",
+    "author": "synthetic-researcher",
+    "author_fullname": "Synthetic Researcher",
+    "created_at": "2026-09-17T12:00:00Z",
+    "collected_at": "2026-09-17T12:01:00Z",
+    "collector": "laclaugpt-cross-module-fixture",
+    "collection_method": "synthetic_fixture",
+    "language": "en",
+    "country": "XX",
+    "parent_source_url": null,
+    "raw_metadata": {
+      "legacy_optional_field": "must-survive-roundtrip"
+    },
+    "raw_ref": "fixture://canonical-parity-v1/raw/record-001"
+  },
+  "content": {
+    "text": "Synthetic participants describe a shared future while disagreeing about who should control the system.",
+    "title": "Synthetic parity record",
+    "language": "en",
+    "translated_text": null,
+    "transcripts": [
+      {
+        "text": "A synthetic transcript segment.",
+        "start_seconds": 1.0,
+        "end_seconds": 3.5
+      }
+    ],
+    "ocr": [
+      {
+        "text": "SYNTHETIC ONLY",
+        "frame_timestamp_seconds": 2.0
+      }
+    ],
+    "frames": [
+      {
+        "frame_timestamp_seconds": 2.0,
+        "media_ref": "fixture://canonical-parity-v1/frame/002"
+      }
+    ],
+    "media_references": [
+      {
+        "media_type": "video",
+        "ref": "fixture://canonical-parity-v1/media/video"
+      }
+    ],
+    "file_references": []
+  },
+  "source_units": [
+    {
+      "unit_id": "unit_text_001",
+      "source_url": "https://example.invalid/laclaugpt/synthetic/record-001",
+      "unit_type": "record_text",
+      "parent_unit_id": null,
+      "text": "Synthetic participants describe a shared future while disagreeing about who should control the system.",
+      "provenance_id": "prov_collection_001"
+    },
+    {
+      "unit_id": "unit_transcript_001",
+      "source_url": "https://example.invalid/laclaugpt/synthetic/record-001",
+      "unit_type": "transcript_span",
+      "parent_unit_id": null,
+      "text": "A synthetic transcript segment.",
+      "start_seconds": 1.0,
+      "end_seconds": 3.5,
+      "provenance_id": "prov_preprocess_001"
+    }
+  ],
+  "alignments": [
+    {
+      "alignment_id": "align_001",
+      "relation": "same_moment",
+      "unit_ids": ["unit_transcript_001"],
+      "confidence": 1.0,
+      "method": "synthetic_fixture",
+      "provenance_id": "prov_preprocess_001"
+    }
+  ],
+  "evidence": [
+    {
+      "evidence_id": "edge_001",
+      "relation": "derived_from",
+      "from_id": "obj_candidate_001",
+      "to_id": "unit_text_001",
+      "source_url": "https://example.invalid/laclaugpt/synthetic/record-001",
+      "provenance_id": "prov_analysis_001",
+      "review_status": "PROVISIONAL",
+      "metadata": {}
+    }
+  ],
+  "analysis": {
+    "status": "complete",
+    "started_at": "2026-09-17T12:02:00Z",
+    "completed_at": "2026-09-17T12:02:01Z",
+    "summary": "Synthetic analysis identifies a contested collective future and a control frontier.",
+    "analysis_objects": [
+      {
+        "object_id": "obj_candidate_001",
+        "object_type": "candidate_interpretation",
+        "epistemic_type": "CANDIDATE_INTERPRETATION",
+        "label": "shared future is articulated against contested control",
+        "value": null,
+        "source_url": "https://example.invalid/laclaugpt/synthetic/record-001",
+        "source_unit_ids": ["unit_text_001"],
+        "provenance_id": "prov_analysis_001",
+        "review_status": "PROVISIONAL",
+        "supersedes": null,
+        "metadata": {
+          "legacy_optional_score": 0.42
+        }
+      }
+    ],
+    "entities": [
+      {
+        "entity_id": "entity_001",
+        "label": "the system",
+        "type": "synthetic_object"
+      }
+    ],
+    "entity_mentions": [],
+    "topics": ["synthetic governance"],
+    "topic_assignments": [],
+    "classifications": [],
+    "embeddings": [],
+    "formations": [
+      {
+        "id": "formation_001",
+        "label": "synthetic formation"
+      }
+    ],
+    "signifiers": ["shared future"],
+    "nodal_points": ["control"],
+    "discourses": [],
+    "imaginaries": [],
+    "relations": [],
+    "events": [],
+    "actors": [],
+    "narrative_episodes": [],
+    "us": ["participants"],
+    "them": ["controllers"],
+    "frontier": ["participation/control"],
+    "affects": [],
+    "sentiments": [],
+    "formula_of_populism": null,
+    "uncertainty": [
+      {
+        "target_id": "obj_candidate_001",
+        "kind": "model_confidence",
+        "value": 0.64,
+        "note": "Synthetic value for contract testing only."
+      }
+    ],
+    "abstentions": [],
+    "codebook_refs": [
+      {
+        "id": "synthetic-codebook",
+        "version": "1.0.0",
+        "sha256": "synthetic-not-a-real-hash"
+      }
+    ],
+    "memory_refs": [],
+    "model_runs": [
+      {
+        "run_id": "synthetic-model-run-001",
+        "provider": "fake",
+        "model": "fixture-model",
+        "prompt_version": "fixture-prompt-v1",
+        "codebook_ref": "synthetic-codebook@1.0.0"
+      }
+    ]
+  },
+  "provenance": [
+    {
+      "provenance_id": "prov_collection_001",
+      "stage": "collection",
+      "method": "synthetic_fixture",
+      "module": "LaclauGPT-Data-Collection",
+      "module_version": "fixture",
+      "git_commit": "fixture",
+      "model": null,
+      "model_version": null,
+      "created_at": "2026-09-17T12:01:00Z",
+      "run_id": "cross-module-parity-v1",
+      "input_refs": [],
+      "transformations": ["normalize_source_identity"],
+      "metadata": {}
+    },
+    {
+      "provenance_id": "prov_preprocess_001",
+      "stage": "preprocess",
+      "method": "synthetic_multimodal_shape",
+      "module": "LaclauGPT-Data-Collection",
+      "module_version": "fixture",
+      "git_commit": "fixture",
+      "model": null,
+      "model_version": null,
+      "created_at": "2026-09-17T12:01:30Z",
+      "run_id": "cross-module-parity-v1",
+      "input_refs": ["unit_text_001"],
+      "transformations": ["attach_optional_multimodal_fields"],
+      "metadata": {}
+    },
+    {
+      "provenance_id": "prov_analysis_001",
+      "stage": "analysis",
+      "method": "fake_provider_neutral",
+      "module": "LaclauGPT-Data-Analysis",
+      "module_version": "fixture",
+      "git_commit": "fixture",
+      "model": "fixture-model",
+      "model_version": "1",
+      "created_at": "2026-09-17T12:02:01Z",
+      "run_id": "cross-module-parity-v1",
+      "input_refs": ["unit_text_001", "synthetic-codebook@1.0.0"],
+      "transformations": ["synthetic_analysis"],
+      "metadata": {}
+    }
+  ],
+  "review": {
+    "status": "PROVISIONAL",
+    "reviewer": null,
+    "reviewed_at": null,
+    "note": null,
+    "corrections": {},
+    "flags": ["synthetic-fixture"],
+    "rerun_requests": [],
+    "review_events": [
+      {
+        "review_id": "review_001",
+        "target_id": "obj_candidate_001",
+        "target_kind": "analysis_object",
+        "action": "annotate",
+        "reviewer": "synthetic-reviewer",
+        "reviewed_at": "2026-09-17T12:03:00Z",
+        "previous_status": "PROVISIONAL",
+        "new_status": "PROVISIONAL",
+        "note": "Synthetic review boundary marker.",
+        "provenance_id": "prov_review_001"
+      }
+    ]
+  }
+}
