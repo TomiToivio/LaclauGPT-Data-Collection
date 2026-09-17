@@ -182,6 +182,15 @@ sampling_rationale = "Kai-Fu Lee on Medium: China/West AI competition, commercia
 priority = "P1"
 active = true
 last_verified = "2026-09-13"
+[[feed]]
+name = "datacenterknowledge"
+feed_url = "https://www.datacenterknowledge.com/rss.xml"
+homepage = "https://www.datacenterknowledge.com"
+source_family = "data-centre / energy / environmental conflict"
+sampling_rationale = "Industry trade press on AI infrastructure: power availability and grid constraints, water use, project cancellations and delays, local opposition and property-tax politics. Covers the material/energy stratum of AI contestation that corporate and policy feeds under-report. Verified live 2026-09-17 with 50 items. NOT all items are AI-related; lightweight relevance filtering at analysis stage only."
+priority = "P2"
+active = true
+last_verified = "2026-09-17"
 
 # --- No-feed sources: web/article collector targets (see issue #4) ---
 

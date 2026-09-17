@@ -32,7 +32,7 @@ formation_sampling_cues:
 
   existential-risk discourse:
     discovery_terms: [existential risk, extinction, catastrophic risk, loss of control, superintelligence]
-    note: "Doomer" is a situated political label. Prefer x-risk/catastrophic-risk language for neutral retrieval and preserve self-description where available.
+    note: '"Doomer" is a situated political label. Prefer x-risk/catastrophic-risk language for neutral retrieval and preserve self-description where available.'
 
   left-wing techno-optimism:
     discovery_terms: [post-work, automation, public ownership, redistribution, technological emancipation, postcapitalism, public AI, public compute]
