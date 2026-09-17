@@ -83,6 +83,42 @@ source_family = "capability skepticism / hype critique / governance"
 sampling_rationale = "Elite criticism of capability claims, hype, deployment and governance choices."
 priority = "P2"
 
+[[feed]]
+name = "public_ai_network"
+feed_url = "https://publicai.substack.com/feed"
+homepage = "https://publicai.network/"
+arena = "elites"
+source_family = "public-interest AI / public infrastructure / open models"
+sampling_rationale = "Technology-positive public-AI discourse centered on public capacity, shared infrastructure, accountability and durable public goods."
+priority = "P1"
+
+[[feed]]
+name = "ada_lovelace"
+feed_url = "https://www.adalovelaceinstitute.org/feed/"
+homepage = "https://www.adalovelaceinstitute.org/"
+arena = "elites"
+source_family = "public-interest AI / Critical AI / political economy / public compute"
+sampling_rationale = "Research on equitable distribution of AI benefits, public-interest governance, public compute and alternative political economies for AI."
+priority = "P1"
+
+[[feed]]
+name = "data_society"
+feed_url = "https://datasociety.net/feed/"
+homepage = "https://datasociety.net/"
+arena = "elites"
+source_family = "Critical AI / labour / surveillance / social impacts"
+sampling_rationale = "Social-science research on AI in lived institutions, labour, surveillance, power and civic life."
+priority = "P1"
+
+[[feed]]
+name = "green_web_foundation"
+feed_url = "https://www.thegreenwebfoundation.org/feed/"
+homepage = "https://www.thegreenwebfoundation.org/"
+arena = "grassroots"
+source_family = "digital infrastructure / data centres / energy / climate justice"
+sampling_rationale = "Tracks data-centre energy, fossil-fuel dependence, digital infrastructure concentration and environmental impacts, including AI-driven demand."
+priority = "P1"
+
 # ---------------------------------------------------------------------------
 # Public web endpoints
 # ---------------------------------------------------------------------------
@@ -173,6 +209,22 @@ homepage = "https://fcai.fi/"
 arena = "elites"
 source_family = "Finland AI research / public-interest innovation"
 sampling_rationale = "Finnish research and innovation discourse connecting AI science and society."
+priority = "P2"
+
+[[web_source]]
+name = "food_water_watch_data_centers"
+homepage = "https://www.foodandwaterwatch.org/tag/data-center/"
+arena = "grassroots"
+source_family = "data-centre opposition / energy / water / environmental justice"
+sampling_rationale = "Dedicated stream of community, ratepayer, water, pollution and moratorium arguments around AI data-centre expansion."
+priority = "P1"
+
+[[web_source]]
+name = "humans_first_data_centers"
+homepage = "https://www.humansfirst.com/data-center-policy"
+arena = "grassroots"
+source_family = "data-centre opposition / local control / ratepayer politics"
+sampling_rationale = "A differently situated grassroots data-centre opposition source emphasizing local control, utility costs, land use and community consent."
 priority = "P2"
 
 # ---------------------------------------------------------------------------
@@ -273,6 +325,20 @@ handle = "emilymbender"
 arena = "elites"
 source_family = "Critical AI / language-model critique"
 priority = "P1"
+
+[[x_account]]
+name = "AI Now Institute"
+handle = "AINowInstitute"
+arena = "elites"
+source_family = "Critical AI / political economy / governance"
+priority = "P1"
+
+[[x_account]]
+name = "Ada Lovelace Institute"
+handle = "AdaLovelaceInst"
+arena = "elites"
+source_family = "public-interest AI / Critical AI / governance"
+priority = "P2"
 
 [[x_account]]
 name = "SAG-AFTRA"
