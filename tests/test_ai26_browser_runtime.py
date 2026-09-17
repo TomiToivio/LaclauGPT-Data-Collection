@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from laclaugpt_data_collection import ai26_browser, distributed_media_runner
 
 
