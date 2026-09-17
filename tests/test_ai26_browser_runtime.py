@@ -115,5 +115,5 @@ def test_ai26_public_env_template_has_placeholders_only() -> None:
     text = (ROOT / "configs" / "ai26.browser.env.example").read_text(encoding="utf-8")
     assert "LACLAUGPT_PROJECT_ID=ai26" in text
     assert "127.0.0.1" in text
-    assert "USER:PASSWORD@HOST:PORT" in text
+    assert "mongodb://HOST:PORT/" in text
     assert "LaclauGPT-Private/collection/ai26" in text
