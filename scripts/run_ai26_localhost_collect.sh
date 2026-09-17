@@ -2,9 +2,14 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+# shellcheck source=scripts/ai26_runtime.sh
+. "${ROOT}/scripts/ai26_runtime.sh"
 ENV_FILE=${LACLAUGPT_ENV_FILE:-"$ROOT/data/config/ai26-localhost.env"}
 SOURCE_MANIFEST=${LACLAUGPT_SOURCE_MANIFEST:-"$ROOT/data/config/ai26.sources.toml"}
 LOCK_FILE=${LACLAUGPT_COLLECT_LOCK:-"$ROOT/data/tmp/ai26-localhost-collect.lock"}
+
+# Cron has neither .venv/bin nor ~/.local/bin on PATH.
+ai26_prepend_runtime_path
 
 mkdir -p "$ROOT/data/logs" "$ROOT/data/tmp"
 [[ -f "$ENV_FILE" ]] || { echo "missing runtime env: $ENV_FILE" >&2; exit 2; }
@@ -23,7 +28,7 @@ export LACLAUGPT_BROWSER=${LACLAUGPT_BROWSER:-firefox-local}
 export LACLAUGPT_CALLER=cron
 
 command -v flock >/dev/null 2>&1 || { echo "flock is required for cron locking" >&2; exit 2; }
-command -v laclaugpt-server-rss >/dev/null 2>&1 || { echo "package is not installed" >&2; exit 2; }
+ai26_require_commands laclaugpt-server-rss || exit 2
 
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then

@@ -176,7 +176,11 @@ source_budgets:
     target_accounts: 10
     daily_record_cap: 75
   x:
-    target_accounts: 28
+    # Soft maximum, not a literal target: the explicit groups[].accounts.x
+    # list currently names 21 handles. Do not expand the list merely to hit a
+    # number; keep this at or above the explicit count.
+    target_accounts_soft_cap: 28
+    explicit_target_count: 21
     daily_record_cap: 240
     per_target_per_poll_cap: 4
     browser_profile_visits_per_cycle: 1
@@ -193,6 +197,12 @@ platforms:
     collection_mode: firefox_browser_graphql_capture
     note: "The Firefox /tour endpoint expands every configured groups.accounts.x handle into a profile visit. Keep this list bounded."
   bluesky: {enabled: true, base_urls: ["https://bsky.app/profile/{handle}"]}
+  # NOTE: tour_accounts() emits a row for every enabled platform but only
+  # substitutes {handle}; a platform with no base_urls yields url="". Mastodon
+  # handles are "@user@instance" so a simple {handle} template cannot express
+  # the profile URL. Mastodon rows therefore currently carry an empty URL in
+  # /tour. Tracked as a known limitation until the browser tour gains
+  # platform-specific URL building.
   mastodon: {enabled: true}
   tiktok: {enabled: false, note: "optional later grassroots extension"}
   instagram: {enabled: false, note: "optional later grassroots extension"}
