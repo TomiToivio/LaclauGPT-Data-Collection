@@ -55,13 +55,18 @@ class CollectionProvenance(Model):
     collector: str = "laclaugpt-data-collection"
     collector_version: str = "0.1.0"
     captured_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    created_at: str | None = None
     capture_id: str = ""
     run_id: str = ""
+    method: str = ""
     module: str = ""
     module_version: str = ""
     git_commit: str = ""
+    model: str | None = None
+    model_version: str | None = None
     visited_url: str = ""
     api_url: str = ""
+    input_refs: list[str] = Field(default_factory=list)
     transformations: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -106,7 +111,9 @@ class HumanReadableSection(Model):
 
 
 class MediaReference(Model):
-    kind: str
+    kind: str = ""
+    media_type: str = ""
+    ref: str = ""
     url: str = ""
     media_index: int = 0
     local_ref: str = ""
@@ -155,13 +162,17 @@ class ContentSection(Model):
     title: str | None = None
     language: str | None = None
     translated_text: str | None = None
+    transcripts: list[dict[str, Any]] = Field(default_factory=list)
+    ocr: list[dict[str, Any]] = Field(default_factory=list)
+    frames: list[dict[str, Any]] = Field(default_factory=list)
     media_references: list[MediaReference] = Field(default_factory=list)
-    file_references: list[str] = Field(default_factory=list)
+    file_references: list[Any] = Field(default_factory=list)
 
 
 class CanonicalRecord(Model):
     """Collection-populated portion of the project-wide canonical record."""
 
+    fixture_version: str | None = None
     schema_version: str = SCHEMA_VERSION
     source_url: str
     source_native_ids: dict[str, str] = Field(default_factory=dict)
@@ -169,6 +180,8 @@ class CanonicalRecord(Model):
     source: SourceSection = Field(default_factory=SourceSection)
     content: ContentSection = Field(default_factory=ContentSection)
     intermediate: IntermediateSection = Field(default_factory=IntermediateSection)
+    source_units: list[dict[str, Any]] = Field(default_factory=list)
+    alignments: list[dict[str, Any]] = Field(default_factory=list)
     evidence: list[dict[str, Any]] = Field(default_factory=list)
     analysis: dict[str, Any] = Field(default_factory=dict)
     human_readable: HumanReadableSection = Field(default_factory=HumanReadableSection)
