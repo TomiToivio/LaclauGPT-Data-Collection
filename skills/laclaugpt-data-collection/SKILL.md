@@ -38,6 +38,24 @@ Use generated cron/systemd examples rather than writing directly into system con
 
 On one machine, Analysis may consume the configured Collection `data/` root directly. In distributed operation, handoff occurs through canonical MongoDB records plus Redis coordination and S3/Allas object references. Do not make sibling repositories mandatory Python imports.
 
+## Cross-module contract conformance
+
+Collection is the first stage of `Collection -> Analysis -> Visualization`, so this module establishes the canonical record every sibling consumes. Three project-wide contracts are normative here and are owned by the meta-repository `TomiToivio/LaclauGPT`:
+
+- `docs/CANONICAL_DATA_CONTRACT.md` — `source_url` is the semantic identity and MUST survive canonicalization and every storage/transport round trip unchanged. Platform identifiers (`document_id`, `video_id`, `new_id`) and backend keys (`_id`, SQLite primary keys, filenames, queue ids) remain aliases and never replace it.
+- `docs/STORAGE_BACKEND_CONTRACT.md` — `auto | mongodb | csv` semantics: `auto` uses MongoDB only when an endpoint is explicitly configured and reachable, explicit `mongodb` fails clearly when unavailable, and local CSV/SQLite stays a first-class zero-infrastructure mode.
+- `fixtures/cross_module/canonical_parity_v1.json` — the versioned schema-drift tripwire. A repository-local copy is vendored under `tests/fixtures/`; never fork its semantics into a second incompatible fixture.
+
+Run the offline conformance check before proposing a change to the record model, an adapter or the backend selector:
+
+```bash
+python tools/verify_contracts.py
+```
+
+It verifies fixture construction through the canonical model, that multimodal content is preserved as references only, that review state stays human-controlled, that JSONL/CSV/MongoDB-shape/SQLite reconstruct the same logical record, that the backend selector never invents a remote destination and fails closed on misconfiguration, and that the public-tree policy still passes. It contacts nothing and writes no research data; the exit status is the gate. Note that `Settings` reads a local `.env`, so the endpoint-dependent checks clear the URI explicitly and the tool reports when an ambient `.env` is present.
+
+Do not treat a green unit suite as contract conformance: these checks are deliberately independent of the module's own tests, because a shared-schema break appears as a mismatch *between* modules rather than as a failing unit here.
+
 ## Human and agent parity
 
 An agent changes the caller/execution metadata, not the scientific meaning of the record. The same collectors, canonical schemas, storage adapters and privacy checks apply to human CLI, cron/systemd and agent operation.

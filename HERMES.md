@@ -12,6 +12,8 @@ Agent-triggered runs must carry caller/execution provenance such as `hermes-agen
 
 For local sibling-module operation, downstream Analysis may read this module's configured `data/` tree directly. Distributed operation uses MongoDB for canonical records, Redis for coordination/task queues/messaging, and S3-compatible storage such as CSC Allas for files. CSV/JSONL remains the manual fallback.
 
+Run the offline cross-module contract check (`python tools/verify_contracts.py`) when a change touches the record model, an adapter or the backend selector.
+
 Keep collection responsibilities narrow, preserve `source_url` identity across deployment/storage profiles, add synthetic tests, and run the repository quality gates before proposing a merge.
 
 ## Tasks
