@@ -26,7 +26,6 @@ from laclaugpt_data_collection.models import (
 )
 from laclaugpt_data_collection.storage.local import SQLiteRecordStore
 
-
 SHARED_PARITY_FIXTURE = Path(__file__).parent / "fixtures" / "canonical_parity_v1.json"
 
 
