@@ -4,18 +4,37 @@ This is the researcher-laptop profile for AI26. Firefox capture and ordinary CLI
 
 The public AI26 files are methodology/templates only. Copy them under ignored `data/config/` before use. Do not commit endpoints, credentials, cookies, private target lists or browser profiles.
 
+For the research laptop covered by issue #61, the repository must live at exactly:
+
+```text
+/mnt/c/Users/totoivio/LaclauGPT-Data-Collection
+```
+
 ## 1. Install
 
 ```bash
-git clone https://github.com/TomiToivio/LaclauGPT-Data-Collection.git
-cd LaclauGPT-Data-Collection
+cd /mnt/c/Users/totoivio/LaclauGPT-Data-Collection
 python -m venv .venv
 source .venv/bin/activate
 pip install -e '.[distributed,feeds,youtube,documents]'
 mkdir -p data/config data/logs data/tmp
 cp configs/studies/ai26.example.yaml data/config/ai26.yaml
 cp configs/studies/ai26.sources.example.toml data/config/ai26.sources.toml
+cp configs/studies/ai26.collection-codebook.yaml data/config/ai26.collection-codebook.yaml
 cp .env.example data/config/ai26-localhost.env
+```
+
+Before doing anything else, verify both commands resolve to the required tree:
+
+```bash
+pwd
+git rev-parse --show-toplevel
+```
+
+Both must print:
+
+```text
+/mnt/c/Users/totoivio/LaclauGPT-Data-Collection
 ```
 
 Edit only `data/config/ai26-localhost.env`. At minimum set:
@@ -75,6 +94,7 @@ The profile consolidates conservative settings seen repeatedly in predecessor La
 ## 3. Start Firefox backend
 
 ```bash
+cd /mnt/c/Users/totoivio/LaclauGPT-Data-Collection
 bash scripts/run_firefox_study.sh data/config/ai26.yaml data 8765
 ```
 
@@ -118,17 +138,25 @@ The existing distributed media worker scans locally captured canonical records, 
 
 ## 7. Cron
 
-All wrappers use `flock`, so overlapping invocations exit cleanly instead of double-running.
+All wrappers use `flock`, so overlapping invocations exit cleanly instead of double-running. They also prepend the repository `.venv/bin` and the user's `~/.local/bin` to `PATH`, because cron normally starts with a minimal environment.
 
-Example crontab:
+Install these exact laptop entries rather than copying a placeholder path:
 
 ```cron
-*/10 * * * * cd /path/to/LaclauGPT-Data-Collection && bash scripts/run_ai26_localhost_sync.sh >> data/logs/ai26-sync.log 2>&1
-17 * * * * cd /path/to/LaclauGPT-Data-Collection && bash scripts/run_ai26_localhost_collect.sh >> data/logs/ai26-collect.log 2>&1
-27 * * * * cd /path/to/LaclauGPT-Data-Collection && bash scripts/run_ai26_localhost_media.sh >> data/logs/ai26-media.log 2>&1
+10 * * * * cd /mnt/c/Users/totoivio/LaclauGPT-Data-Collection && bash scripts/run_ai26_localhost_sync.sh >> data/logs/ai26-sync.log 2>&1
+17 * * * * cd /mnt/c/Users/totoivio/LaclauGPT-Data-Collection && bash scripts/run_ai26_localhost_collect.sh >> data/logs/ai26-collect.log 2>&1
+27 * * * * cd /mnt/c/Users/totoivio/LaclauGPT-Data-Collection && bash scripts/run_ai26_localhost_media.sh >> data/logs/ai26-media.log 2>&1
 ```
 
 Do not put secrets directly in crontab. The wrappers load the ignored `data/config/ai26-localhost.env` file.
+
+Firefox itself is manual and must not be added to cron.
+
+After installing the crontab, verify there is no literal `/path/to/` left:
+
+```bash
+crontab -l | grep -F '/path/to/' && echo 'ERROR: placeholder cron path remains' || true
+```
 
 ## 8. AI26 research settings
 
@@ -142,6 +170,8 @@ The source design deliberately keeps a bounded, interpretable sample across acce
 
 RSS/blog/newsletter sources remain the priority for stable unattended collection. Firefox/browser-assisted capture covers platforms where API collection is unavailable, inappropriate or operationally fragile. YouTube should default to transcripts rather than media download unless the study explicitly needs multimodal material.
 
+Keep the ignored runtime copies synchronized with the public templates when the public source design changes. In particular, compare `data/config/ai26.sources.toml` against `configs/studies/ai26.sources.example.toml` before an unattended run so newly audited sources are not silently omitted.
+
 ## 9. Smoke test
 
 Use only public-safe/synthetic material when testing:
@@ -154,6 +184,7 @@ Use only public-safe/synthetic material when testing:
 6. Run `bash scripts/run_ai26_localhost_media.sh` against one small public-safe downloadable object.
 7. Verify the object under the AI26 Allas/S3 project prefix and the corresponding checksum/object metadata in canonical state.
 8. Repeat the sync/collection/media commands and confirm no duplicate canonical records or duplicate object identities are created.
+9. Repeat a wrapper with a cron-like `PATH=/usr/bin:/bin`; it must still find the repository virtualenv command.
 
 ## 10. Troubleshooting
 
