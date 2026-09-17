@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from .config import Settings
 from .distributed_capture import DistributedCaptureSink
@@ -13,6 +15,38 @@ from .media import MediaBackend, MediaDownloader, MediaJob
 from .media_runner import load_records
 from .storage.remote import S3ObjectStore
 from .store import CollectionStore
+
+
+class MediaRunLockedError(RuntimeError):
+    """Raised when another media run already owns the data-root lock."""
+
+
+@contextmanager
+def media_run_lock(data_root: str | Path) -> Iterator[Path]:
+    """Hold an atomic per-data-root lock for a media run.
+
+    O_EXCL makes acquisition race-safe for cron invocations on the same host.
+    The file contains only the current PID and is removed on normal or exceptional
+    exit. A stale lock can be removed manually after verifying no downloader is
+    still running.
+    """
+
+    root = Path(data_root)
+    root.mkdir(parents=True, exist_ok=True)
+    lock_path = root / ".distributed-media.lock"
+    try:
+        fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError as exc:
+        raise MediaRunLockedError(f"media run already active: {lock_path}") from exc
+    try:
+        os.write(fd, f"{os.getpid()}\n".encode("ascii"))
+        os.close(fd)
+        yield lock_path
+    finally:
+        try:
+            lock_path.unlink()
+        except FileNotFoundError:
+            pass
 
 
 class S3MediaBackend(MediaBackend):
@@ -78,17 +112,14 @@ def apply_media_results(
     return list(touched.values())
 
 
-def run_distributed_media(
+def _run_distributed_media_unlocked(
     settings: Settings,
     *,
     study_config: str | Path,
     data_root: str | Path,
-    workers: int = 4,
-    limit: int = 100,
+    workers: int,
+    limit: int,
 ) -> dict[str, Any]:
-    """Download a bounded media batch, update MongoDB and emit readiness events."""
-    if limit < 1:
-        raise ValueError("limit must be at least 1")
     sink = DistributedCaptureSink(settings)
     sink.assert_private_config(study_config)
 
@@ -125,12 +156,44 @@ def run_distributed_media(
             "run_id": settings.run_id,
             "records_scanned": len(records),
             "queued": len(jobs),
+            "attempted": len(results),
             "completed": sum(row.get("status") == "completed" for row in results),
             "failed": sum(row.get("status") == "failed" for row in results),
+            "skipped": max(len(records) - len(jobs), 0),
             "mongo_refreshed": len(touched),
         }
     finally:
         store.close()
+
+
+def run_distributed_media(
+    settings: Settings,
+    *,
+    study_config: str | Path,
+    data_root: str | Path,
+    workers: int = 4,
+    limit: int = 100,
+    use_lock: bool = False,
+) -> dict[str, Any]:
+    """Download a bounded media batch, update MongoDB and emit readiness events."""
+    if limit < 1:
+        raise ValueError("limit must be at least 1")
+    if not use_lock:
+        return _run_distributed_media_unlocked(
+            settings,
+            study_config=study_config,
+            data_root=data_root,
+            workers=workers,
+            limit=limit,
+        )
+    with media_run_lock(data_root):
+        return _run_distributed_media_unlocked(
+            settings,
+            study_config=study_config,
+            data_root=data_root,
+            workers=workers,
+            limit=limit,
+        )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -139,14 +202,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--data-root", required=True)
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--limit", type=int, default=100)
+    parser.add_argument("--lock", action="store_true", help="prevent overlapping cron runs")
     args = parser.parse_args(argv)
-    result = run_distributed_media(
-        Settings(),
-        study_config=args.study_config,
-        data_root=args.data_root,
-        workers=args.workers,
-        limit=args.limit,
-    )
+    try:
+        result = run_distributed_media(
+            Settings(),
+            study_config=args.study_config,
+            data_root=args.data_root,
+            workers=args.workers,
+            limit=args.limit,
+            use_lock=args.lock,
+        )
+    except MediaRunLockedError as exc:
+        print(json.dumps({"status": "locked", "error": str(exc)}, sort_keys=True))
+        return 75
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     return 0 if result["failed"] == 0 else 1
 

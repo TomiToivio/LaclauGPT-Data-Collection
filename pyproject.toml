@@ -70,6 +70,7 @@ laclaugpt-multi-capture = "laclaugpt_data_collection.multi_capture_server:main"
 laclaugpt-media-download = "laclaugpt_data_collection.media_runner:main"
 laclaugpt-distributed-media = "laclaugpt_data_collection.distributed_media_runner:main"
 laclaugpt-brazil26 = "laclaugpt_data_collection.brazil26_browser:main"
+laclaugpt-ai26 = "laclaugpt_data_collection.ai26_browser:main"
 laclaugpt-handoff = "laclaugpt_data_collection.handoff_runner:main"
 laclaugpt-server-rss = "laclaugpt_data_collection.server_runner:main"
 
