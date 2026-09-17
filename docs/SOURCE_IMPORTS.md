@@ -22,9 +22,9 @@ The original scraper is retained as design lineage for TikTok endpoint routing a
 
 Reusable generic-source concepts are represented as optional adapters for feeds, public web/URL collection and future YouTube/Telegram/arXiv collectors. Analysis and project-specific code are not imported.
 
-## LaclauGPT-Data-Storage
+## Storage infrastructure
 
-Only backend-integration ideas are used here: records and objects are behind interfaces, with MongoDB/S3 optional. Durable cross-project storage administration remains the responsibility of the Data Storage module.
+Only backend-integration ideas are used here: records and objects are behind interfaces, with MongoDB/S3 optional. Storage is currently deployment infrastructure rather than a separate owning repository: MongoDB, Redis and S3-compatible object storage may run wherever the deployment requires them, while each module owns the adapters it needs to honor the canonical data contract.
 
 ## LaclauGPT-Social-Simulation-Laboratory
 
