@@ -98,8 +98,10 @@ feed_url = "https://www.adalovelaceinstitute.org/feed/"
 homepage = "https://www.adalovelaceinstitute.org/"
 arena = "elites"
 source_family = "public-interest AI / Critical AI / political economy / public compute"
-sampling_rationale = "Research on equitable distribution of AI benefits, public-interest governance, public compute and alternative political economies for AI."
+sampling_rationale = "Research on equitable distribution of AI benefits, public-interest governance, public compute and alternative political economies for AI. NOTE: verified 2026-09-11, channel alive but 0 items. Kept active pending publisher fix."
 priority = "P1"
+active = true
+last_verified = "2026-09-11"
 
 [[feed]]
 name = "data_society"
@@ -107,8 +109,10 @@ feed_url = "https://datasociety.net/feed/"
 homepage = "https://datasociety.net/"
 arena = "elites"
 source_family = "Critical AI / labour / surveillance / social impacts"
-sampling_rationale = "Social-science research on AI in lived institutions, labour, surveillance, power and civic life."
+sampling_rationale = "Data-power research on AI in lived institutions: sociotechnical orderings, labour, surveillance, infrastructure critique and civic life. NOTE: feed verified live 2026-09-11 but served 0 items (channel alive, no content). Kept active pending publisher fix; remove if still empty at next verification."
 priority = "P1"
+active = true
+last_verified = "2026-09-11"
 
 [[feed]]
 name = "green_web_foundation"
@@ -119,9 +123,98 @@ source_family = "digital infrastructure / data centres / energy / climate justic
 sampling_rationale = "Tracks data-centre energy, fossil-fuel dependence, digital infrastructure concentration and environmental impacts, including AI-driven demand."
 priority = "P1"
 
+[[feed]]
+name = "metr"
+feed_url = "https://metr.org/feed.xml"
+homepage = "https://metr.org"
+source_family = "x-risk / evaluations"
+sampling_rationale = "Model-evaluations research; safety-institutional discourse on frontier-model risk and autonomy benchmarks."
+priority = "P1"
+active = true
+last_verified = "2026-09-11"
+[[feed]]
+name = "interconnects"
+feed_url = "https://www.interconnects.ai/feed"
+homepage = "https://www.interconnects.ai"
+source_family = "frontier-AI elite / bridge"
+sampling_rationale = "Nathan Lambert: technical frontier-AI development, scaling, open-weights policy debates; bridges industry and policy imaginaries."
+priority = "P1"
+active = true
+last_verified = "2026-09-11"
+[[feed]]
+name = "import_ai"
+feed_url = "https://importai.substack.com/feed"
+homepage = "https://importai.substack.com"
+source_family = "AI-industry elite"
+sampling_rationale = "Jack Clark (Anthropic co-founder): weekly industry-safety-policy synthesis; elite articulations of scale and governance."
+priority = "P1"
+active = true
+last_verified = "2026-09-11"
+[[feed]]
+name = "cset_georgetown"
+feed_url = "https://cset.georgetown.edu/feed/"
+homepage = "https://cset.georgetown.edu"
+source_family = "governance / national security"
+sampling_rationale = "CSET research commentary: compute, national security, infrastructure, regulation articulations."
+priority = "P1"
+active = true
+last_verified = "2026-09-11"
+[[feed]]
+name = "works_in_progress"
+feed_url = "https://worksinprogress.co/rss.xml"
+homepage = "https://worksinprogress.co"
+source_family = "progress imaginary (P2)"
+sampling_rationale = "Secondary source for contemporary progress-oriented technological imaginaries; broad scope - NOT all AI-related, NOT all accelerationist. Lightweight relevance filtering at analysis stage only."
+priority = "P2"
+active = true
+last_verified = "2026-09-11"
+[[feed]]
+name = "realtimetechpocalypse"
+feed_url = "https://www.realtimetechpocalypse.com/feed"
+source_family = "critical_ai_tescreal"
+sampling_rationale = "Émile P. Torres's newsletter: TESCREAL, longtermism and existential-risk ideology critique; core critical-AI-TESCREAL long-form source."
+priority = "P1"
+active = true
+last_verified = "2026-09-13"
+[[feed]]
+name = "yudkowsky_net"
+feed_url = "https://www.yudkowsky.net/feed/"
+source_family = "x_risk_alignment"
+sampling_rationale = "Eliezer Yudkowsky's personal site feed: existential risk, alignment, AGI-catastrophe writing outside LessWrong."
+priority = "P1"
+active = true
+last_verified = "2026-09-13"
+[[feed]]
+name = "petterijarvinen"
+feed_url = "https://www.petterijarvinen.fi/feed/"
+source_family = "finland_public_discourse"
+sampling_rationale = "Petteri Järvinen's blog: high-signal Finnish-language AI public discourse (expert tier)."
+priority = "P1"
+active = true
+last_verified = "2026-09-13"
+[[feed]]
+name = "kaifulee_medium"
+feed_url = "https://kaifulee.medium.com/feed"
+source_family = "china_ai_discourse"
+sampling_rationale = "Kai-Fu Lee on Medium: China/West AI competition, commercialization, future imaginaries from a leading China-AI voice."
+priority = "P1"
+active = true
+last_verified = "2026-09-13"
+[[feed]]
+name = "datacenterknowledge"
+feed_url = "https://www.datacenterknowledge.com/rss.xml"
+homepage = "https://www.datacenterknowledge.com"
+source_family = "data-centre / energy / environmental conflict"
+sampling_rationale = "Industry trade press on AI infrastructure: power availability and grid constraints, water use, project cancellations and delays, local opposition and property-tax politics. Covers the material/energy stratum of AI contestation that corporate and policy feeds under-report. Verified live 2026-09-17 with 50 items. NOT all items are AI-related; lightweight relevance filtering at analysis stage only."
+priority = "P2"
+active = true
+last_verified = "2026-09-17"
+
 # ---------------------------------------------------------------------------
 # Public web endpoints
 # ---------------------------------------------------------------------------
+
+# --- No-feed sources: web/article collector targets (see issue #4) ---
 
 [[web_source]]
 name = "openai_news"
