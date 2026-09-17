@@ -15,6 +15,10 @@ set -a
 source "$ENV_FILE"
 set +a
 
+# Cron starts with a minimal PATH. Prefer the repository virtualenv and the
+# user's local bin directory before falling back to the inherited PATH.
+export PATH="$ROOT/.venv/bin:${HOME:-}/.local/bin:${PATH:-/usr/bin:/bin}"
+
 export LACLAUGPT_PROJECT_ID=${LACLAUGPT_PROJECT_ID:-ai26}
 export LACLAUGPT_PROFILE=${LACLAUGPT_PROFILE:-ai26-localhost-remote}
 export LACLAUGPT_MACHINE=${LACLAUGPT_MACHINE:-laptop}
@@ -23,7 +27,7 @@ export LACLAUGPT_BROWSER=${LACLAUGPT_BROWSER:-firefox-local}
 export LACLAUGPT_CALLER=cron
 
 command -v flock >/dev/null 2>&1 || { echo "flock is required for cron locking" >&2; exit 2; }
-command -v laclaugpt-server-rss >/dev/null 2>&1 || { echo "package is not installed" >&2; exit 2; }
+command -v laclaugpt-server-rss >/dev/null 2>&1 || { echo "laclaugpt-server-rss is not installed; install the repository virtualenv first" >&2; exit 2; }
 
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
