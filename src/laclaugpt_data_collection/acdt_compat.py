@@ -13,6 +13,7 @@ from .models import (
     CanonicalRecord,
     CollectionProvenance,
     ContentSection,
+    MediaReference,
     RawCaptureSection,
     SourceSection,
 )
@@ -30,6 +31,40 @@ def _list(value: Any) -> list[str]:
     if isinstance(value, (list, tuple, set)):
         return [_str(item) for item in value if _str(item)]
     return [_str(value)]
+
+
+def _media(value: Any) -> list[MediaReference]:
+    if not value:
+        return []
+    values = value if isinstance(value, (list, tuple)) else [value]
+    result: list[MediaReference] = []
+    for index, item in enumerate(values):
+        if isinstance(item, Mapping):
+            known = {
+                "kind",
+                "url",
+                "media_index",
+                "local_ref",
+                "object_ref",
+                "checksum",
+                "metadata",
+            }
+            metadata = deepcopy(dict(item.get("metadata") or {}))
+            metadata.update({key: deepcopy(val) for key, val in item.items() if key not in known})
+            result.append(
+                MediaReference(
+                    kind=_str(item.get("kind") or item.get("type")) or "media",
+                    url=_str(item.get("url")),
+                    media_index=int(item.get("media_index", index) or index),
+                    local_ref=_str(item.get("local_ref")),
+                    object_ref=_str(item.get("object_ref")),
+                    checksum=_str(item.get("checksum")),
+                    metadata=metadata,
+                )
+            )
+        else:
+            result.append(MediaReference(kind="media", url=_str(item), media_index=index))
+    return result
 
 
 def import_legacy_twitter(row: Mapping[str, Any], *, study_id: str | None = None) -> CanonicalRecord:
@@ -58,6 +93,9 @@ def import_legacy_twitter(row: Mapping[str, Any], *, study_id: str | None = None
             "repost_of": row.get("repost_of") or row.get("retweet_of") or row.get("retweeted_status_id"),
             "quote_of": row.get("quote_of") or row.get("quoted_status_id"),
             "conversation_id": row.get("conversation_id"),
+            "reply_to_actor": row.get("reply_to_actor") or row.get("in_reply_to_screen_name"),
+            "repost_actor": row.get("repost_actor") or row.get("retweeted_screen_name"),
+            "quote_actor": row.get("quote_actor") or row.get("quoted_screen_name"),
         }.items()
         if _str(value)
     }
@@ -65,6 +103,9 @@ def import_legacy_twitter(row: Mapping[str, Any], *, study_id: str | None = None
     native_ids = {"document_id": document_id} if document_id else {}
     if actor_id:
         native_ids["actor_id"] = actor_id
+
+    media_references = _media(row.get("media_references") or row.get("media"))
+    translation_metadata = deepcopy(dict(row.get("translation_metadata") or {}))
 
     record = CanonicalRecord(
         source_url=source_url,
@@ -89,13 +130,18 @@ def import_legacy_twitter(row: Mapping[str, Any], *, study_id: str | None = None
                 "interaction_ids": interaction_ids,
                 "engagement": deepcopy(dict(row.get("engagement") or {})),
                 "collection_query": row.get("collection_query") or row.get("query"),
+                "collection_keywords": _list(row.get("collection_keywords") or row.get("keywords")),
+                "collection_hashtags": _list(row.get("collection_hashtags")),
                 "platform_metadata": deepcopy(dict(row.get("platform_metadata") or {})),
+                "translation_metadata": translation_metadata,
             },
         ),
         content=ContentSection(
             text=text,
             language=language or None,
             translated_text=row.get("translated_text"),
+            media_references=media_references,
+            file_references=_list(row.get("file_references")),
         ),
         provenance=[
             CollectionProvenance(
@@ -106,6 +152,7 @@ def import_legacy_twitter(row: Mapping[str, Any], *, study_id: str | None = None
                     "study_id": study_id,
                     "legacy_format": "twitter_x_row",
                     "missing_fields_not_inferred": True,
+                    "translation_metadata": translation_metadata or None,
                 },
             )
         ],
@@ -130,6 +177,7 @@ def import_legacy_manifesto(row: Mapping[str, Any], *, study_id: str | None = No
         source_url = f"manifesto:{document_id}"
 
     language = _str(row.get("language") or row.get("lang"))
+    translation_metadata = deepcopy(dict(row.get("translation_metadata") or {}))
     record = CanonicalRecord(
         source_url=source_url,
         source_native_ids={"document_id": document_id} if document_id else {},
@@ -149,6 +197,7 @@ def import_legacy_manifesto(row: Mapping[str, Any], *, study_id: str | None = No
                 "country": row.get("country"),
                 "election": row.get("election"),
                 "manifesto_type": row.get("manifesto_type"),
+                "translation_metadata": translation_metadata,
             },
         ),
         content=ContentSection(
@@ -156,6 +205,8 @@ def import_legacy_manifesto(row: Mapping[str, Any], *, study_id: str | None = No
             title=row.get("title"),
             language=language or None,
             translated_text=row.get("translated_text"),
+            media_references=_media(row.get("media_references") or row.get("media")),
+            file_references=_list(row.get("file_references")),
         ),
         provenance=[
             CollectionProvenance(
@@ -166,6 +217,7 @@ def import_legacy_manifesto(row: Mapping[str, Any], *, study_id: str | None = No
                     "study_id": study_id,
                     "legacy_format": "manifesto_row",
                     "missing_fields_not_inferred": True,
+                    "translation_metadata": translation_metadata or None,
                 },
             )
         ],
@@ -200,6 +252,9 @@ def export_legacy_row(record: CanonicalRecord) -> dict[str, Any]:
             "mentions": deepcopy(record.source.raw_metadata.get("mentions", [])),
             "links": deepcopy(record.source.raw_metadata.get("links", [])),
             "interaction_ids": deepcopy(record.source.raw_metadata.get("interaction_ids", {})),
+            "translation_metadata": deepcopy(record.source.raw_metadata.get("translation_metadata", {})),
+            "media_references": [item.model_dump(mode="json") for item in record.content.media_references],
+            "file_references": list(record.content.file_references),
             "compatibility_version": COMPAT_VERSION,
         }
     )
