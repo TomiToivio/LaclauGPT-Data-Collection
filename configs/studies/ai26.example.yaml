@@ -226,9 +226,9 @@ groups:
   - id: critical_ai_x
     name: Critical AI and political economy
     arena: elites
-    notes: power, labour, inequality, discrimination, surveillance, extraction, concentration and hype critique
+    notes: power, labour, inequality, discrimination, surveillance, extraction, concentration and hype critique; institutional accounts broaden the stratum without treating source identity as ideology
     accounts:
-      x: [timnitGebru, emilymbender]
+      x: [timnitGebru, emilymbender, AINowInstitute, AdaLovelaceInst]
       bluesky: [timnitgebru.blacksky.app, emilymbender.bsky.social]
       mastodon: ["@TimnitGebru@mastodon.social", "@emilymbender@dair-community.social"]
 
@@ -264,8 +264,11 @@ groups:
   - id: left_techno_optimism_discovery
     name: Public-interest and left techno-optimism discovery
     arena: elites
-    notes: retain as an explicit discovery stratum so technology-positive egalitarian/post-work articulations are not collapsed into market accelerationism
+    notes: retain as an explicit discovery stratum so technology-positive egalitarian/post-work articulations are not collapsed into market accelerationism; deliberately use discovery terms and long-form sources rather than pre-assigning individual accounts
     discovery_terms: [post-work, postcapitalism, public AI, public compute, democratic AI, automation dividend, technological emancipation]
+    discovery_entities:
+      - Public AI Network
+      - Ada Lovelace Institute
 
 storage:
   canonical_records: configured_runtime_backend
