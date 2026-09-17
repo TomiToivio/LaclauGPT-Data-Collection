@@ -1,4 +1,4 @@
-"""Two-machine AI26 invariants (issue #60).
+"""Two-machine AI26 invariants (issues #60, #61).
 
 These tests are offline and touch only checked-in public configuration. They
 lock the properties that let Localhost and Laskin share one AI26 research
@@ -6,9 +6,14 @@ design instead of drifting into machine-specific forks:
 
 * the X browser-tour targets in the study YAML and the source manifest agree;
 * the declared X budget is not smaller than the explicit target list;
-* the cron wrappers resolve their own interpreter path instead of assuming
-  ``laclaugpt-*`` is already on PATH (cron's PATH excludes both ``.venv/bin``
-  and ``~/.local/bin``).
+* the Localhost cron wrappers resolve their own interpreter path instead of
+  assuming ``laclaugpt-*`` is already on PATH (cron's PATH excludes both
+  ``.venv/bin`` and ``~/.local/bin``).
+
+The two Laskin wrappers are deliberately excluded from the PATH check: they
+resolve their console script through an explicit ``RUNNER`` path with a
+``python3 -m`` fallback instead of a ``command -v`` guard, so they never had
+this failure mode. They were landed separately in #62.
 """
 
 import re
@@ -23,8 +28,6 @@ WRAPPERS = [
     "run_ai26_localhost_collect.sh",
     "run_ai26_localhost_media.sh",
     "run_ai26_localhost_sync.sh",
-    "run_ai26_laskin_collect.sh",
-    "run_ai26_laskin_media.sh",
 ]
 
 
