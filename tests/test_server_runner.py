@@ -12,28 +12,18 @@ from laclaugpt_data_collection.server_runner import (
 )
 
 
-class FakeRedis:
-    def __init__(self):
-        self.leases = []
-
-    def acquire_once(self, resource, *, ttl_seconds=3600):
-        self.leases.append((resource, ttl_seconds))
-        return True
-
-
-class FakeSink:
+class FakeStore:
     last = None
 
-    def __init__(self, settings):
-        self.settings = settings
-        self.redis = FakeRedis()
+    def __init__(self, uri, database, collection, project_id, **kwargs):
+        self.uri = uri
+        self.database = database
+        self.collection = collection
+        self.project_id = project_id
         self.records = []
-        FakeSink.last = self
+        FakeStore.last = self
 
-    def assert_private_config(self, path):
-        return Path(path)
-
-    def ingest(self, record):
+    def upsert(self, record):
         self.records.append(record)
 
 
@@ -68,7 +58,11 @@ class FakeRSSCollector:
 
 class SettingsStub:
     project_id = "ai26"
-    run_id = "shared-run-001"
+    mongodb_uri = "mongodb://example.invalid"
+    mongodb_database = "laclaugpt"
+    effective_mongodb_collection = "ai26_records"
+    mongodb_connect_timeout_ms = 2000
+    mongodb_graph_max_depth = 3
 
 
 def test_manifest_loader_uses_feed_array(tmp_path: Path) -> None:
@@ -132,13 +126,13 @@ def test_rfc_rss_timestamp_is_supported() -> None:
     assert parsed.isoformat() == "2026-09-16T10:00:00+00:00"
 
 
-def test_server_worker_filters_pre_floor_and_syncs_bounded_new_records(
+def test_phase0_rss_upserts_directly_to_mongodb(
     tmp_path: Path, monkeypatch
 ) -> None:
     manifest = tmp_path / "sources.toml"
     manifest.write_text(
         '[[feed]]\nname="one"\nfeed_url="https://example.org/feed"\n'
-        'source_family="synthetic"\npriority="P1"\n',
+        'source_family="synthetic"\narena="elites"\npriority="P1"\n',
         encoding="utf-8",
     )
     monkeypatch.setattr("laclaugpt_data_collection.server_runner.MongoRecordStore", FakeStore)
@@ -151,13 +145,28 @@ def test_server_worker_filters_pre_floor_and_syncs_bounded_new_records(
         max_feeds=1,
         per_feed_limit=2,
         limit=1,
+        rotation=0,
     )
     assert result["records_collected"] == 2
-    assert result["records_excluded"] == 1
     assert result["records_synced"] == 1
-    assert FakeSink.last is not None
-    stored = FakeSink.last.records[0]
-    assert stored["collection_id"] == "ai26"
-    assert stored["source"]["raw_metadata"]["source_name"] == "one"
-    assert stored["provenance"][-1]["metadata"]["worker_id"] == "linux-server-rss"
-    assert FakeSink.last.redis.leases[0][0].startswith("server-rss:shared-run-001:")
+    assert "duplicate_leases" not in result
+    assert FakeStore.last is not None
+    stored = FakeStore.last.records[0]
+    assert stored.source.raw_metadata["collection_id"] == "ai26"
+    assert stored.source.raw_metadata["source_name"] == "one"
+    assert stored.source.raw_metadata["arena"] == "elites"
+    assert stored.provenance[-1].metadata["worker_id"] == "linux-server-rss"
+
+
+def test_phase0_rss_requires_mongodb(tmp_path: Path) -> None:
+    manifest = tmp_path / "sources.toml"
+    manifest.write_text(
+        '[[feed]]\nname="one"\nfeed_url="https://example.org/feed"\n',
+        encoding="utf-8",
+    )
+
+    class MissingMongo(SettingsStub):
+        mongodb_uri = ""
+
+    with pytest.raises(RuntimeError, match="requires LACLAUGPT_MONGODB_URI"):
+        run_distributed_rss(MissingMongo(), source_manifest=manifest)
