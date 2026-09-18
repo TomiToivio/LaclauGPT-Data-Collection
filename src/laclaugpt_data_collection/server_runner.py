@@ -10,6 +10,7 @@ import argparse
 import json
 import time
 import tomllib
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -17,7 +18,50 @@ from urllib.parse import urlsplit
 from .collectors.rss import RSSCollector
 from .config import Settings
 from .models import CanonicalRecord
-from .storage.mongodb import MongoRecordStore
+
+
+class Phase0MongoStore:
+    """Minimal MongoDB adapter for the legacy Phase 0 analysis contract."""
+
+    def __init__(self, uri: str, database: str, project_id: str, *, connect_timeout_ms: int = 2000) -> None:
+        if not uri:
+            raise RuntimeError("MongoDB URI is required")
+        try:
+            from pymongo import MongoClient
+        except ImportError as exc:  # pragma: no cover - optional dependency
+            raise RuntimeError(
+                "Install laclaugpt-data-collection[distributed] for MongoDB"
+            ) from exc
+        self.collection_name = f"laclaugpt2_{project_id}_scraper_collection"
+        client = MongoClient(uri, serverSelectionTimeoutMS=connect_timeout_ms)
+        self._collection = client[database][self.collection_name]
+        self._collection.create_index("source_url", unique=True, name="source_url_unique")
+        self._collection.create_index("document_id", name="document_id")
+        self._collection.create_index("source_date", name="source_date")
+
+    def upsert(self, record: CanonicalRecord) -> None:
+        metadata = record.source.raw_metadata
+        source_title = str(metadata.get("source_title") or record.content.title or "").strip()
+        source_name = str(metadata.get("source_name") or "").strip()
+        actor_name = str(metadata.get("actor_name") or record.source.author or source_name).strip()
+        document_id = str(record.source_native_ids.get("document_id") or record.source_url)
+        fields = {
+            "document_id": document_id,
+            "source_url": record.source_url,
+            "source_text": record.content.text,
+            "source_title": source_title,
+            "source_date": record.source.created_at,
+            "source_name": source_name,
+            "source_type": record.source.source_type or record.source.platform or "rss",
+            "actor_name": actor_name,
+            "arena": str(metadata.get("arena") or ""),
+            "project": str(metadata.get("collection_id") or ""),
+        }
+        self._collection.update_one(
+            {"source_url": record.source_url},
+            {"$set": fields},
+            upsert=True,
+        )
 
 
 def load_feed_manifest(path: str | Path) -> list[dict[str, Any]]:
@@ -64,6 +108,7 @@ def _stamp_source_metadata(
     record.source.raw_metadata["collection_id"] = collection_id
     record.source.raw_metadata["source_name"] = str(feed.get("name") or "")
     record.source.raw_metadata["source_family"] = str(feed.get("source_family") or "")
+    record.source.raw_metadata["actor_name"] = str(feed.get("actor_name") or "")
     record.source.raw_metadata["sampling_priority"] = str(feed.get("priority") or "")
     arena = str(feed.get("arena") or "")
     if arena:
@@ -170,13 +215,11 @@ def run_distributed_rss(
         per_feed_limit=per_feed_limit,
     )
 
-    store = MongoRecordStore(
+    store = Phase0MongoStore(
         settings.mongodb_uri,
         settings.mongodb_database,
-        settings.effective_mongodb_collection,
         settings.project_id,
         connect_timeout_ms=settings.mongodb_connect_timeout_ms,
-        graph_max_depth=settings.mongodb_graph_max_depth,
     )
 
     synced = 0
@@ -197,76 +240,7 @@ def run_distributed_rss(
         "feed_names": [str(feed.get("name") or "") for feed in feeds],
         "records_collected": len(records),
         "records_synced": synced,
+        "mongodb_collection": store.collection_name,
         "warnings": warnings,
         "errors": errors,
     }
-
-
-def main(argv: list[str] | None = None) -> int:
-    """Phase 0 RSS entry point used by `laclaugpt-server-rss` and the cron wrapper.
-
-    Writes flat Phase 0 documents into the collection the Phase 0 analysis core
-    reads (issue #85), so a collected item is directly discoverable by
-    `laclaugpt/laclaugpt_process.py`. Redis/S3 are not involved on this path.
-
-    Returns non-zero when collection fails, so cron surfaces the fault.
-    """
-    from .config import Settings
-    from .phase0_mongo import write_phase0_records
-
-    parser = argparse.ArgumentParser(description="Phase 0 RSS collection into MongoDB")
-    parser.add_argument("--source-manifest", required=True)
-    parser.add_argument("--collection-id", default=None)
-    parser.add_argument("--worker-id", default="laclaugpt-server-rss")
-    parser.add_argument("--max-feeds", type=int, default=10)
-    parser.add_argument("--per-feed-limit", type=int, default=10)
-    parser.add_argument("--limit", type=int, default=50)
-    parser.add_argument("--json", action="store_true", help="print the batch summary as JSON")
-    args = parser.parse_args(argv)
-
-    settings = Settings()
-    routed_collection = args.collection_id or settings.project_id
-    feeds = select_feed_window(
-        load_feed_manifest(args.source_manifest),
-        max_feeds=args.max_feeds,
-    )
-    records, warnings = collect_rss_records(
-        feeds,
-        collection_id=routed_collection,
-        worker_id=args.worker_id,
-        per_feed_limit=args.per_feed_limit,
-    )
-
-    errors: list[str] = []
-    written = 0
-    try:
-        written = write_phase0_records(settings, records[: args.limit])
-    except Exception as exc:  # noqa: BLE001 - report, do not traceback under cron
-        errors.append(f"phase0 write failed: {str(exc)[:180]}")
-
-    summary = {
-        "status": "ok" if not errors else "error",
-        "project_id": settings.project_id,
-        "collection": f"laclaugpt2_{settings.project_id}_scraper_collection",
-        "worker_id": args.worker_id,
-        "records_collected": len(records),
-        "records_written": written,
-        "warnings": warnings,
-        "errors": errors,
-    }
-    if args.json:
-        print(json.dumps(summary, indent=2, default=str))
-    else:
-        print(
-            f"[phase0] collected={len(records)} written={written} "
-            f"errors={len(errors)} collection={summary['collection']}"
-        )
-        for warning in warnings:
-            print(f"  warning: {warning}")
-        for error in errors:
-            print(f"  error: {error}")
-    return 0 if not errors else 1
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
