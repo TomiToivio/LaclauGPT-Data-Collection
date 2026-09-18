@@ -5,7 +5,7 @@
 version: ai26-collection-v3
 study: ai26
 purpose: balanced_collection_discovery
-source_of_truth: https://github.com/TomiToivio/LaclauGPT/blob/main/paper/PAPER.md
+source_of_truth: https://github.com/TomiToivio/LaclauGPT/blob/main/paper/PHASE_1_PAPER.md
 
 principles:
   - formations are provisional sensitising concepts, not fixed actor identities
