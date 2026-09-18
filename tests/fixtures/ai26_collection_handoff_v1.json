@@ -1,0 +1,109 @@
+{
+  "fixture_version": "1.0.0",
+  "schema_version": "1.1.0-draft",
+  "source_url": "https://example.invalid/ai26/synthetic/post-001",
+  "source_native_ids": {
+    "document_id": "ai26-synthetic-001",
+    "x_post_id": "1234567890",
+    "thread_id": "thread-9"
+  },
+  "source": {
+    "platform": "x",
+    "source_type": "post",
+    "author": "synthetic-author",
+    "author_fullname": "Synthetic Author",
+    "language": "en",
+    "created_at": "2026-09-18T09:30:00+00:00",
+    "collected_at": "2026-09-18T10:00:00+00:00",
+    "raw_ref": "s3://example-invalid-ai26/projects/ai26/synthetic/raw/001.json",
+    "raw_metadata": {
+      "collector_native": 42
+    }
+  },
+  "content": {
+    "text": "AI should serve democratic society rather than private accumulation.",
+    "title": "Synthetic AI26 post",
+    "language": "en",
+    "media_references": [
+      {
+        "kind": "image",
+        "media_type": "image",
+        "ref": "fixture://ai26-handoff-v1/media/001",
+        "url": "https://example.invalid/ai26/media/001.jpg",
+        "media_index": 0,
+        "object_ref": "s3://example-invalid-ai26/projects/ai26/media/001.jpg",
+        "checksum": "sha256:0000000000000000000000000000000000000000000000000000000000000002",
+        "metadata": {
+          "width": 1080,
+          "height": 1080
+        }
+      },
+      {
+        "kind": "video",
+        "media_type": "video",
+        "ref": "fixture://ai26-handoff-v1/media/002",
+        "url": "https://example.invalid/ai26/media/002.mp4",
+        "media_index": 1,
+        "object_ref": "s3://example-invalid-ai26/projects/ai26/media/002.mp4",
+        "metadata": {
+          "duration_seconds": 12.5
+        }
+      }
+    ],
+    "frames": [
+      {
+        "media_ref": "fixture://ai26-handoff-v1/media/002",
+        "frame_timestamp_seconds": 3.5,
+        "description": "Synthetic frame description"
+      }
+    ]
+  },
+  "raw_capture": {
+    "ref": "s3://example-invalid-ai26/projects/ai26/synthetic/raw/001.json",
+    "payload": {
+      "native": {
+        "id": "1234567890",
+        "note": "synthetic payload retained for round-trip evidence"
+      }
+    },
+    "checksum": "sha256:0000000000000000000000000000000000000000000000000000000000000001",
+    "content_type": "application/json",
+    "metadata": {
+      "preservation": "exact-or-durable-reference"
+    }
+  },
+  "source_units": [],
+  "alignments": [],
+  "evidence": [],
+  "analysis": {},
+  "human_readable": {},
+  "provenance": [
+    {
+      "provenance_id": "prov_collection_001",
+      "method": "browser-capture",
+      "model_version": "0.4.0",
+      "created_at": "2026-09-18T10:00:00+00:00",
+      "metadata": {
+        "stage": "collection",
+        "collector": "laclaugpt-data-collection",
+        "collection_method": "browser-capture",
+        "run_id": "collect-synthetic-001"
+      }
+    }
+  ],
+  "review": {},
+  "handoff": {
+    "contract_version": "1.0",
+    "handoff_key": "0000000000000000000000000000000000000000000000000000000000000000",
+    "revision": "rev-synthetic-001",
+    "status": "ready",
+    "reason": "source_ready",
+    "project_id": "ai26",
+    "collection_id": "ai26",
+    "arena": "elites",
+    "run_id": "ai26-distributed-001",
+    "source_url": "https://example.invalid/ai26/synthetic/post-001",
+    "published_at": "2026-09-18T09:30:00+00:00",
+    "source_priority": 1
+  }
+}
