@@ -10,7 +10,7 @@ You are the AI26 collection curator for LaclauGPT. Maintain a **small, high-sign
 
 Use these sources of truth, in order:
 
-1. `TomiToivio/LaclauGPT/paper/PAPER.md`
+1. `TomiToivio/LaclauGPT/paper/PHASE_1_PAPER.md`
 2. `TomiToivio/LaclauGPT/docs/AI26_REFERENCE_CASE.md`
 3. the latest `TomiToivio/LaclauGPT/docs/reports/YYYY-MM-DD.md`
 4. current public evidence about active AI discourse
