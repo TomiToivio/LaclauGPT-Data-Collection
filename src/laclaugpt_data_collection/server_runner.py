@@ -200,3 +200,68 @@ def run_distributed_rss(
         "warnings": warnings,
         "errors": errors,
     }
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Build the Phase 0 RSS-only command-line interface."""
+    parser = argparse.ArgumentParser(
+        prog="laclaugpt-server-rss",
+        description=(
+            "Collect RSS/Atom text records directly into MongoDB for Phase 0. "
+            "This path does not use Redis or S3/Allas."
+        ),
+    )
+    parser.add_argument(
+        "--source-manifest",
+        required=True,
+        help="Path to the TOML source manifest containing [[feed]] entries.",
+    )
+    parser.add_argument("--collection-id", default=None)
+    parser.add_argument("--worker-id", default="linux-server-rss")
+    parser.add_argument("--max-feeds", type=int, default=10)
+    parser.add_argument("--per-feed-limit", type=int, default=10)
+    parser.add_argument("--limit", type=int, default=50)
+    parser.add_argument(
+        "--rotation",
+        type=int,
+        default=None,
+        help="Optional deterministic feed-window rotation offset.",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Run one cron-safe Phase 0 RSS batch.
+
+    Exit 0 only when collection and MongoDB persistence complete without
+    per-record errors. Configuration, collection, and persistence failures
+    return 1 so cron/systemd can detect the failed run.
+    """
+    args = build_parser().parse_args(argv)
+    try:
+        result = run_distributed_rss(
+            Settings(),
+            source_manifest=args.source_manifest,
+            collection_id=args.collection_id,
+            worker_id=args.worker_id,
+            max_feeds=args.max_feeds,
+            per_feed_limit=args.per_feed_limit,
+            limit=args.limit,
+            rotation=args.rotation,
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(
+            json.dumps(
+                {"status": "error", "error": str(exc)},
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+        )
+        return 1
+
+    print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+    return 0 if result["status"] == "ok" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
