@@ -16,8 +16,123 @@ from urllib.parse import urlsplit
 
 from .collectors.rss import RSSCollector
 from .config import Settings
-from .distributed_capture import DistributedCaptureSink
-from .handoff import build_handoff, ready_sort_key
+from .models import CanonicalRecord
+
+
+class Phase0MongoStore:
+    """Minimal MongoDB adapter for the legacy Phase 0 analysis contract."""
+
+    def __init__(
+        self,
+        uri: str,
+        database: str,
+        project_id: str,
+        *,
+        connect_timeout_ms: int = 2000,
+        client_factory: Any | None = None,
+    ) -> None:
+        if not uri:
+            raise RuntimeError("MongoDB URI is required")
+        if client_factory is None:
+            try:
+                from pymongo import MongoClient
+
+                client_factory = MongoClient
+            except ImportError as exc:  # pragma: no cover - optional dependency
+                raise RuntimeError(
+                    "Install laclaugpt-data-collection[distributed] for MongoDB"
+                ) from exc
+        self.collection_name = f"laclaugpt2_{project_id}_scraper_collection"
+        client = client_factory(uri, serverSelectionTimeoutMS=connect_timeout_ms)
+        self._collection = client[database][self.collection_name]
+        self._collection.create_index("source_url", unique=True, name="source_url_unique")
+        self._collection.create_index("document_id", name="document_id")
+        self._collection.create_index("source_date", name="source_date")
+
+    def upsert(self, record: CanonicalRecord) -> None:
+        metadata = record.source.raw_metadata
+        source_title = str(metadata.get("source_title") or record.content.title or "").strip()
+        source_name = str(metadata.get("source_name") or "").strip()
+        actor_name = str(metadata.get("actor_name") or record.source.author or source_name).strip()
+        document_id = str(record.source_native_ids.get("document_id") or record.source_url)
+        fields = {
+            "document_id": document_id,
+            "source_url": record.source_url,
+            "source_text": record.content.text,
+            "source_title": source_title,
+            "source_date": record.source.created_at,
+            "source_name": source_name,
+            "source_type": record.source.source_type or record.source.platform or "rss",
+            "actor_name": actor_name,
+            "arena": str(metadata.get("arena") or ""),
+            "project": str(metadata.get("collection_id") or ""),
+        }
+        # Identity is the stable document id when one is known, so a re-collected
+        # article updates in place; source_url remains the canonical identity anchor.
+        self._collection.update_one(
+            {"document_id": document_id},
+            {"$set": fields},
+            upsert=True,
+        )
+
+
+def phase0_collection_name(project_id: str) -> str:
+    """Return the MongoDB collection the Phase 0 analysis core reads.
+
+    Defined in one place (``phase0_mongo``) so collection and analysis cannot drift
+    apart; re-exported here because this module is the Phase 0 collection entry
+    point and callers import the contract from it.
+    """
+    from .phase0_mongo import phase0_collection_name as _name
+
+    return _name(project_id)
+
+
+def phase0_document(record: Any, *, project_id: str = "") -> dict[str, Any]:
+    """Return the flat Phase 0 document for a collected record.
+
+    The Phase 0 analysis core reads flat fields (``source_text``, ``source_title``,
+    ``source_date``, ``source_name``, ``source_type``, ``actor_name``, ``arena``,
+    ``language``) rather than the nested canonical record, so this is the projection
+    across that boundary. The field set is deliberately small and explicit: it is the
+    contract Phase 0 analysis reads, not a copy of the canonical model.
+    """
+    def as_mapping(value: Any) -> dict[str, Any]:
+        if value is None:
+            return {}
+        if isinstance(value, dict):
+            return value
+        dumped = getattr(value, "model_dump", None)
+        return dict(dumped()) if callable(dumped) else {}
+
+    top = as_mapping(record)
+    source = as_mapping(top.get("source"))
+    content = as_mapping(top.get("content"))
+    metadata = as_mapping(source.get("raw_metadata"))
+
+    document_id = str(top.get("document_id") or "")
+    if not document_id:
+        native = as_mapping(top.get("source_native_ids"))
+        document_id = str(native.get("document_id") or "") or str(top.get("source_url") or "")
+    source_url = str(top.get("source_url") or source.get("url") or "")
+    title = str(content.get("title") or top.get("title") or "")
+    actor_name = str(
+        top.get("actor_name") or metadata.get("actor_name") or source.get("author") or ""
+    )
+
+    return {
+        "document_id": document_id,
+        "source_url": source_url,
+        "source_text": str(content.get("text") or top.get("text") or ""),
+        "source_title": title,
+        "title": title,
+        "source_date": str(source.get("created_at") or top.get("source_date") or ""),
+        "source_name": str(metadata.get("source_name") or top.get("source_name") or ""),
+        "source_type": str(top.get("source_type") or source.get("source_type") or "rss"),
+        "actor_name": actor_name,
+        "language": str(content.get("language") or source.get("language") or ""),
+        "arena": str(metadata.get("arena") or top.get("arena") or ""),
+    }
 
 
 def load_feed_manifest(path: str | Path) -> list[dict[str, Any]]:
@@ -60,10 +175,11 @@ def _stamp_source_metadata(
     *,
     collection_id: str,
     worker_id: str,
-) -> dict[str, Any]:
+) -> CanonicalRecord:
     record.source.raw_metadata["collection_id"] = collection_id
     record.source.raw_metadata["source_name"] = str(feed.get("name") or "")
     record.source.raw_metadata["source_family"] = str(feed.get("source_family") or "")
+    record.source.raw_metadata["actor_name"] = str(feed.get("actor_name") or "")
     record.source.raw_metadata["sampling_priority"] = str(feed.get("priority") or "")
     arena = str(feed.get("arena") or "")
     if arena:
@@ -76,10 +192,7 @@ def _stamp_source_metadata(
         if arena:
             metadata["arena"] = arena
     record.refresh_human_readable()
-    payload = record.model_dump(mode="json")
-    payload["collection_id"] = collection_id
-    payload["arena"] = arena
-    return payload
+    return record
 
 
 def collect_rss_records(
@@ -88,9 +201,9 @@ def collect_rss_records(
     collection_id: str,
     worker_id: str,
     per_feed_limit: int = 20,
-) -> tuple[list[dict[str, Any]], list[str]]:
+) -> tuple[list[CanonicalRecord], list[str]]:
     """Collect and annotate RSS records without touching distributed services."""
-    records: list[dict[str, Any]] = []
+    records: list[CanonicalRecord] = []
     warnings: list[str] = []
     for feed in feeds:
         feed_url = str(feed["feed_url"])
@@ -152,15 +265,14 @@ def run_distributed_rss(
     limit: int = 50,
     rotation: int | None = None,
 ) -> dict[str, Any]:
-    """Run a bounded RSS batch and write eligible records to shared backends."""
+    """Run one bounded Phase 0 RSS batch and upsert directly to MongoDB."""
     if max_feeds < 1 or per_feed_limit < 1 or limit < 1:
         raise ValueError("max_feeds, per_feed_limit and limit must be at least 1")
-    sink = DistributedCaptureSink(settings)
-    sink.assert_private_config(source_manifest)
+    if not settings.mongodb_uri:
+        raise RuntimeError("Phase 0 RSS collection requires LACLAUGPT_MONGODB_URI")
+
     routed_collection = collection_id or settings.project_id
     if rotation is None:
-        # Advance the window once per hour so a hourly cron covers the whole
-        # manifest over successive ticks without persisting extra state.
         rotation = int(time.time() // 3600) * max_feeds
     feeds = select_feed_window(
         load_feed_manifest(source_manifest),
@@ -174,82 +286,88 @@ def run_distributed_rss(
         per_feed_limit=per_feed_limit,
     )
 
-    candidates: list[tuple[dict[str, Any], dict[str, Any]]] = []
-    excluded = 0
-    for record in records:
-        handoff = build_handoff(
-            record,
-            project_id=settings.project_id,
-            run_id=settings.run_id,
-        )
-        if handoff["status"] == "excluded":
-            excluded += 1
-            continue
-        candidates.append((record, handoff))
-    candidates.sort(key=lambda pair: ready_sort_key(pair[1]))
+    store = Phase0MongoStore(
+        settings.mongodb_uri,
+        settings.mongodb_database,
+        settings.project_id,
+        connect_timeout_ms=settings.mongodb_connect_timeout_ms,
+    )
 
     synced = 0
-    duplicate_leases = 0
     errors: list[str] = []
-    for record, handoff in candidates[:limit]:
-        handoff_key = str(handoff["handoff_key"])
-        if not sink.redis.acquire_once(
-            f"server-rss:{settings.run_id}:{handoff_key}",
-            ttl_seconds=30 * 24 * 3600,
-        ):
-            duplicate_leases += 1
-            continue
+    for record in records[:limit]:
         try:
-            sink.ingest(record)
+            store.upsert(record)
             synced += 1
         except Exception as exc:  # noqa: BLE001
-            errors.append(f"{record.get('source_url', '')}: {str(exc)[:180]}")
+            errors.append(f"{record.source_url}: {str(exc)[:180]}")
 
     return {
         "status": "ok" if not errors else "partial",
         "project_id": settings.project_id,
         "collection_id": routed_collection,
-        "run_id": settings.run_id,
         "worker_id": worker_id,
         "feeds_considered": len(feeds),
         "feed_names": [str(feed.get("name") or "") for feed in feeds],
         "records_collected": len(records),
-        "records_excluded": excluded,
         "records_synced": synced,
-        "duplicate_leases": duplicate_leases,
+        "mongodb_collection": store.collection_name,
         "warnings": warnings,
         "errors": errors,
     }
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="laclaugpt-server-rss")
+    """Phase 0 RSS entry point used by `laclaugpt-server-rss` and the cron wrapper.
+
+    Writes flat Phase 0 documents into the collection the Phase 0 analysis core
+    reads, so a collected item is directly discoverable by
+    `laclaugpt/laclaugpt_process.py`. Redis/S3 are not involved on this path.
+
+    Returns non-zero when collection fails, so cron surfaces the fault.
+    """
+    from .config import Settings
+
+    parser = argparse.ArgumentParser(description="Phase 0 RSS collection into MongoDB")
     parser.add_argument("--source-manifest", required=True)
-    parser.add_argument("--collection-id")
-    parser.add_argument("--worker-id", default="linux-server-rss")
+    parser.add_argument("--collection-id", default=None)
+    parser.add_argument("--worker-id", default="laclaugpt-server-rss")
     parser.add_argument("--max-feeds", type=int, default=10)
     parser.add_argument("--per-feed-limit", type=int, default=10)
     parser.add_argument("--limit", type=int, default=50)
-    parser.add_argument(
-        "--rotation",
-        type=int,
-        default=None,
-        help="feed-window rotation offset; defaults to an hourly advancing offset",
-    )
+    parser.add_argument("--json", action="store_true", help="print the batch summary as JSON")
     args = parser.parse_args(argv)
-    result = run_distributed_rss(
-        Settings(),
-        source_manifest=args.source_manifest,
-        collection_id=args.collection_id,
-        worker_id=args.worker_id,
-        max_feeds=args.max_feeds,
-        per_feed_limit=args.per_feed_limit,
-        limit=args.limit,
-        rotation=args.rotation,
-    )
-    print(json.dumps(result, ensure_ascii=False, sort_keys=True))
-    return 0 if result["status"] == "ok" else 1
+
+    settings = Settings()
+    try:
+        summary = run_distributed_rss(
+            settings,
+            source_manifest=args.source_manifest,
+            collection_id=args.collection_id,
+            worker_id=args.worker_id,
+            max_feeds=args.max_feeds,
+            per_feed_limit=args.per_feed_limit,
+            limit=args.limit,
+        )
+    except Exception as exc:  # noqa: BLE001 - report, do not traceback under cron
+        print(f"[phase0] collection failed: {str(exc)[:200]}")
+        return 1
+
+    if args.json:
+        print(json.dumps(summary, indent=2, default=str))
+    else:
+        print(
+            f"[phase0] collected={summary['records_collected']} "
+            f"synced={summary['records_synced']} "
+            f"errors={len(summary['errors'])} "
+            f"collection={summary.get('mongodb_collection', '')}"
+        )
+        for warning in summary["warnings"]:
+            print(f"  warning: {warning}")
+        for error in summary["errors"]:
+            print(f"  error: {error}")
+    return 0 if not summary["errors"] else 1
 
 
-if __name__ == "__main__":  # pragma: no cover
+if __name__ == "__main__":
     raise SystemExit(main())

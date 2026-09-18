@@ -4,9 +4,17 @@ Codex and other coding agents must follow `AGENTS.md` as the canonical repositor
 
 Before changing runtime paths or data handling, also read `docs/RUNTIME_DATA.md` and `docs/PRIVACY.md`.
 
-Every runtime or study-specific artifact belongs below the untracked repository-local `data/` root. Do not introduce parallel top-level runtime directories. Use the canonical path helpers and initializer in `src/laclaugpt_data_collection/config.py`.
+For Phase 0 / Phase 1 work:
 
-For local sibling-module operation, downstream Analysis may read this module's configured `data/` tree directly. Distributed and CSV/JSONL fallback rules are defined in `docs/RUNTIME_DATA.md`.
+- inspect `laclaugpt/` before editing;
+- preserve the hand-coded Phase 0 implementation and its behavior;
+- never modify a `TOMI-LOCKED` element or its semantics without explicit authorization;
+- restore exactly one requested Phase 1 capability per task;
+- prefer small adapters/wrappers over replacing Phase 0 logic;
+- use old Phase 1 code under `src/` as a reference implementation, not as an automatic source of architectural authority;
+- target MongoDB + Redis + CSC Allas for canonical distributed infrastructure;
+- do not invent new SQLite-first, filesystem-only, alternate queue, alternate database, or alternate object-store modes for configurability;
+- avoid unrelated refactors and stop after the bounded task is complete.
 
 Keep changes inside the existing `src/` architecture, preserve stable normalized records and provenance, add synthetic tests, and run the repository quality gates before merging.
 

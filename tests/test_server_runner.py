@@ -6,34 +6,27 @@ from laclaugpt_data_collection.collectors.base import CollectionResult
 from laclaugpt_data_collection.models import CollectionProvenance, NormalizedRecord
 from laclaugpt_data_collection.realtime import parse_source_time
 from laclaugpt_data_collection.server_runner import (
+    Phase0MongoStore,
     load_feed_manifest,
+    phase0_collection_name,
+    phase0_document,
     run_distributed_rss,
     select_feed_window,
 )
 
 
-class FakeRedis:
-    def __init__(self):
-        self.leases = []
-
-    def acquire_once(self, resource, *, ttl_seconds=3600):
-        self.leases.append((resource, ttl_seconds))
-        return True
-
-
-class FakeSink:
+class FakeStore:
     last = None
 
-    def __init__(self, settings):
-        self.settings = settings
-        self.redis = FakeRedis()
+    def __init__(self, uri, database, project_id, **kwargs):
+        self.uri = uri
+        self.database = database
+        self.project_id = project_id
+        self.collection_name = f"laclaugpt2_{project_id}_scraper_collection"
         self.records = []
-        FakeSink.last = self
+        FakeStore.last = self
 
-    def assert_private_config(self, path):
-        return Path(path)
-
-    def ingest(self, record):
+    def upsert(self, record):
         self.records.append(record)
 
 
@@ -68,7 +61,11 @@ class FakeRSSCollector:
 
 class SettingsStub:
     project_id = "ai26"
-    run_id = "shared-run-001"
+    mongodb_uri = "mongodb://example.invalid"
+    mongodb_database = "laclaugpt"
+    effective_mongodb_collection = "ai26_records"
+    mongodb_connect_timeout_ms = 2000
+    mongodb_graph_max_depth = 3
 
 
 def test_manifest_loader_uses_feed_array(tmp_path: Path) -> None:
@@ -132,16 +129,16 @@ def test_rfc_rss_timestamp_is_supported() -> None:
     assert parsed.isoformat() == "2026-09-16T10:00:00+00:00"
 
 
-def test_server_worker_filters_pre_floor_and_syncs_bounded_new_records(
+def test_phase0_rss_upserts_directly_to_mongodb(
     tmp_path: Path, monkeypatch
 ) -> None:
     manifest = tmp_path / "sources.toml"
     manifest.write_text(
         '[[feed]]\nname="one"\nfeed_url="https://example.org/feed"\n'
-        'source_family="synthetic"\npriority="P1"\n',
+        'source_family="synthetic"\narena="elites"\npriority="P1"\n',
         encoding="utf-8",
     )
-    monkeypatch.setattr("laclaugpt_data_collection.server_runner.DistributedCaptureSink", FakeSink)
+    monkeypatch.setattr("laclaugpt_data_collection.server_runner.Phase0MongoStore", FakeStore)
     monkeypatch.setattr("laclaugpt_data_collection.server_runner.RSSCollector", FakeRSSCollector)
 
     result = run_distributed_rss(
@@ -151,13 +148,125 @@ def test_server_worker_filters_pre_floor_and_syncs_bounded_new_records(
         max_feeds=1,
         per_feed_limit=2,
         limit=1,
+        rotation=0,
     )
     assert result["records_collected"] == 2
-    assert result["records_excluded"] == 1
     assert result["records_synced"] == 1
-    assert FakeSink.last is not None
-    stored = FakeSink.last.records[0]
-    assert stored["collection_id"] == "ai26"
-    assert stored["source"]["raw_metadata"]["source_name"] == "one"
-    assert stored["provenance"][-1]["metadata"]["worker_id"] == "linux-server-rss"
-    assert FakeSink.last.redis.leases[0][0].startswith("server-rss:shared-run-001:")
+    assert result["mongodb_collection"] == "laclaugpt2_ai26_scraper_collection"
+    assert "duplicate_leases" not in result
+    assert FakeStore.last is not None
+    stored = FakeStore.last.records[0]
+    assert stored.source.raw_metadata["collection_id"] == "ai26"
+    assert stored.source.raw_metadata["source_name"] == "one"
+    assert stored.source.raw_metadata["arena"] == "elites"
+    assert stored.provenance[-1].metadata["worker_id"] == "linux-server-rss"
+
+
+def test_phase0_rss_requires_mongodb(tmp_path: Path) -> None:
+    manifest = tmp_path / "sources.toml"
+    manifest.write_text(
+        '[[feed]]\nname="one"\nfeed_url="https://example.org/feed"\n',
+        encoding="utf-8",
+    )
+
+    class MissingMongo(SettingsStub):
+        mongodb_uri = ""
+
+    with pytest.raises(RuntimeError, match="requires LACLAUGPT_MONGODB_URI"):
+        run_distributed_rss(MissingMongo(), source_manifest=manifest)
+
+
+def test_phase0_collection_name_matches_analysis_contract() -> None:
+    assert phase0_collection_name("ai26") == "laclaugpt2_ai26_scraper_collection"
+
+
+def test_phase0_document_is_flat_and_analysis_ready() -> None:
+    record = NormalizedRecord(
+        document_id="article-1",
+        platform="rss",
+        timestamp="Wed, 16 Sep 2026 10:00:00 GMT",
+        source_url="https://example.org/article",
+        text="Article body",
+        author="Alice",
+        raw_payload={"id": "article-1"},
+        collection_provenance=CollectionProvenance(module="rss-test"),
+    )
+    record.content.title = "Article title"
+    record.source.raw_metadata["source_name"] = "Example Feed"
+    record.source.raw_metadata["arena"] = "elites"
+
+    document = phase0_document(record)
+
+    assert document == {
+        "document_id": "article-1",
+        "source_url": "https://example.org/article",
+        "source_text": "Article body",
+        "source_title": "Article title",
+        "title": "Article title",
+        "source_date": "Wed, 16 Sep 2026 10:00:00 GMT",
+        "source_name": "Example Feed",
+        "source_type": "rss",
+        "actor_name": "Alice",
+        "language": "",
+        "arena": "elites",
+    }
+
+
+class FakeMongoCollection:
+    def __init__(self):
+        self.indexes = []
+        self.updates = []
+
+    def create_index(self, fields, **kwargs):
+        self.indexes.append((fields, kwargs))
+
+    def update_one(self, query, update, *, upsert=False):
+        self.updates.append((query, update, upsert))
+
+
+class FakeMongoDatabase:
+    def __init__(self, collection):
+        self.collection = collection
+
+    def __getitem__(self, name):
+        assert name == "laclaugpt2_ai26_scraper_collection"
+        return self.collection
+
+
+class FakeMongoClient:
+    collection = FakeMongoCollection()
+
+    def __init__(self, uri, **kwargs):
+        self.uri = uri
+        self.kwargs = kwargs
+
+    def __getitem__(self, name):
+        assert name == "laclaugpt"
+        return FakeMongoDatabase(self.collection)
+
+
+def test_phase0_store_upserts_by_stable_document_id() -> None:
+    FakeMongoClient.collection = FakeMongoCollection()
+    store = Phase0MongoStore(
+        "mongodb://example.invalid",
+        "laclaugpt",
+        "ai26",
+        client_factory=FakeMongoClient,
+    )
+    record = NormalizedRecord(
+        document_id="article-1",
+        platform="rss",
+        source_url="https://example.org/article",
+        text="Article body",
+        raw_payload={"id": "article-1"},
+        collection_provenance=CollectionProvenance(module="rss-test"),
+    )
+
+    store.upsert(record)
+    store.upsert(record)
+
+    assert len(FakeMongoClient.collection.updates) == 2
+    for query, update, upsert in FakeMongoClient.collection.updates:
+        assert query == {"document_id": "article-1"}
+        assert update["$set"]["source_url"] == "https://example.org/article"
+        assert upsert is True

@@ -4,9 +4,17 @@ Claude Code must follow `AGENTS.md` as the canonical repository contract.
 
 Before changing runtime paths or data handling, also read `docs/RUNTIME_DATA.md` and `docs/PRIVACY.md`.
 
-Key rule: every runtime or study-specific artifact is stored below the untracked repository-local `data/` root. Do not create alternative top-level runtime directories. Use the path helpers and initialization behavior defined in `src/laclaugpt_data_collection/config.py`.
+For Phase 0 / Phase 1 work:
 
-For local sibling-module operation, downstream Analysis may read this module's configured `data/` tree directly. Distributed and manual interchange rules are defined in `docs/RUNTIME_DATA.md`.
+- inspect `laclaugpt/` first;
+- preserve Phase 0 behavior;
+- treat every `TOMI-LOCKED` marker as immutable unless Tomi explicitly authorizes that exact change;
+- restore only one explicitly requested Phase 1 capability at a time;
+- prefer wrappers/adapters around Phase 0 over rewrites;
+- treat existing `src/` code as a reference/source of functionality, not automatically as the canonical architecture;
+- target MongoDB + Redis + CSC Allas for new Phase 1 infrastructure;
+- do not add alternate local-only storage/deployment architectures unless explicitly requested;
+- stop when the requested restoration step is complete.
 
 Run the repository's public-tree check, lint/type checks, and tests before merging.
 
