@@ -10,6 +10,7 @@ import argparse
 import json
 import time
 import tomllib
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -17,7 +18,50 @@ from urllib.parse import urlsplit
 from .collectors.rss import RSSCollector
 from .config import Settings
 from .models import CanonicalRecord
-from .storage.mongodb import MongoRecordStore
+
+
+class Phase0MongoStore:
+    """Minimal MongoDB adapter for the legacy Phase 0 analysis contract."""
+
+    def __init__(self, uri: str, database: str, project_id: str, *, connect_timeout_ms: int = 2000) -> None:
+        if not uri:
+            raise RuntimeError("MongoDB URI is required")
+        try:
+            from pymongo import MongoClient
+        except ImportError as exc:  # pragma: no cover - optional dependency
+            raise RuntimeError(
+                "Install laclaugpt-data-collection[distributed] for MongoDB"
+            ) from exc
+        self.collection_name = f"laclaugpt2_{project_id}_scraper_collection"
+        client = MongoClient(uri, serverSelectionTimeoutMS=connect_timeout_ms)
+        self._collection = client[database][self.collection_name]
+        self._collection.create_index("source_url", unique=True, name="source_url_unique")
+        self._collection.create_index("document_id", name="document_id")
+        self._collection.create_index("source_date", name="source_date")
+
+    def upsert(self, record: CanonicalRecord) -> None:
+        metadata = record.source.raw_metadata
+        source_title = str(metadata.get("source_title") or record.content.title or "").strip()
+        source_name = str(metadata.get("source_name") or "").strip()
+        actor_name = str(metadata.get("actor_name") or record.source.author or source_name).strip()
+        document_id = str(record.source_native_ids.get("document_id") or record.source_url)
+        fields = {
+            "document_id": document_id,
+            "source_url": record.source_url,
+            "source_text": record.content.text,
+            "source_title": source_title,
+            "source_date": record.source.created_at,
+            "source_name": source_name,
+            "source_type": record.source.source_type or record.source.platform or "rss",
+            "actor_name": actor_name,
+            "arena": str(metadata.get("arena") or ""),
+            "project": str(metadata.get("collection_id") or ""),
+        }
+        self._collection.update_one(
+            {"source_url": record.source_url},
+            {"$set": fields},
+            upsert=True,
+        )
 
 
 def load_feed_manifest(path: str | Path) -> list[dict[str, Any]]:
@@ -64,6 +108,7 @@ def _stamp_source_metadata(
     record.source.raw_metadata["collection_id"] = collection_id
     record.source.raw_metadata["source_name"] = str(feed.get("name") or "")
     record.source.raw_metadata["source_family"] = str(feed.get("source_family") or "")
+    record.source.raw_metadata["actor_name"] = str(feed.get("actor_name") or "")
     record.source.raw_metadata["sampling_priority"] = str(feed.get("priority") or "")
     arena = str(feed.get("arena") or "")
     if arena:
@@ -170,13 +215,11 @@ def run_distributed_rss(
         per_feed_limit=per_feed_limit,
     )
 
-    store = MongoRecordStore(
+    store = Phase0MongoStore(
         settings.mongodb_uri,
         settings.mongodb_database,
-        settings.effective_mongodb_collection,
         settings.project_id,
         connect_timeout_ms=settings.mongodb_connect_timeout_ms,
-        graph_max_depth=settings.mongodb_graph_max_depth,
     )
 
     synced = 0
@@ -197,71 +240,7 @@ def run_distributed_rss(
         "feed_names": [str(feed.get("name") or "") for feed in feeds],
         "records_collected": len(records),
         "records_synced": synced,
+        "mongodb_collection": store.collection_name,
         "warnings": warnings,
         "errors": errors,
     }
-
-
-def build_parser() -> argparse.ArgumentParser:
-    """Build the Phase 0 RSS-only command-line interface."""
-    parser = argparse.ArgumentParser(
-        prog="laclaugpt-server-rss",
-        description=(
-            "Collect RSS/Atom text records directly into MongoDB for Phase 0. "
-            "This path does not use Redis or S3/Allas."
-        ),
-    )
-    parser.add_argument(
-        "--source-manifest",
-        required=True,
-        help="Path to the TOML source manifest containing [[feed]] entries.",
-    )
-    parser.add_argument("--collection-id", default=None)
-    parser.add_argument("--worker-id", default="linux-server-rss")
-    parser.add_argument("--max-feeds", type=int, default=10)
-    parser.add_argument("--per-feed-limit", type=int, default=10)
-    parser.add_argument("--limit", type=int, default=50)
-    parser.add_argument(
-        "--rotation",
-        type=int,
-        default=None,
-        help="Optional deterministic feed-window rotation offset.",
-    )
-    return parser
-
-
-def main(argv: list[str] | None = None) -> int:
-    """Run one cron-safe Phase 0 RSS batch.
-
-    Exit 0 only when collection and MongoDB persistence complete without
-    per-record errors. Configuration, collection, and persistence failures
-    return 1 so cron/systemd can detect the failed run.
-    """
-    args = build_parser().parse_args(argv)
-    try:
-        result = run_distributed_rss(
-            Settings(),
-            source_manifest=args.source_manifest,
-            collection_id=args.collection_id,
-            worker_id=args.worker_id,
-            max_feeds=args.max_feeds,
-            per_feed_limit=args.per_feed_limit,
-            limit=args.limit,
-            rotation=args.rotation,
-        )
-    except Exception as exc:  # noqa: BLE001
-        print(
-            json.dumps(
-                {"status": "error", "error": str(exc)},
-                ensure_ascii=False,
-                sort_keys=True,
-            )
-        )
-        return 1
-
-    print(json.dumps(result, ensure_ascii=False, sort_keys=True))
-    return 0 if result["status"] == "ok" else 1
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
