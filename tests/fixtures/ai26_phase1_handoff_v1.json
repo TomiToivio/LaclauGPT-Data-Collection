@@ -1,0 +1,89 @@
+{
+  "contract_version": "ai26-phase1-handoff-v1",
+  "schema_version": "1.1.0",
+  "source_url": "https://example.invalid/ai26/post/001",
+  "source_native_ids": {
+    "platform_post_id": "ai26-post-001",
+    "author_id": "ai26-author-001"
+  },
+  "raw_capture": {
+    "ref": "fixture://ai26-phase1/raw/001",
+    "content_type": "application/json",
+    "captured_at": "2026-09-18T09:00:05Z",
+    "metadata": {
+      "synthetic": true
+    }
+  },
+  "source": {
+    "platform": "synthetic-ai26",
+    "source_type": "social_post",
+    "author": "synthetic-account",
+    "created_at": "2026-09-18T09:00:00Z",
+    "collected_at": "2026-09-18T09:00:05Z",
+    "collector": "laclaugpt-data-collection",
+    "collection_method": "synthetic_ai26_fixture",
+    "language": "en",
+    "country": "XX",
+    "raw_metadata": {
+      "query_profile": "AI26",
+      "source_label": "synthetic-fixture"
+    },
+    "raw_ref": "fixture://ai26-phase1/raw/001"
+  },
+  "content": {
+    "text": "Synthetic AI26 source text for Collection to Analysis contract verification.",
+    "language": "en",
+    "frames": [
+      {
+        "frame_timestamp_seconds": 4.0,
+        "media_ref": "fixture://ai26-phase1/frame/004"
+      }
+    ],
+    "media_references": [
+      {
+        "kind": "source_media",
+        "media_type": "video",
+        "ref": "fixture://ai26-phase1/media/video-001",
+        "media_index": 0,
+        "metadata": {
+          "synthetic": true
+        }
+      }
+    ]
+  },
+  "intermediate": {
+    "frames": [
+      {
+        "frame_timestamp_seconds": 4.0,
+        "media_ref": "fixture://ai26-phase1/frame/004"
+      }
+    ]
+  },
+  "source_units": [],
+  "alignments": [],
+  "evidence": [],
+  "analysis": {},
+  "provenance": [
+    {
+      "provenance_id": "prov-ai26-collection-001",
+      "stage": "collection",
+      "collector": "laclaugpt-data-collection",
+      "collector_version": "fixture",
+      "captured_at": "2026-09-18T09:00:05Z",
+      "created_at": "2026-09-18T09:00:05Z",
+      "capture_id": "capture-ai26-001",
+      "run_id": "ai26-phase1-handoff-v1",
+      "method": "synthetic_ai26_fixture",
+      "module": "LaclauGPT-Data-Collection",
+      "module_version": "fixture",
+      "git_commit": "fixture",
+      "input_refs": [],
+      "transformations": ["normalize_source_identity"],
+      "metadata": {
+        "contract_version": "ai26-phase1-handoff-v1"
+      }
+    }
+  ],
+  "review": {},
+  "legacy": {}
+}
