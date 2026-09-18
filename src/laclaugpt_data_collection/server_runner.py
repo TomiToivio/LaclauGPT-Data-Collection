@@ -10,6 +10,7 @@ import argparse
 import json
 import time
 import tomllib
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -17,7 +18,73 @@ from urllib.parse import urlsplit
 from .collectors.rss import RSSCollector
 from .config import Settings
 from .models import CanonicalRecord
-from .storage.mongodb import MongoRecordStore
+
+
+def phase0_collection_name(project_id: str) -> str:
+    """Return the legacy Phase 0 collection consumed by Data Analysis."""
+    return f"laclaugpt2_{project_id}_scraper_collection"
+
+
+def phase0_document(record: CanonicalRecord) -> dict[str, Any]:
+    """Flatten one RSS record to the deliberately minimal Phase 0 Mongo contract."""
+    source_name = str(record.source.raw_metadata.get("source_name") or "")
+    source_type = record.source.source_type or record.source.platform or "rss"
+    actor_name = record.source.author_fullname or record.source.author or source_name
+    document_id = record.source_native_ids.get("document_id") or sha256(
+        record.source_url.encode("utf-8")
+    ).hexdigest()
+    return {
+        "document_id": str(document_id),
+        "source_url": record.source_url,
+        "source_text": record.content.text or "",
+        "source_title": record.content.title or "",
+        "title": record.content.title or "",
+        "source_date": record.source.created_at,
+        "source_name": source_name,
+        "source_type": source_type,
+        "actor_name": actor_name,
+        "language": record.source.language or record.content.language or "",
+        "arena": str(record.source.raw_metadata.get("arena") or ""),
+    }
+
+
+class Phase0MongoStore:
+    """RSS-only compatibility store for the hand-coded Phase 0 analysis core."""
+
+    def __init__(
+        self,
+        uri: str,
+        database: str,
+        project_id: str,
+        *,
+        connect_timeout_ms: int = 2000,
+        client_factory: Any | None = None,
+    ) -> None:
+        if client_factory is None:
+            try:
+                from pymongo import MongoClient
+            except ImportError as exc:  # pragma: no cover - optional dependency
+                raise RuntimeError(
+                    "Install laclaugpt-data-collection[distributed] for MongoDB"
+                ) from exc
+            client_factory = MongoClient
+        self.collection_name = phase0_collection_name(project_id)
+        client = client_factory(uri, serverSelectionTimeoutMS=connect_timeout_ms)
+        self._collection = client[database][self.collection_name]
+        self._collection.create_index(
+            [("document_id", 1)], unique=True, name="phase0_document_id_unique"
+        )
+        self._collection.create_index(
+            [("source_url", 1)], unique=True, name="phase0_source_url_unique"
+        )
+
+    def upsert(self, record: CanonicalRecord) -> None:
+        document = phase0_document(record)
+        self._collection.update_one(
+            {"document_id": document["document_id"]},
+            {"$set": document},
+            upsert=True,
+        )
 
 
 def load_feed_manifest(path: str | Path) -> list[dict[str, Any]]:
@@ -170,13 +237,11 @@ def run_distributed_rss(
         per_feed_limit=per_feed_limit,
     )
 
-    store = MongoRecordStore(
+    store = Phase0MongoStore(
         settings.mongodb_uri,
         settings.mongodb_database,
-        settings.effective_mongodb_collection,
         settings.project_id,
         connect_timeout_ms=settings.mongodb_connect_timeout_ms,
-        graph_max_depth=settings.mongodb_graph_max_depth,
     )
 
     synced = 0
@@ -197,6 +262,7 @@ def run_distributed_rss(
         "feed_names": [str(feed.get("name") or "") for feed in feeds],
         "records_collected": len(records),
         "records_synced": synced,
+        "mongodb_collection": store.collection_name,
         "warnings": warnings,
         "errors": errors,
     }
