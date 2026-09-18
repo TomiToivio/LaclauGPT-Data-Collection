@@ -7,7 +7,7 @@ study: ai26
 title: Ideological contestation over AI
 timezone: UTC
 reference_case: true
-paper: https://github.com/TomiToivio/LaclauGPT/blob/main/paper/PAPER.md
+paper: https://github.com/TomiToivio/LaclauGPT/blob/main/paper/PHASE_1_PAPER.md
 collection_codebook: ai26.collection-codebook.yaml
 source_manifest: ai26.sources.example.toml
 
