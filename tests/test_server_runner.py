@@ -7,6 +7,7 @@ from laclaugpt_data_collection.models import CollectionProvenance, NormalizedRec
 from laclaugpt_data_collection.realtime import parse_source_time
 from laclaugpt_data_collection.server_runner import (
     load_feed_manifest,
+    main,
     run_distributed_rss,
     select_feed_window,
 )
@@ -170,3 +171,49 @@ def test_phase0_rss_requires_mongodb(tmp_path: Path) -> None:
 
     with pytest.raises(RuntimeError, match="requires LACLAUGPT_MONGODB_URI"):
         run_distributed_rss(MissingMongo(), source_manifest=manifest)
+
+
+
+def test_phase0_cli_returns_zero_for_success(tmp_path: Path, monkeypatch, capsys) -> None:
+    manifest = tmp_path / "sources.toml"
+    manifest.write_text(
+        '[[feed]]\nname="one"\nfeed_url="https://example.org/feed"\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("LACLAUGPT_MONGODB_URI", "mongodb://example.invalid")
+    monkeypatch.setattr("laclaugpt_data_collection.server_runner.MongoRecordStore", FakeStore)
+    monkeypatch.setattr("laclaugpt_data_collection.server_runner.RSSCollector", FakeRSSCollector)
+
+    exit_code = main([
+        "--source-manifest",
+        str(manifest),
+        "--max-feeds",
+        "1",
+        "--per-feed-limit",
+        "1",
+        "--limit",
+        "1",
+        "--rotation",
+        "0",
+    ])
+
+    assert exit_code == 0
+    payload = __import__("json").loads(capsys.readouterr().out)
+    assert payload["status"] == "ok"
+    assert payload["records_synced"] == 1
+
+
+def test_phase0_cli_returns_nonzero_without_mongodb(tmp_path: Path, monkeypatch, capsys) -> None:
+    manifest = tmp_path / "sources.toml"
+    manifest.write_text(
+        '[[feed]]\nname="one"\nfeed_url="https://example.org/feed"\n',
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("LACLAUGPT_MONGODB_URI", raising=False)
+
+    exit_code = main(["--source-manifest", str(manifest)])
+
+    assert exit_code == 1
+    payload = __import__("json").loads(capsys.readouterr().out)
+    assert payload["status"] == "error"
+    assert "LACLAUGPT_MONGODB_URI" in payload["error"]
