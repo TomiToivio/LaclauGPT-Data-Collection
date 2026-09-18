@@ -57,6 +57,30 @@ Analysis, simulation, dashboards, research datasets, operational target lists, c
 - Canonical `source_url` or stable URI-like identity across every backend and module handoff.
 - Public-repository hygiene: no research data, target/account lists, browser profiles, cookies, tokens, credentials or real deployment configuration in Git.
 
+## Phase 0 runtime
+
+Phase 0 deliberately uses a narrow RSS/Atom-only path:
+
+```text
+RSS/Atom feeds -> canonical text records -> MongoDB -> Data Analysis
+```
+
+The active Phase 0 collector is `laclaugpt-server-rss` (or `python -m laclaugpt_data_collection.server_runner`). It reads only `[[feed]]` rows from the source manifest and writes directly to MongoDB. Redis, CSC Allas/S3, browser collectors, social-platform collectors, media download, OCR and Whisper are not part of the Phase 0 runtime.
+
+Example CLI invocation:
+
+```bash
+LACLAUGPT_PROJECT_ID=ai26 \
+LACLAUGPT_MONGODB_URI='mongodb://HOST:PORT/' \
+laclaugpt-server-rss \
+  --source-manifest data/config/ai26.sources.toml \
+  --max-feeds 8 \
+  --per-feed-limit 5 \
+  --limit 40
+```
+
+For cron on Laskin, `scripts/run_ai26_laskin_collect.sh` remains the bounded one-cycle wrapper. Phase 1 code stays in the repository but is inactive for this path. Phase 1 capabilities should be restored later one at a time, validating MongoDB records and Data Analysis compatibility after each addition.
+
 ## Source-plugin architecture
 
 Collection now has a versioned source-plugin layer around the existing collectors. The architecture is intentionally simple:
