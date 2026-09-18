@@ -20,69 +20,46 @@ from .config import Settings
 from .models import CanonicalRecord
 
 
-def phase0_collection_name(project_id: str) -> str:
-    """Return the legacy Phase 0 collection consumed by Data Analysis."""
-    return f"laclaugpt2_{project_id}_scraper_collection"
-
-
-def phase0_document(record: CanonicalRecord) -> dict[str, Any]:
-    """Flatten one RSS record to the deliberately minimal Phase 0 Mongo contract."""
-    source_name = str(record.source.raw_metadata.get("source_name") or "")
-    source_type = record.source.source_type or record.source.platform or "rss"
-    actor_name = record.source.author_fullname or record.source.author or source_name
-    document_id = record.source_native_ids.get("document_id") or sha256(
-        record.source_url.encode("utf-8")
-    ).hexdigest()
-    return {
-        "document_id": str(document_id),
-        "source_url": record.source_url,
-        "source_text": record.content.text or "",
-        "source_title": record.content.title or "",
-        "title": record.content.title or "",
-        "source_date": record.source.created_at,
-        "source_name": source_name,
-        "source_type": source_type,
-        "actor_name": actor_name,
-        "language": record.source.language or record.content.language or "",
-        "arena": str(record.source.raw_metadata.get("arena") or ""),
-    }
-
-
 class Phase0MongoStore:
-    """RSS-only compatibility store for the hand-coded Phase 0 analysis core."""
+    """Minimal MongoDB adapter for the legacy Phase 0 analysis contract."""
 
-    def __init__(
-        self,
-        uri: str,
-        database: str,
-        project_id: str,
-        *,
-        connect_timeout_ms: int = 2000,
-        client_factory: Any | None = None,
-    ) -> None:
-        if client_factory is None:
-            try:
-                from pymongo import MongoClient
-            except ImportError as exc:  # pragma: no cover - optional dependency
-                raise RuntimeError(
-                    "Install laclaugpt-data-collection[distributed] for MongoDB"
-                ) from exc
-            client_factory = MongoClient
-        self.collection_name = phase0_collection_name(project_id)
-        client = client_factory(uri, serverSelectionTimeoutMS=connect_timeout_ms)
+    def __init__(self, uri: str, database: str, project_id: str, *, connect_timeout_ms: int = 2000) -> None:
+        if not uri:
+            raise RuntimeError("MongoDB URI is required")
+        try:
+            from pymongo import MongoClient
+        except ImportError as exc:  # pragma: no cover - optional dependency
+            raise RuntimeError(
+                "Install laclaugpt-data-collection[distributed] for MongoDB"
+            ) from exc
+        self.collection_name = f"laclaugpt2_{project_id}_scraper_collection"
+        client = MongoClient(uri, serverSelectionTimeoutMS=connect_timeout_ms)
         self._collection = client[database][self.collection_name]
-        self._collection.create_index(
-            [("document_id", 1)], unique=True, name="phase0_document_id_unique"
-        )
-        self._collection.create_index(
-            [("source_url", 1)], unique=True, name="phase0_source_url_unique"
-        )
+        self._collection.create_index("source_url", unique=True, name="source_url_unique")
+        self._collection.create_index("document_id", name="document_id")
+        self._collection.create_index("source_date", name="source_date")
 
     def upsert(self, record: CanonicalRecord) -> None:
-        document = phase0_document(record)
+        metadata = record.source.raw_metadata
+        source_title = str(metadata.get("source_title") or record.content.title or "").strip()
+        source_name = str(metadata.get("source_name") or "").strip()
+        actor_name = str(metadata.get("actor_name") or record.source.author or source_name).strip()
+        document_id = str(record.source_native_ids.get("document_id") or record.source_url)
+        fields = {
+            "document_id": document_id,
+            "source_url": record.source_url,
+            "source_text": record.content.text,
+            "source_title": source_title,
+            "source_date": record.source.created_at,
+            "source_name": source_name,
+            "source_type": record.source.source_type or record.source.platform or "rss",
+            "actor_name": actor_name,
+            "arena": str(metadata.get("arena") or ""),
+            "project": str(metadata.get("collection_id") or ""),
+        }
         self._collection.update_one(
-            {"document_id": document["document_id"]},
-            {"$set": document},
+            {"source_url": record.source_url},
+            {"$set": fields},
             upsert=True,
         )
 
@@ -131,6 +108,7 @@ def _stamp_source_metadata(
     record.source.raw_metadata["collection_id"] = collection_id
     record.source.raw_metadata["source_name"] = str(feed.get("name") or "")
     record.source.raw_metadata["source_family"] = str(feed.get("source_family") or "")
+    record.source.raw_metadata["actor_name"] = str(feed.get("actor_name") or "")
     record.source.raw_metadata["sampling_priority"] = str(feed.get("priority") or "")
     arena = str(feed.get("arena") or "")
     if arena:

@@ -22,7 +22,7 @@ class FakeStore:
         self.uri = uri
         self.database = database
         self.project_id = project_id
-        self.collection_name = phase0_collection_name(project_id)
+        self.collection_name = f"laclaugpt2_{project_id}_scraper_collection"
         self.records = []
         FakeStore.last = self
 
