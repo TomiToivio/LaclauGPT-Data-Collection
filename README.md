@@ -8,7 +8,7 @@
 
 **LaclauGPT** is an open social-science research framework for **LLM-assisted computational discourse analysis** of large textual and multimodal corpora. It combines computational methods with interpretive political research while keeping model outputs traceable to source evidence, uncertainty, provenance and human review.
 
-The current flagship research programme is **[LaclauGPT: Ideological contestation over AI](https://github.com/TomiToivio/LaclauGPT/blob/main/paper/PAPER.md)**. The canonical theoretical and methodological contract is **[THEORY.md](https://github.com/TomiToivio/LaclauGPT/blob/main/THEORY.md)**.
+The current flagship research programme is **[LaclauGPT: Ideological contestation over AI](https://github.com/TomiToivio/LaclauGPT/blob/main/paper/PHASE_1_PAPER.md)**. The canonical theoretical and methodological contract is **[THEORY.md](https://github.com/TomiToivio/LaclauGPT/blob/main/THEORY.md)**.
 
 The framework is developed around Ernesto Laclau and Chantal Mouffe's discourse theory and Emilia Palonen's work on populism, polarisation and hegemonic dynamics. The AI/AGI study is the main development case, but LaclauGPT is a **general research framework rather than a single-purpose AI classifier**. The same architecture can support election research, populism, grievance politics, social-media research and other comparative discourse-analysis projects.
 
@@ -38,7 +38,7 @@ Its theoretical concepts include nodal points, floating and empty signifiers, eq
 
 Important cautions include: **frequency is not hegemony; semantic similarity is not equivalence; negative sentiment is not antagonism; polysemy is not empty signification; and document-level evidence does not automatically establish corpus-level formations.** Abstention is a valid output when evidence is insufficient.
 
-See the **[scientific paper](https://github.com/TomiToivio/LaclauGPT/blob/main/paper/PAPER.md)** and **[theory contract](https://github.com/TomiToivio/LaclauGPT/blob/main/THEORY.md)** for the full conceptual framework.
+See the **[scientific paper](https://github.com/TomiToivio/LaclauGPT/blob/main/paper/PHASE_1_PAPER.md)** and **[theory contract](https://github.com/TomiToivio/LaclauGPT/blob/main/THEORY.md)** for the full conceptual framework.
 
 ## This repository
 
