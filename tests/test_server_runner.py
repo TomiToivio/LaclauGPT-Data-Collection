@@ -15,11 +15,11 @@ from laclaugpt_data_collection.server_runner import (
 class FakeStore:
     last = None
 
-    def __init__(self, uri, database, collection, project_id, **kwargs):
+    def __init__(self, uri, database, project_id, **kwargs):
         self.uri = uri
         self.database = database
-        self.collection = collection
         self.project_id = project_id
+        self.collection_name = f"laclaugpt2_{project_id}_scraper_collection"
         self.records = []
         FakeStore.last = self
 
@@ -135,7 +135,7 @@ def test_phase0_rss_upserts_directly_to_mongodb(
         'source_family="synthetic"\narena="elites"\npriority="P1"\n',
         encoding="utf-8",
     )
-    monkeypatch.setattr("laclaugpt_data_collection.server_runner.MongoRecordStore", FakeStore)
+    monkeypatch.setattr("laclaugpt_data_collection.server_runner.Phase0MongoStore", FakeStore)
     monkeypatch.setattr("laclaugpt_data_collection.server_runner.RSSCollector", FakeRSSCollector)
 
     result = run_distributed_rss(
@@ -149,6 +149,7 @@ def test_phase0_rss_upserts_directly_to_mongodb(
     )
     assert result["records_collected"] == 2
     assert result["records_synced"] == 1
+    assert result["mongodb_collection"] == "laclaugpt2_ai26_scraper_collection"
     assert "duplicate_leases" not in result
     assert FakeStore.last is not None
     stored = FakeStore.last.records[0]
