@@ -200,3 +200,73 @@ def run_distributed_rss(
         "warnings": warnings,
         "errors": errors,
     }
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Phase 0 RSS entry point used by `laclaugpt-server-rss` and the cron wrapper.
+
+    Writes flat Phase 0 documents into the collection the Phase 0 analysis core
+    reads (issue #85), so a collected item is directly discoverable by
+    `laclaugpt/laclaugpt_process.py`. Redis/S3 are not involved on this path.
+
+    Returns non-zero when collection fails, so cron surfaces the fault.
+    """
+    from .config import Settings
+    from .phase0_mongo import write_phase0_records
+
+    parser = argparse.ArgumentParser(description="Phase 0 RSS collection into MongoDB")
+    parser.add_argument("--source-manifest", required=True)
+    parser.add_argument("--collection-id", default=None)
+    parser.add_argument("--worker-id", default="laclaugpt-server-rss")
+    parser.add_argument("--max-feeds", type=int, default=10)
+    parser.add_argument("--per-feed-limit", type=int, default=10)
+    parser.add_argument("--limit", type=int, default=50)
+    parser.add_argument("--json", action="store_true", help="print the batch summary as JSON")
+    args = parser.parse_args(argv)
+
+    settings = Settings()
+    routed_collection = args.collection_id or settings.project_id
+    feeds = select_feed_window(
+        load_feed_manifest(args.source_manifest),
+        max_feeds=args.max_feeds,
+    )
+    records, warnings = collect_rss_records(
+        feeds,
+        collection_id=routed_collection,
+        worker_id=args.worker_id,
+        per_feed_limit=args.per_feed_limit,
+    )
+
+    errors: list[str] = []
+    written = 0
+    try:
+        written = write_phase0_records(settings, records[: args.limit])
+    except Exception as exc:  # noqa: BLE001 - report, do not traceback under cron
+        errors.append(f"phase0 write failed: {str(exc)[:180]}")
+
+    summary = {
+        "status": "ok" if not errors else "error",
+        "project_id": settings.project_id,
+        "collection": f"laclaugpt2_{settings.project_id}_scraper_collection",
+        "worker_id": args.worker_id,
+        "records_collected": len(records),
+        "records_written": written,
+        "warnings": warnings,
+        "errors": errors,
+    }
+    if args.json:
+        print(json.dumps(summary, indent=2, default=str))
+    else:
+        print(
+            f"[phase0] collected={len(records)} written={written} "
+            f"errors={len(errors)} collection={summary['collection']}"
+        )
+        for warning in warnings:
+            print(f"  warning: {warning}")
+        for error in errors:
+            print(f"  error: {error}")
+    return 0 if not errors else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

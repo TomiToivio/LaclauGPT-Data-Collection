@@ -81,6 +81,33 @@ laclaugpt-server-rss \
 
 For cron on Laskin, `scripts/run_ai26_laskin_collect.sh` remains the bounded one-cycle wrapper. Phase 1 code stays in the repository but is inactive for this path. Phase 1 capabilities should be restored later one at a time, validating MongoDB records and Data Analysis compatibility after each addition.
 
+### Phase 0 MongoDB boundary (shared with Data Analysis)
+
+Phase 0 collection and the Phase 0 analysis core share **one** database and **one** collection name. The collection is derived from the project id:
+
+```text
+laclaugpt2_<project>_scraper_collection      # e.g. laclaugpt2_ai26_scraper_collection
+```
+
+This is deliberately **not** the Phase 1 distributed collection naming (`<project>__records`). Phase 1 writes nested `CanonicalRecord` documents; the hand-coded Phase 0 analysis core reads flat documents. `src/laclaugpt_data_collection/phase0_mongo.py` is the explicit Phase 0 adapter between the two and can be retired once Phase 1 is reintroduced step by step.
+
+The flat document exposes the fields analysis expects:
+
+```text
+document_id, source_url, source_text, source_title, source_date, source_name,
+source_type, source_feed_url, source_author, source_categories, content_hash,
+project, arena, actor_name, actor_type, ai_formation, political_formation,
+country, language, site_name, collected_at
+```
+
+Two properties make the boundary safe to run from cron:
+
+- **Identity.** Documents are upserted on the canonical `source_url` (fragments and tracking parameters such as `utm_*`/`fbclid` stripped), so re-collecting an article updates it instead of creating a duplicate the analysis core would analyse twice.
+- **Minimality.** The Phase 0 path requires MongoDB only. It opens no Redis connection and no S3/Allas connection, and the existing Phase 1 distributed runner is left intact for later restoration.
+
+The boundary is pinned by `tests/test_issue_85_phase0_mongo_contract.py`, which asserts the collection name and required field list against the constants the analysis core uses.
+
+
 ## Source-plugin architecture
 
 Collection now has a versioned source-plugin layer around the existing collectors. The architecture is intentionally simple:
