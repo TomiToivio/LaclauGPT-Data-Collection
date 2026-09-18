@@ -17,7 +17,50 @@ from urllib.parse import urlsplit
 from .collectors.rss import RSSCollector
 from .config import Settings
 from .models import CanonicalRecord
-from .storage.mongodb import MongoRecordStore
+
+
+class Phase0MongoStore:
+    """Minimal MongoDB adapter for the legacy Phase 0 analysis contract."""
+
+    def __init__(self, uri: str, database: str, project_id: str, *, connect_timeout_ms: int = 2000) -> None:
+        if not uri:
+            raise RuntimeError("MongoDB URI is required")
+        try:
+            from pymongo import MongoClient
+        except ImportError as exc:  # pragma: no cover - optional dependency
+            raise RuntimeError(
+                "Install laclaugpt-data-collection[distributed] for MongoDB"
+            ) from exc
+        self.collection_name = f"laclaugpt2_{project_id}_scraper_collection"
+        client = MongoClient(uri, serverSelectionTimeoutMS=connect_timeout_ms)
+        self._collection = client[database][self.collection_name]
+        self._collection.create_index("source_url", unique=True, name="source_url_unique")
+        self._collection.create_index("document_id", name="document_id")
+        self._collection.create_index("source_date", name="source_date")
+
+    def upsert(self, record: CanonicalRecord) -> None:
+        metadata = record.source.raw_metadata
+        source_title = str(metadata.get("source_title") or record.content.title or "").strip()
+        source_name = str(metadata.get("source_name") or "").strip()
+        actor_name = str(metadata.get("actor_name") or record.source.author or source_name).strip()
+        document_id = str(record.source_native_ids.get("document_id") or record.source_url)
+        fields = {
+            "document_id": document_id,
+            "source_url": record.source_url,
+            "source_text": record.content.text,
+            "source_title": source_title,
+            "source_date": record.source.created_at,
+            "source_name": source_name,
+            "source_type": record.source.source_type or record.source.platform or "rss",
+            "actor_name": actor_name,
+            "arena": str(metadata.get("arena") or ""),
+            "project": str(metadata.get("collection_id") or ""),
+        }
+        self._collection.update_one(
+            {"source_url": record.source_url},
+            {"$set": fields},
+            upsert=True,
+        )
 
 
 def load_feed_manifest(path: str | Path) -> list[dict[str, Any]]:
@@ -64,6 +107,7 @@ def _stamp_source_metadata(
     record.source.raw_metadata["collection_id"] = collection_id
     record.source.raw_metadata["source_name"] = str(feed.get("name") or "")
     record.source.raw_metadata["source_family"] = str(feed.get("source_family") or "")
+    record.source.raw_metadata["actor_name"] = str(feed.get("actor_name") or "")
     record.source.raw_metadata["sampling_priority"] = str(feed.get("priority") or "")
     arena = str(feed.get("arena") or "")
     if arena:
@@ -170,13 +214,11 @@ def run_distributed_rss(
         per_feed_limit=per_feed_limit,
     )
 
-    store = MongoRecordStore(
+    store = Phase0MongoStore(
         settings.mongodb_uri,
         settings.mongodb_database,
-        settings.effective_mongodb_collection,
         settings.project_id,
         connect_timeout_ms=settings.mongodb_connect_timeout_ms,
-        graph_max_depth=settings.mongodb_graph_max_depth,
     )
 
     synced = 0
@@ -197,6 +239,7 @@ def run_distributed_rss(
         "feed_names": [str(feed.get("name") or "") for feed in feeds],
         "records_collected": len(records),
         "records_synced": synced,
+        "mongodb_collection": store.collection_name,
         "warnings": warnings,
         "errors": errors,
     }
