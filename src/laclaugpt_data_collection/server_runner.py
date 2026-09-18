@@ -1,8 +1,14 @@
-"""Linux-server non-browser collector for the first distributed AI26 test.
+"""Phase 0 RSS/Atom collection into MongoDB for AI26 on the Linux server.
 
-The initial server worker deliberately starts with RSS/Atom because feeds are the
-highest-value, lowest-friction AI26 source family. It uses the same MongoDB,
-Redis and S3/Allas distributed sink as Firefox collection on the laptop.
+Phase 0 deliberately starts with RSS/Atom because feeds are the highest-value,
+lowest-friction AI26 source family and long-form text suits discourse analysis
+better than short-form social media.
+
+This is the MongoDB-only Phase 0 path: it writes flat documents into the collection
+the Phase 0 analysis core reads (``laclaugpt2_<project>_scraper_collection``) and
+requires no Redis, no S3/Allas, no browser collector and no multimodal pipeline. The
+Phase 1 distributed capture plane remains in the repository for later restoration
+but is not part of this path.
 """
 from __future__ import annotations
 
