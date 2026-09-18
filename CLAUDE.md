@@ -16,9 +16,7 @@ For Phase 0 / Phase 1 work:
 - do not add alternate local-only storage/deployment architectures unless explicitly requested;
 - stop when the requested restoration step is complete.
 
-Every runtime or study-specific artifact belongs below the untracked repository-local `data/` root. Do not create alternative top-level runtime directories.
-
-Run the repository's public-tree check, lint/type checks, and tests before proposing a merge.
+Run the repository's public-tree check, lint/type checks, and tests before merging.
 
 ## TOMI-LOCKED
 
@@ -59,3 +57,4 @@ The marker is intentionally grep-friendly:
 ```bash
 grep -R "TOMI-LOCKED" .
 ```
+

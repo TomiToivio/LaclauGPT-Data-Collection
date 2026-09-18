@@ -46,7 +46,7 @@ git switch -c issue-<n>-<short-slug>
 
 Push the branch early with a bounded first increment and keep working on the same branch. Report the branch, the commit and the test status on the issue.
 
-Run the quality gates before proposing a merge: the public-tree check, Ruff, the mypy gate and pytest. If the base branch moved while you worked, rebase and re-run the gates; never force-push.
+Run the quality gates before proposing a merge: the public-tree check, Ruff, the mypy gate and pytest. If `main` moved while you worked, rebase and re-run the gates; never force-push.
 
 ## TOMI-LOCKED
 
@@ -87,3 +87,4 @@ The marker is intentionally grep-friendly:
 ```bash
 grep -R "TOMI-LOCKED" .
 ```
+

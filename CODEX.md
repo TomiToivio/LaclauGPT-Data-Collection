@@ -16,9 +16,7 @@ For Phase 0 / Phase 1 work:
 - do not invent new SQLite-first, filesystem-only, alternate queue, alternate database, or alternate object-store modes for configurability;
 - avoid unrelated refactors and stop after the bounded task is complete.
 
-Every runtime or study-specific artifact belongs below the untracked repository-local `data/` root.
-
-Keep changes inside the existing `src/` architecture, preserve stable normalized records and provenance, add synthetic tests where appropriate, and run the repository quality gates before proposing a merge.
+Keep changes inside the existing `src/` architecture, preserve stable normalized records and provenance, add synthetic tests, and run the repository quality gates before merging.
 
 ## TOMI-LOCKED
 
@@ -59,3 +57,4 @@ The marker is intentionally grep-friendly:
 ```bash
 grep -R "TOMI-LOCKED" .
 ```
+

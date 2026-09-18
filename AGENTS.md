@@ -129,7 +129,7 @@ Before merging run the public-tree check, Ruff, the configured mypy gate and pyt
 
 ## Legacy migration
 
-Historical repositories and existing Phase 1 code are reference implementations, not architecture templates. Classify schema archaeology as `ADOPT`, `ADAPT`, `ALREADY_IMPLEMENTED`, `LEGACY_COMPATIBILITY_ONLY`, `OBSOLETE`, or `PRIVATE_DO_NOT_COPY`, and document non-obvious decisions.
+Historical repositories are reference implementations, not architecture templates. Classify schema archaeology as `ADOPT`, `ADAPT`, `ALREADY_IMPLEMENTED`, `LEGACY_COMPATIBILITY_ONLY`, `OBSOLETE`, or `PRIVATE_DO_NOT_COPY`, and document non-obvious decisions.
 
 ## TOMI-LOCKED
 
@@ -170,3 +170,4 @@ The marker is intentionally grep-friendly:
 ```bash
 grep -R "TOMI-LOCKED" .
 ```
+
