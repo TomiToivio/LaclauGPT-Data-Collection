@@ -75,3 +75,19 @@ Before starting either study:
 6. Confirm Analysis consumes canonical records rather than scraping Collection internals.
 
 The public repository should contain reusable code and synthetic examples only. Live target lists, schedules, machine endpoints and collected material remain private.
+
+
+## WSL Ubuntu workstation implementation
+
+For the reproducible localhost workstation requested in issue #76, use:
+
+- `docs/installation/WSL_UBUNTU.md`
+- `docs/installation/AI26.md`
+- `docs/installation/BRAZIL26.md`
+- `scripts/install_common.sh`
+- `scripts/install_ai26.sh` / `scripts/install_brazil26.sh`
+- `scripts/validate_installation.sh`
+
+The project env files select MongoDB/Redis/Allas backends but do not store
+Allas access keys. CSC `allas-conf` in S3 mode manages the credential files
+consumed by boto3.

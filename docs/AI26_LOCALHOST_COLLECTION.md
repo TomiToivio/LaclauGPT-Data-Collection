@@ -58,13 +58,17 @@ LACLAUGPT_REDIS_URL=<remote Redis URL>
 LACLAUGPT_S3_ENDPOINT=<CSC Allas S3 endpoint>
 LACLAUGPT_S3_REGION=<region>
 LACLAUGPT_S3_BUCKET=<bucket>
-LACLAUGPT_S3_ACCESS_KEY=<private value>
-LACLAUGPT_S3_SECRET_KEY=<private value>
+# Credentials are managed by CSC allas-conf in S3 mode (~/.aws/*).
+# Do not duplicate Allas access/secret keys in this env file.
 LACLAUGPT_S3_SIGNATURE_VERSION=s3
 LACLAUGPT_S3_ADDRESSING_STYLE=auto
 ```
 
-Load it for interactive commands:
+Configure CSC Allas first with `allas-conf` in S3 mode. boto3 then reads
+the credential/config files under `~/.aws/`; this same file-based mechanism
+works for cron without exporting credentials into the crontab or project env.
+
+Load the project env for interactive commands:
 
 ```bash
 set -a
