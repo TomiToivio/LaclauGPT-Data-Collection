@@ -11,8 +11,8 @@ WORKDIR          -> /mnt/workspace/LaclauGPT-Data-Collection
 WHAT to collect  -> configs/studies/ai26.example.yaml
 SOURCE manifest  -> configs/studies/ai26.sources.example.toml
 COLLECTION cues  -> configs/studies/ai26.collection-codebook.yaml
-THEORY/design    -> LaclauGPT paper/PAPER.md
-                    (https://github.com/TomiToivio/LaclauGPT/blob/main/paper/PAPER.md)
+THEORY/design    -> LaclauGPT paper/PHASE_1_PAPER.md
+                    (https://github.com/TomiToivio/LaclauGPT/blob/main/paper/PHASE_1_PAPER.md)
 
 Laskin:
   cron collectors          -> scripts/run_ai26_laskin_collect.sh   (hourly :10)
