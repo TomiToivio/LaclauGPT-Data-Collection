@@ -107,6 +107,8 @@ Two properties make the boundary safe to run from cron:
 
 The boundary is pinned by `tests/test_issue_85_phase0_mongo_contract.py`, which asserts the collection name and required field list against the constants the analysis core uses.
 
+See `docs/PHASE0_RSS_RUNTIME.md` for the full Phase 0 runtime contract: CLI and cron, the MongoDB boundary, and exactly what stays disabled from Phase 1.
+
 
 ## Source-plugin architecture
 
