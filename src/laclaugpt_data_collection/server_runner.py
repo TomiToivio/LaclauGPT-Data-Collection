@@ -16,8 +16,8 @@ from urllib.parse import urlsplit
 
 from .collectors.rss import RSSCollector
 from .config import Settings
-from .distributed_capture import DistributedCaptureSink
-from .handoff import build_handoff, ready_sort_key
+from .models import CanonicalRecord
+from .storage.mongodb import MongoRecordStore
 
 
 def load_feed_manifest(path: str | Path) -> list[dict[str, Any]]:
@@ -60,7 +60,7 @@ def _stamp_source_metadata(
     *,
     collection_id: str,
     worker_id: str,
-) -> dict[str, Any]:
+) -> CanonicalRecord:
     record.source.raw_metadata["collection_id"] = collection_id
     record.source.raw_metadata["source_name"] = str(feed.get("name") or "")
     record.source.raw_metadata["source_family"] = str(feed.get("source_family") or "")
@@ -76,10 +76,7 @@ def _stamp_source_metadata(
         if arena:
             metadata["arena"] = arena
     record.refresh_human_readable()
-    payload = record.model_dump(mode="json")
-    payload["collection_id"] = collection_id
-    payload["arena"] = arena
-    return payload
+    return record
 
 
 def collect_rss_records(
@@ -88,9 +85,9 @@ def collect_rss_records(
     collection_id: str,
     worker_id: str,
     per_feed_limit: int = 20,
-) -> tuple[list[dict[str, Any]], list[str]]:
+) -> tuple[list[CanonicalRecord], list[str]]:
     """Collect and annotate RSS records without touching distributed services."""
-    records: list[dict[str, Any]] = []
+    records: list[CanonicalRecord] = []
     warnings: list[str] = []
     for feed in feeds:
         feed_url = str(feed["feed_url"])
