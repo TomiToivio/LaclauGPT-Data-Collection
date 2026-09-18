@@ -141,7 +141,7 @@ def test_server_worker_filters_pre_floor_and_syncs_bounded_new_records(
         'source_family="synthetic"\npriority="P1"\n',
         encoding="utf-8",
     )
-    monkeypatch.setattr("laclaugpt_data_collection.server_runner.DistributedCaptureSink", FakeSink)
+    monkeypatch.setattr("laclaugpt_data_collection.server_runner.MongoRecordStore", FakeStore)
     monkeypatch.setattr("laclaugpt_data_collection.server_runner.RSSCollector", FakeRSSCollector)
 
     result = run_distributed_rss(
