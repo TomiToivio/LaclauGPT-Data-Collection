@@ -39,6 +39,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 DEFAULT_FIXTURE = REPOSITORY_ROOT / "tests" / "fixtures" / "canonical_parity_v1.json"
+AI26_HANDOFF_FIXTURE = REPOSITORY_ROOT / "tests" / "fixtures" / "ai26_phase1_handoff_v1.json"
 
 # Normative invariants from the fixture README.
 EXPECTED_SOURCE_URL = "https://example.invalid/laclaugpt/synthetic/record-001"
@@ -269,6 +270,44 @@ def ambient_configuration_note() -> str | None:
     return None
 
 
+
+def check_ai26_phase1_handoff() -> None:
+    """Pin the Collection -> Analysis AI26 Phase 1 boundary."""
+    from laclaugpt_data_collection.models import CanonicalRecord, SCHEMA_VERSION
+
+    payload = _load_fixture(AI26_HANDOFF_FIXTURE)
+    contract_version = payload.pop("contract_version", None)
+    _require(
+        contract_version == "ai26-phase1-handoff-v1",
+        f"unexpected AI26 handoff contract version: {contract_version!r}",
+    )
+    record = CanonicalRecord.model_validate(payload)
+
+    _require(record.schema_version == SCHEMA_VERSION == "1.1.0", "AI26 schema version drifted")
+    _require(record.source_url == "https://example.invalid/ai26/post/001", "AI26 source identity was lost")
+    _require(
+        record.source_native_ids.get("platform_post_id") == "ai26-post-001",
+        "AI26 native post id was lost",
+    )
+    _require(record.source.created_at == "2026-09-18T09:00:00Z", "AI26 source timestamp was lost")
+    _require(record.source.collected_at == "2026-09-18T09:00:05Z", "AI26 collection timestamp was lost")
+    _require(record.content.text.startswith("Synthetic AI26 source text"), "AI26 text was lost")
+    _require(record.source.language == "en" and record.content.language == "en", "AI26 language metadata was lost")
+    _require(
+        record.content.media_references[0].ref == "fixture://ai26-phase1/media/video-001",
+        "AI26 media reference was lost",
+    )
+    _require(
+        record.intermediate.frames[0]["media_ref"] == "fixture://ai26-phase1/frame/004",
+        "AI26 frame reference was lost",
+    )
+    _require(
+        record.provenance[0].metadata.get("contract_version") == contract_version,
+        "AI26 handoff provenance was lost",
+    )
+    _require(record.analysis == {} and record.evidence == [], "Collection fixture must remain analysis-neutral")
+
+
 def check_public_tree_policy() -> None:
     """The repository's own public-tree hygiene gate must pass."""
     import subprocess
@@ -311,6 +350,7 @@ def main(argv: list[str] | None = None) -> int:
             lambda: check_review_state_is_human_controlled(record),
         ),
         ("backend selector semantics", check_backend_selector_semantics),
+        ("AI26 Phase 1 handoff", check_ai26_phase1_handoff),
         ("public-tree policy", check_public_tree_policy),
     ]
 
