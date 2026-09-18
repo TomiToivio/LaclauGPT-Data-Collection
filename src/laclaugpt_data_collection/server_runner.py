@@ -10,7 +10,6 @@ import argparse
 import json
 import time
 import tomllib
-from hashlib import sha256
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -23,17 +22,28 @@ from .models import CanonicalRecord
 class Phase0MongoStore:
     """Minimal MongoDB adapter for the legacy Phase 0 analysis contract."""
 
-    def __init__(self, uri: str, database: str, project_id: str, *, connect_timeout_ms: int = 2000) -> None:
+    def __init__(
+        self,
+        uri: str,
+        database: str,
+        project_id: str,
+        *,
+        connect_timeout_ms: int = 2000,
+        client_factory: Any | None = None,
+    ) -> None:
         if not uri:
             raise RuntimeError("MongoDB URI is required")
-        try:
-            from pymongo import MongoClient
-        except ImportError as exc:  # pragma: no cover - optional dependency
-            raise RuntimeError(
-                "Install laclaugpt-data-collection[distributed] for MongoDB"
-            ) from exc
+        if client_factory is None:
+            try:
+                from pymongo import MongoClient
+
+                client_factory = MongoClient
+            except ImportError as exc:  # pragma: no cover - optional dependency
+                raise RuntimeError(
+                    "Install laclaugpt-data-collection[distributed] for MongoDB"
+                ) from exc
         self.collection_name = f"laclaugpt2_{project_id}_scraper_collection"
-        client = MongoClient(uri, serverSelectionTimeoutMS=connect_timeout_ms)
+        client = client_factory(uri, serverSelectionTimeoutMS=connect_timeout_ms)
         self._collection = client[database][self.collection_name]
         self._collection.create_index("source_url", unique=True, name="source_url_unique")
         self._collection.create_index("document_id", name="document_id")
@@ -57,11 +67,72 @@ class Phase0MongoStore:
             "arena": str(metadata.get("arena") or ""),
             "project": str(metadata.get("collection_id") or ""),
         }
+        # Identity is the stable document id when one is known, so a re-collected
+        # article updates in place; source_url remains the canonical identity anchor.
         self._collection.update_one(
-            {"source_url": record.source_url},
+            {"document_id": document_id},
             {"$set": fields},
             upsert=True,
         )
+
+
+def phase0_collection_name(project_id: str) -> str:
+    """Return the MongoDB collection the Phase 0 analysis core reads.
+
+    Defined in one place (``phase0_mongo``) so collection and analysis cannot drift
+    apart; re-exported here because this module is the Phase 0 collection entry
+    point and callers import the contract from it.
+    """
+    from .phase0_mongo import phase0_collection_name as _name
+
+    return _name(project_id)
+
+
+def phase0_document(record: Any, *, project_id: str = "") -> dict[str, Any]:
+    """Return the flat Phase 0 document for a collected record.
+
+    The Phase 0 analysis core reads flat fields (``source_text``, ``source_title``,
+    ``source_date``, ``source_name``, ``source_type``, ``actor_name``, ``arena``,
+    ``language``) rather than the nested canonical record, so this is the projection
+    across that boundary. The field set is deliberately small and explicit: it is the
+    contract Phase 0 analysis reads, not a copy of the canonical model.
+    """
+    def as_mapping(value: Any) -> dict[str, Any]:
+        if value is None:
+            return {}
+        if isinstance(value, dict):
+            return value
+        dumped = getattr(value, "model_dump", None)
+        return dict(dumped()) if callable(dumped) else {}
+
+    top = as_mapping(record)
+    source = as_mapping(top.get("source"))
+    content = as_mapping(top.get("content"))
+    metadata = as_mapping(source.get("raw_metadata"))
+
+    document_id = str(top.get("document_id") or "")
+    if not document_id:
+        native = as_mapping(top.get("source_native_ids"))
+        document_id = str(native.get("document_id") or "") or str(top.get("source_url") or "")
+    source_url = str(top.get("source_url") or source.get("url") or "")
+    title = str(content.get("title") or top.get("title") or "")
+    actor_name = str(
+        top.get("actor_name") or metadata.get("actor_name") or source.get("author") or ""
+    )
+
+    return {
+        "document_id": document_id,
+        "source_url": source_url,
+        "source_text": str(content.get("text") or top.get("text") or ""),
+        "source_title": title,
+        "title": title,
+        "source_date": str(source.get("created_at") or top.get("source_date") or ""),
+        "source_name": str(metadata.get("source_name") or top.get("source_name") or ""),
+        "source_type": str(top.get("source_type") or source.get("source_type") or "rss"),
+        "actor_name": actor_name,
+        "language": str(content.get("language") or source.get("language") or ""),
+        "arena": str(metadata.get("arena") or top.get("arena") or ""),
+    }
 
 
 def load_feed_manifest(path: str | Path) -> list[dict[str, Any]]:
@@ -244,3 +315,59 @@ def run_distributed_rss(
         "warnings": warnings,
         "errors": errors,
     }
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Phase 0 RSS entry point used by `laclaugpt-server-rss` and the cron wrapper.
+
+    Writes flat Phase 0 documents into the collection the Phase 0 analysis core
+    reads, so a collected item is directly discoverable by
+    `laclaugpt/laclaugpt_process.py`. Redis/S3 are not involved on this path.
+
+    Returns non-zero when collection fails, so cron surfaces the fault.
+    """
+    from .config import Settings
+
+    parser = argparse.ArgumentParser(description="Phase 0 RSS collection into MongoDB")
+    parser.add_argument("--source-manifest", required=True)
+    parser.add_argument("--collection-id", default=None)
+    parser.add_argument("--worker-id", default="laclaugpt-server-rss")
+    parser.add_argument("--max-feeds", type=int, default=10)
+    parser.add_argument("--per-feed-limit", type=int, default=10)
+    parser.add_argument("--limit", type=int, default=50)
+    parser.add_argument("--json", action="store_true", help="print the batch summary as JSON")
+    args = parser.parse_args(argv)
+
+    settings = Settings()
+    try:
+        summary = run_distributed_rss(
+            settings,
+            source_manifest=args.source_manifest,
+            collection_id=args.collection_id,
+            worker_id=args.worker_id,
+            max_feeds=args.max_feeds,
+            per_feed_limit=args.per_feed_limit,
+            limit=args.limit,
+        )
+    except Exception as exc:  # noqa: BLE001 - report, do not traceback under cron
+        print(f"[phase0] collection failed: {str(exc)[:200]}")
+        return 1
+
+    if args.json:
+        print(json.dumps(summary, indent=2, default=str))
+    else:
+        print(
+            f"[phase0] collected={summary['records_collected']} "
+            f"synced={summary['records_synced']} "
+            f"errors={len(summary['errors'])} "
+            f"collection={summary.get('mongodb_collection', '')}"
+        )
+        for warning in summary["warnings"]:
+            print(f"  warning: {warning}")
+        for error in summary["errors"]:
+            print(f"  error: {error}")
+    return 0 if not summary["errors"] else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
