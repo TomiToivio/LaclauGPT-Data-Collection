@@ -152,15 +152,14 @@ def run_distributed_rss(
     limit: int = 50,
     rotation: int | None = None,
 ) -> dict[str, Any]:
-    """Run a bounded RSS batch and write eligible records to shared backends."""
+    """Run one bounded Phase 0 RSS batch and upsert directly to MongoDB."""
     if max_feeds < 1 or per_feed_limit < 1 or limit < 1:
         raise ValueError("max_feeds, per_feed_limit and limit must be at least 1")
-    sink = DistributedCaptureSink(settings)
-    sink.assert_private_config(source_manifest)
+    if not settings.mongodb_uri:
+        raise RuntimeError("Phase 0 RSS collection requires LACLAUGPT_MONGODB_URI")
+
     routed_collection = collection_id or settings.project_id
     if rotation is None:
-        # Advance the window once per hour so a hourly cron covers the whole
-        # manifest over successive ticks without persisting extra state.
         rotation = int(time.time() // 3600) * max_feeds
     feeds = select_feed_window(
         load_feed_manifest(source_manifest),
@@ -174,82 +173,33 @@ def run_distributed_rss(
         per_feed_limit=per_feed_limit,
     )
 
-    candidates: list[tuple[dict[str, Any], dict[str, Any]]] = []
-    excluded = 0
-    for record in records:
-        handoff = build_handoff(
-            record,
-            project_id=settings.project_id,
-            run_id=settings.run_id,
-        )
-        if handoff["status"] == "excluded":
-            excluded += 1
-            continue
-        candidates.append((record, handoff))
-    candidates.sort(key=lambda pair: ready_sort_key(pair[1]))
+    store = MongoRecordStore(
+        settings.mongodb_uri,
+        settings.mongodb_database,
+        settings.effective_mongodb_collection,
+        settings.project_id,
+        connect_timeout_ms=settings.mongodb_connect_timeout_ms,
+        graph_max_depth=settings.mongodb_graph_max_depth,
+    )
 
     synced = 0
-    duplicate_leases = 0
     errors: list[str] = []
-    for record, handoff in candidates[:limit]:
-        handoff_key = str(handoff["handoff_key"])
-        if not sink.redis.acquire_once(
-            f"server-rss:{settings.run_id}:{handoff_key}",
-            ttl_seconds=30 * 24 * 3600,
-        ):
-            duplicate_leases += 1
-            continue
+    for record in records[:limit]:
         try:
-            sink.ingest(record)
+            store.upsert(record)
             synced += 1
         except Exception as exc:  # noqa: BLE001
-            errors.append(f"{record.get('source_url', '')}: {str(exc)[:180]}")
+            errors.append(f"{record.source_url}: {str(exc)[:180]}")
 
     return {
         "status": "ok" if not errors else "partial",
         "project_id": settings.project_id,
         "collection_id": routed_collection,
-        "run_id": settings.run_id,
         "worker_id": worker_id,
         "feeds_considered": len(feeds),
         "feed_names": [str(feed.get("name") or "") for feed in feeds],
         "records_collected": len(records),
-        "records_excluded": excluded,
         "records_synced": synced,
-        "duplicate_leases": duplicate_leases,
         "warnings": warnings,
         "errors": errors,
     }
-
-
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="laclaugpt-server-rss")
-    parser.add_argument("--source-manifest", required=True)
-    parser.add_argument("--collection-id")
-    parser.add_argument("--worker-id", default="linux-server-rss")
-    parser.add_argument("--max-feeds", type=int, default=10)
-    parser.add_argument("--per-feed-limit", type=int, default=10)
-    parser.add_argument("--limit", type=int, default=50)
-    parser.add_argument(
-        "--rotation",
-        type=int,
-        default=None,
-        help="feed-window rotation offset; defaults to an hourly advancing offset",
-    )
-    args = parser.parse_args(argv)
-    result = run_distributed_rss(
-        Settings(),
-        source_manifest=args.source_manifest,
-        collection_id=args.collection_id,
-        worker_id=args.worker_id,
-        max_feeds=args.max_feeds,
-        per_feed_limit=args.per_feed_limit,
-        limit=args.limit,
-        rotation=args.rotation,
-    )
-    print(json.dumps(result, ensure_ascii=False, sort_keys=True))
-    return 0 if result["status"] == "ok" else 1
-
-
-if __name__ == "__main__":  # pragma: no cover
-    raise SystemExit(main())
