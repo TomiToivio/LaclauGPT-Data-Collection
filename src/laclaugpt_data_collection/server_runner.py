@@ -10,6 +10,7 @@ import argparse
 import json
 import time
 import tomllib
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
