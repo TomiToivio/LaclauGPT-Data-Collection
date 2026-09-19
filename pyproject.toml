@@ -20,9 +20,6 @@ dependencies = [
 [project.optional-dependencies]
 distributed = [
   "boto3>=1.35,<2",
-  # boto3 normally pulls botocore transitively, but declaring it explicitly
-  # prevents partially installed/broken distributed environments from leaving
-  # the S3 adapter with boto3 present but botocore unavailable.
   "botocore>=1.35,<2",
   "pymongo>=4.9,<5",
   "redis>=5.1,<6",
@@ -41,6 +38,13 @@ web-mining = [
   "Scrapy>=2.11,<3",
   "trafilatura>=2,<3",
   "minet>=1",
+]
+phase1-extraction = [
+  "readability-lxml>=0.8,<1",
+  "extruct>=0.18,<1",
+  "dateparser>=1.2,<2",
+  "warcio>=1.7,<2",
+  "selectolax>=0.3,<1",
 ]
 bluesky-native = ["atproto>=0.0.55,<1"]
 reddit = ["praw>=7.8,<8"]
@@ -79,9 +83,6 @@ packages = ["src/laclaugpt_data_collection"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# src/ for the package, repo root so `tests.fixtures` resolves locally even
-# when a foreign top-level `tests` package exists in the interpreter's
-# site-packages (name shadowing).
 pythonpath = ["src", "."]
 addopts = "-q"
 
