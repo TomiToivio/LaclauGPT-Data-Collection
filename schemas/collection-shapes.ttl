@@ -1,0 +1,25 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix schema: <https://schema.org/> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix laclau: <https://laclaugpt.org/ns/> .
+
+laclau:CollectedDocumentShape
+    a sh:NodeShape ;
+    sh:targetClass schema:DigitalDocument ;
+    sh:property [
+        sh:path schema:url ;
+        sh:minCount 1 ;
+        sh:maxCount 1
+    ] ;
+    sh:property [
+        sh:path laclau:schemaVersion ;
+        sh:minCount 1
+    ] .
+
+laclau:CollectionActivityShape
+    a sh:NodeShape ;
+    sh:targetClass prov:Activity ;
+    sh:property [
+        sh:path laclau:collector ;
+        sh:minCount 1
+    ] .
