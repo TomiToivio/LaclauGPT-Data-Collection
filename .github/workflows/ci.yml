@@ -83,6 +83,22 @@ jobs:
           src/laclaugpt_data_collection/storage/base.py
           src/laclaugpt_data_collection/storage/local.py
 
+  phase1-contract:
+    name: Phase 1 handoff contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install
+        run: python -m pip install --upgrade pip && python -m pip install -e '.[dev]'
+      - name: Verify canonical and AI26 Phase 1 contracts
+        run: python tools/verify_contracts.py
+      - name: Verify pinned AI26 handoff fixture
+        run: pytest -q tests/test_ai26_phase1_handoff.py
+
   test:
     name: tests
     runs-on: ubuntu-latest
