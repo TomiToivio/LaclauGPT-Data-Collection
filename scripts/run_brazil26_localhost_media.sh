@@ -2,7 +2,8 @@
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 ENV_FILE=${LACLAUGPT_ENV_FILE:-"$ROOT/data/config/brazil26-localhost.env"}
-STUDY_CONFIG=${LACLAUGPT_STUDY_CONFIG:-"$ROOT/data/config/brazil26.yaml"}
+PRIVATE_ROOT=${LACLAUGPT_PRIVATE_REPO:-"$ROOT/../LaclauGPT-Private"}
+STUDY_CONFIG=${LACLAUGPT_STUDY_CONFIG:-"$PRIVATE_ROOT/collection/brazil26/brazil-election-2026.yaml"}
 DATA_ROOT=${LACLAUGPT_DATA_ROOT:-"$ROOT/data"}
 LOCK_FILE=${LACLAUGPT_MEDIA_LOCK:-"$ROOT/data/tmp/brazil26-localhost-media.lock"}
 
@@ -20,4 +21,4 @@ exec 9>"$LOCK_FILE"
 flock -n 9 || { echo "Brazil26 media worker already running; exiting cleanly" >&2; exit 0; }
 
 cd "$ROOT"
-exec laclaugpt-distributed-media   --study-config "$STUDY_CONFIG"   --data-root "$DATA_ROOT"   --workers "${LACLAUGPT_MEDIA_WORKERS:-2}"   --limit "${LACLAUGPT_MEDIA_BATCH_LIMIT:-50}"
+exec laclaugpt-distributed-media   --study-config "$STUDY_CONFIG"   --data-root "$DATA_ROOT"   --workers "${LACLAUGPT_MEDIA_WORKERS:-2}"   --limit "${LACLAUGPT_MEDIA_BATCH_LIMIT:-50}"   --lock
