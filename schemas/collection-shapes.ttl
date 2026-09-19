@@ -10,11 +10,8 @@ laclau:CollectedDocumentShape
         sh:path schema:url ;
         sh:minCount 1 ;
         sh:maxCount 1
-    ] ;
-    sh:property [
-        sh:path laclau:schemaVersion ;
-        sh:minCount 1
-    ] .
+    ]
+    .
 
 laclau:CollectionActivityShape
     a sh:NodeShape ;
