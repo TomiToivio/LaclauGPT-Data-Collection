@@ -18,6 +18,7 @@ def test_phase1_fixture_has_dependency_free_text_provenance() -> None:
 
 def test_phase1_package_is_not_imported_by_top_level_package() -> None:
     import sys
+
     import laclaugpt_data_collection
 
     assert laclaugpt_data_collection is not None
