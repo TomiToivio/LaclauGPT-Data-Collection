@@ -85,6 +85,12 @@ class Settings(BaseSettings):
     # which is what Allas requires, so ``path`` must stay opt-in.
     s3_addressing_style: Literal["auto", "virtual", "path"] = "auto"
 
+    kg_enabled: bool = False
+    kg_backend: Literal["none", "local", "mongodb", "arango"] = "none"
+    kg_export_root: Path = Path("./data/exports/kg")
+    arango_url: str = ""
+    arango_database: str = "laclaugpt"
+
     rag_enabled: bool = False
     rag_backend: Literal["none", "neo4j", "queue", "custom"] = "none"
     rag_dataset: str = ""
@@ -144,6 +150,8 @@ class Settings(BaseSettings):
         if self.record_backend in {"sqlite", "auto", "csv"}:
             self.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
             self.csv_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.kg_enabled and self.kg_backend == "local":
+            self.kg_export_root.mkdir(parents=True, exist_ok=True)
         if self.rag_enabled:
             self.rag_failure_log.parent.mkdir(parents=True, exist_ok=True)
         if self.distributed_config_backend == "redis":
@@ -180,6 +188,9 @@ class Settings(BaseSettings):
             "s3_addressing_style": self.s3_addressing_style,
             "browser_host": self.browser_host,
             "browser_port": str(self.browser_port),
+            "kg_enabled": str(self.kg_enabled),
+            "kg_backend": self.kg_backend,
+            "kg_export_root": str(self.kg_export_root),
             "rag_enabled": str(self.rag_enabled),
             "rag_backend": self.rag_backend,
             "rag_dataset": self.rag_dataset,
