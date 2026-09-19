@@ -24,7 +24,8 @@ distributed = [
   "pymongo>=4.9,<5",
   "redis>=5.1,<6",
 ]
-rag = ["neo4j>=5.25,<6"]\nkg = ["rdflib>=7,<8", "pyshacl>=0.30,<1", "python-arango>=8,<9"]
+rag = ["neo4j>=5.25,<6"]
+kg = ["rdflib>=7,<8", "pyshacl>=0.30,<1", "python-arango>=8,<9"]
 feeds = ["feedparser>=6.0,<7"]
 browser = ["playwright>=1.47,<2"]
 mastodon = ["Mastodon.py>=2.0,<3"]
