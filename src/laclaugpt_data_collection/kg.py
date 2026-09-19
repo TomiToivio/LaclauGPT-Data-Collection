@@ -302,7 +302,7 @@ def to_jsonld(projection: KGProjection) -> dict[str, Any]:
 def to_rdf_graph(projection: KGProjection) -> Any:
     """Build an RDFLib graph lazily so normal collection has no RDF dependency."""
     try:
-        from rdflib import Graph, Literal, RDF, URIRef
+        from rdflib import RDF, Graph, Literal, URIRef
         from rdflib.namespace import XSD
     except ImportError as exc:
         raise RuntimeError("RDF export requires the optional kg dependency set") from exc
