@@ -257,6 +257,12 @@ def project_record(record: CanonicalRecord, *, study_id: str | None = None) -> K
 
 
 def _expand_term(value: str) -> str:
+    aliases = {
+        "url": "https://schema.org/url",
+        "identifier": "http://purl.org/dc/terms/identifier",
+    }
+    if value in aliases:
+        return aliases[value]
     prefixes = {
         "schema": "https://schema.org/",
         "dcterms": "http://purl.org/dc/terms/",
