@@ -123,7 +123,12 @@ def _run_distributed_media_unlocked(
     sink = DistributedCaptureSink(settings)
     sink.assert_private_config(study_config)
 
-    records = load_records(data_root)[:limit]
+    all_records = load_records(data_root)
+    records = [
+        record
+        for record in all_records
+        if routing_metadata(record, default_collection=settings.project_id)[0] == settings.project_id
+    ][:limit]
     store = CollectionStore(data_root)
     try:
         object_store = S3ObjectStore(

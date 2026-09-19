@@ -1,134 +1,169 @@
 # Brazil26 Firefox browser collection
 
-Brazil26 reuses the shared Firefox collector and the current distributed storage stack. The browser capture path is intentionally local: Firefox talks only to a backend bound to `127.0.0.1`. Canonical records are staged under a Brazil26-only data root and continuously mirrored to the configured remote MongoDB/Redis/CSC Allas backends. Media downloading is separate from browsing and is safe to run from cron.
-
-The implementation is based on the previously working private `collector/firefox` collector and preserves its study-isolation rule: Brazil26 must have its own private study config, Firefox profile, data root, SQLite state, dedup/checkpoints, run identity and remote namespace. Do not share those with AI26.
-
-## 1. Install
-
-Requires Python 3.11+, Firefox and access to the private Brazil26 configuration. From a checkout:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -U pip
-python -m pip install -e '.[distributed]'
-```
-
-Do not put the real Brazil26 study YAML or `.env` in the public repository. `configs/brazil26.env.example` lists the supported variable names using placeholders only. Copy those names into a private environment file outside Git and fill the values from the current private deployment configuration.
-
-At minimum the runtime must configure `LACLAUGPT_PROJECT_ID=brazil26`, the private config directory, MongoDB, Redis, S3/Allas and the Brazil26 data root. The public collector uses the same `LACLAUGPT_*` names as the rest of the distributed Data Collection stack.
-
-## 2. Create a dedicated Firefox profile
-
-Open `about:profiles`, create a profile reserved for Brazil26 and launch it. Keeping Brazil26 separate prevents cookies, extension-local settings and operational state from being confused with AI26 or another study.
-
-Install the extension temporarily for development/research use:
-
-1. Open `about:debugging#/runtime/this-firefox`.
-2. Choose **Load Temporary Add-on**.
-3. Select `browser/firefox/manifest.json` from this repository.
-4. Keep this Brazil26 Firefox profile dedicated to the study.
-
-The extension uses the shared code in `browser/firefox/`. Do not fork a Brazil-specific copy unless the shared collector genuinely requires a compatibility fix.
-
-## 3. Verify private configuration and remote services
-
-Load your private environment, then run:
-
-```bash
-python -m laclaugpt_data_collection.brazil26_browser check \
-  --study-config /path/to/private/brazil26.yaml
-```
-
-The command refuses a non-Brazil study config, enforces the `brazil26` project namespace and performs the distributed control-plane smoke check without printing credentials.
-
-## 4. Start the localhost backend
-
-```bash
-python -m laclaugpt_data_collection.brazil26_browser backend \
-  --study-config /path/to/private/brazil26.yaml \
-  --host 127.0.0.1 \
-  --port 8765 \
-  --data-root /path/to/private/brazil26-data
-```
-
-The Brazil26 wrapper will not bind to a LAN/VPN address. It starts the existing shared `CaptureServer`, retains the proven local raw/canonical/state files as a recovery fallback, and mirrors new canonical JSONL rows to the configured distributed sink. An offset advances only after remote ingest succeeds, so a transient MongoDB/Redis/S3 failure is retried rather than silently dropping the record.
-
-On startup it prints a sanitized readiness summary showing the study, project id, local backend URL and remote backend identities. Credentials are never printed.
-
-## 5. Point Firefox at localhost and verify identity
-
-Set the extension backend URL to the same loopback address and port, normally:
+Brazil26 is a human-researcher workflow built on the shared LaclauGPT Firefox capture stack. Operational study configuration remains private. The canonical study file is:
 
 ```text
-http://127.0.0.1:8765
+LaclauGPT-Private/collection/brazil26/brazil-election-2026.yaml
 ```
 
-Before browsing, verify:
+The public repository contains only reusable runtime code, synthetic tests and public-safe documentation.
+
+## One-command researcher workflow
+
+After installing the package and preparing the existing Brazil26 runtime environment, start a session with:
+
+```bash
+laclaugpt-brazil26
+```
+
+That command:
+
+1. resolves the private Brazil26 study config;
+2. refuses to fall back to the public example config when the private file is missing;
+3. reuses the existing Brazil26 data root and durable SQLite/media/mirror state;
+4. ensures the marker-managed Brazil26 cron block exists;
+5. starts the localhost-only capture backend and distributed mirror;
+6. launches Firefox using the configured Brazil26 research profile;
+7. keeps the process attached so Ctrl-C stops the local session cleanly.
+
+By default the private repository is expected next to this checkout as
+`../LaclauGPT-Private`. Override it with `LACLAUGPT_PRIVATE_REPO`, or set
+`BRAZIL26_CONFIG` / `LACLAUGPT_STUDY_CONFIG` to the exact YAML path.
+
+The existing data root is taken from `LACLAUGPT_DATA_ROOT`; when unset it
+remains the repository `data/` tree used by the current Brazil26 scripts.
+The launcher does not rename or migrate the active dataset.
+
+## Runtime environment
+
+The launcher reads `data/config/brazil26-localhost.env` when present and then
+forces the study identity to `LACLAUGPT_PROJECT_ID=brazil26`. MongoDB, Redis
+and CSC Allas/S3 settings should stay in ignored/private runtime configuration.
+
+Useful browser variables:
+
+```bash
+LACLAUGPT_FIREFOX_PROFILE="Brazil26 Research"
+# or
+LACLAUGPT_FIREFOX_PROFILE_PATH=/private/path/to/firefox/profile
+# WSL or other non-standard installation:
+LACLAUGPT_FIREFOX_COMMAND='powershell.exe ... firefox.exe'
+```
+
+If Firefox is not discoverable, startup fails clearly instead of opening an
+uncontrolled browser profile.
+
+For backend-only maintenance or debugging:
+
+```bash
+laclaugpt-brazil26 --no-browser
+laclaugpt-brazil26 --no-cron
+```
+
+The existing low-level commands remain available for compatibility:
+
+```bash
+laclaugpt-brazil26 check --study-config /private/brazil-election-2026.yaml
+laclaugpt-brazil26 backend --study-config /private/brazil-election-2026.yaml --data-root ./data
+laclaugpt-brazil26 media --study-config /private/brazil-election-2026.yaml --data-root ./data
+```
+
+## Firefox extension
+
+Use a dedicated Firefox profile for Brazil26. Install the shared extension from
+`browser/firefox/manifest.json` as described in `browser/firefox/README.md`.
+Do not fork Brazil-specific browser code unless the shared collector requires a
+real compatibility change.
+
+The capture backend binds to loopback only. Verify the live study identity with:
 
 ```bash
 curl http://127.0.0.1:8765/status
 curl http://127.0.0.1:8765/tour
 ```
 
-`/status` must show the intended Brazil26 study identity. `/tour` shows the accounts/targets from the private study config and whether the configured study window is active. If the identity is wrong, stop the backend and correct the private config before collecting anything.
+The status must identify Brazil26 before collecting research material.
 
-## 6. Normal capture workflow
+## TikTok and Instagram media
 
-Browse the configured public platform pages using the dedicated Brazil26 profile. The extension captures supported API responses and posts them to localhost. The backend normalizes them through the shared platform parsers.
+Browser capture records media references without blocking interactive research.
+The Brazil26 media worker uses the existing persistent `MediaDownloader` and
+distributed media runner. TikTok and Instagram image/video references supported
+by the canonical media model are downloaded later to the configured storage.
 
-During collection:
+Media identity includes the collection id, platform, source identity and media
+index. Completed items are skipped on later runs. Failed items remain retryable.
+Object keys are deterministic and study-scoped, so the same source URL can be
+present in Brazil26 and another study without sharing download state.
 
-- local raw captures and canonical JSONL are written below the Brazil26 data root;
-- canonical records are mirrored to the Brazil26 MongoDB namespace;
-- lightweight coordination/handoff references are published through the configured Redis namespace;
-- raw canonical payload objects are persisted through the configured S3/Allas backend;
-- media URLs are recorded, but large media downloads do not block browser capture.
+The distributed media runner additionally filters loaded records to the active
+project id. A Brazil26 run therefore refuses to process explicitly tagged AI26
+records even when both accidentally exist below one local data root.
 
-If the remote mirror temporarily fails, browser capture continues locally. The mirror retries from the last durable byte offset. Stop the backend with Ctrl-C; it performs one final mirror pass and writes a local manifest.
+## Cron
 
-## 7. Media downloader as cron
+The one-command launcher runs `scripts/install_cron_brazil26.sh`. The installer
+owns a marker-delimited block:
 
-Media is downloaded independently with the existing distributed media runner through the Brazil26 wrapper:
+```text
+# BEGIN LACLAUGPT BRAZIL26
+...
+# END LACLAUGPT BRAZIL26
+```
+
+Repeated installation replaces that block instead of adding duplicates. The
+media job runs every 15 minutes, passes the resolved private Brazil26 config and
+data root explicitly, and writes to:
+
+```text
+data/logs/brazil26-media.log
+```
+
+The shell wrapper uses `flock`, and the distributed media runner also uses its
+per-data-root lock, so overlapping media runs exit safely.
+
+Inspect the installed jobs with:
 
 ```bash
-python -m laclaugpt_data_collection.brazil26_browser media \
-  --study-config /path/to/private/brazil26.yaml \
-  --data-root /path/to/private/brazil26-data \
-  --workers 4 \
-  --limit 100
+crontab -l
+tail -f data/logs/brazil26-media.log
 ```
 
-The downloader uses the same Brazil26 MongoDB/Redis/S3 settings, durable local media index and deterministic media keys. Successful media is not redownloaded; failed jobs stay retryable. The command prints counts for scanned/queued/completed/failed records and returns non-zero when media failures remain.
+Remove the Brazil26 cron block by editing the crontab and deleting the lines
+between the two Brazil26 markers. Re-running `laclaugpt-brazil26` reinstalls it.
 
-Example crontab entry, using placeholders only:
+## Continuing existing Brazil26 state
 
-```cron
-*/15 * * * * cd /path/to/LaclauGPT-Data-Collection && /path/to/.venv/bin/python -m laclaugpt_data_collection.brazil26_browser media --study-config /path/to/private/brazil26.yaml --data-root /path/to/private/brazil26-data --workers 4 --limit 200 >> /path/to/private/logs/brazil26-media.log 2>&1
-```
+This workflow is deliberately additive. It keeps the existing local normalized
+JSONL, SQLite/media index, mirror offset file and distributed Brazil26 namespace.
+The mirror checkpoint advances only after successful remote ingest. Existing
+records remain visible, new records append to the same logical study, completed
+media remains recognized, and failed media can retry.
 
-Keep the actual checkout path, config path, data path, endpoints and credentials private.
+Brazil26 and AI26 must still use distinct Firefox profiles and project ids. The
+runtime now also rejects a cross-study `collection_id` in the Brazil26 mirror,
+providing a second guard against accidental dataset mixing.
 
-## 8. Minimal smoke test
+## Stop and smoke-test
 
-1. Run the `check` command and require `status: ok`.
-2. Start the backend on `127.0.0.1`.
-3. Confirm `/status` reports the Brazil26 study.
-4. Open one configured public target in the dedicated Firefox profile.
-5. Confirm the backend capture counters increase.
-6. Confirm a canonical row appears under `<data-root>/normalized/`.
-7. Confirm the row appears in the Brazil26 remote MongoDB namespace and the Redis collected/handoff stream receives the corresponding lightweight reference.
-8. Run the `media` command and verify any pending media is either completed, skipped as already complete, or left as an explicit retryable failure.
+Stop an interactive session with Ctrl-C. The backend performs a final mirror pass
+and writes its manifest before exit.
 
-## 9. Troubleshooting
+A local smoke test is:
 
-If Firefox cannot reach `/status` or `/tour`, first confirm the backend process is running on the same host/port configured in the extension. The backend intentionally rejects non-loopback bind addresses.
+1. run `laclaugpt-brazil26`;
+2. confirm `/status` reports Brazil26;
+3. browse one configured TikTok or Instagram target in the Brazil26 Firefox profile;
+4. confirm a new canonical row appears under the existing data root;
+5. confirm the row reaches the Brazil26 distributed namespace;
+6. run the media worker or let cron process it;
+7. confirm a completed media item is skipped on a second run.
 
-If capture works locally but remote mirroring fails, keep the backend running if safe to do so: local collection remains durable. Re-run the `check` command, inspect the private MongoDB/Redis/Allas environment, then restart the backend. The `.brazil26-distributed-offsets.json` file under the private data root is the mirror checkpoint; do not copy it to AI26.
+Public CI does not require the private repository. Unit tests use synthetic paths,
+fixtures and mocked browser/process behavior.
 
-If media fails, inspect the cron log and rerun the same command. Do not delete `state.sqlite3` merely to force retries because it contains deduplication, checkpoints and media status.
+## Privacy boundary
 
-## Privacy and publication boundary
-
-Never commit real Brazil26 account lists, study YAML, `.env`, credentials, hostnames, private ports, machine paths, raw captures, normalized research data, media, logs or state databases. Public code and docs should contain only reusable logic, synthetic fixtures and placeholders.
+Never commit the real Brazil26 study YAML, account lists, browser profiles,
+cookies, credentials, hostnames, private endpoints, collected records, downloaded
+media or researcher-specific settings to this public repository.
