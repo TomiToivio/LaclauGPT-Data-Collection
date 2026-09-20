@@ -356,6 +356,58 @@ def default_registry() -> PluginRegistry:
             cursor=context.cursor,
         )
 
+    def arxiv_factory(context: CollectionContext) -> LegacyCollector:
+        query = str(context.require("query"))
+        max_results = int(context.config.get("max_results", 10))
+        categories_value = context.config.get("categories", [])
+        if categories_value in (None, ""):
+            categories: list[str] = []
+        elif isinstance(categories_value, list) and all(
+            isinstance(category, str) for category in categories_value
+        ):
+            categories = categories_value
+        else:
+            raise ValueError("arxiv categories must be a list of strings")
+        return ArxivCollector(
+            query=query,
+            max_results=max_results,
+            categories=categories,
+            cursor=context.cursor,
+        )
+
+    registry.register(
+        adapt_collector(
+            PluginSpec(
+                plugin_id="arxiv",
+                version="1.0.0",
+                source_type="scholarly_document",
+                config_schema={
+                    "type": "object",
+                    "required": ["query"],
+                    "properties": {
+                        "query": {"type": "string"},
+                        "max_results": {"type": "integer", "minimum": 1},
+                        "categories": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                    },
+                },
+                modes=("polling", "batch"),
+                authentication="none for public arXiv API",
+                canonical_identifier="canonical https://arxiv.org/abs/<id> URL",
+                raw_payload_policy=(
+                    "preserve deterministic bibliographic metadata snapshot inline; "
+                    "PDF remains a referenced source object unless separately downloaded"
+                ),
+                media_policy=(
+                    "preserve arXiv PDF URL as a media reference with download_required metadata"
+                ),
+            ),
+            arxiv_factory,
+        )
+    )
+
     registry.register(
         adapt_collector(
             PluginSpec(
