@@ -44,6 +44,7 @@ def settings(tmp_path: Path) -> Settings:
             run_id="ai26-smoke-ready",
             mongodb_uri="mongodb://example.invalid:27017",
             redis_url="redis://example.invalid:6379/0",
+            messaging_backend="redis",
             s3_bucket="synthetic",
             private_config_dir=private,
         ),
@@ -95,3 +96,110 @@ def test_media_record_does_not_emit_ready_event_before_download(tmp_path: Path, 
         }
     )
     assert [name for name, _ in sink.redis.events] == ["collected"]
+
+
+class FailingRedis(FakeRedis):
+    def publish_stream(self, name, fields, *, maxlen=100000):
+        self.events.append((name, fields))
+        raise RuntimeError("synthetic redis outage")
+
+
+def redis_disabled_settings(tmp_path: Path) -> Settings:
+    private = tmp_path / "private-disabled"
+    private.mkdir()
+    return Settings(
+        _env_file=None,
+        project_id="ai26",
+        run_id="ai26-no-redis",
+        record_backend="mongodb",
+        object_backend="s3",
+        cache_backend="memory",
+        messaging_backend="none",
+        mongodb_uri="mongodb://example.invalid:27017",
+        redis_url="",
+        s3_bucket="synthetic",
+        private_config_dir=private,
+    )
+
+
+def test_redis_disabled_mode_persists_and_remains_pollable(tmp_path: Path, monkeypatch) -> None:
+    patch_backends(monkeypatch)
+    sink = DistributedCaptureSink(redis_disabled_settings(tmp_path))
+
+    record = sink.ingest(
+        {
+            "collection_id": "ai26",
+            "source_url": "https://example.invalid/post/no-redis",
+            "source": {"platform": "rss", "created_at": "2026-09-16T10:00:00Z"},
+            "content": {"text": "durable without redis"},
+        }
+    )
+
+    assert sink.redis is None
+    assert sink.notification_errors == []
+    assert len(sink.records.records) == 1
+    assert sink.records.records[0].source_url == record.source_url
+    assert sink.smoke_check()["redis"] == "disabled"
+
+
+def test_mongo_write_happens_before_notifications(tmp_path: Path, monkeypatch) -> None:
+    trace: list[str] = []
+
+    class OrderedMongo(FakeMongo):
+        def upsert(self, record):
+            trace.append("mongo")
+            super().upsert(record)
+
+    class OrderedRedis(FakeRedis):
+        def publish_stream(self, name, fields, *, maxlen=100000):
+            trace.append(f"redis:{name}")
+            return super().publish_stream(name, fields, maxlen=maxlen)
+
+    monkeypatch.setattr(
+        "laclaugpt_data_collection.distributed_capture.MongoRecordStore", OrderedMongo
+    )
+    monkeypatch.setattr(
+        "laclaugpt_data_collection.distributed_capture.S3ObjectStore", FakeS3
+    )
+    monkeypatch.setattr(
+        "laclaugpt_data_collection.distributed_capture.RedisCoordinator", OrderedRedis
+    )
+
+    sink = DistributedCaptureSink(settings(tmp_path))
+    sink.ingest(
+        {
+            "collection_id": "ai26",
+            "source_url": "https://example.invalid/post/ordered",
+            "source": {"platform": "rss", "created_at": "2026-09-16T10:00:00Z"},
+            "content": {"text": "ordering fixture"},
+        }
+    )
+
+    assert trace == ["mongo", "redis:collected", "redis:analysis-ready"]
+
+
+def test_redis_event_failure_cannot_lose_durable_record(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(
+        "laclaugpt_data_collection.distributed_capture.MongoRecordStore", FakeMongo
+    )
+    monkeypatch.setattr(
+        "laclaugpt_data_collection.distributed_capture.S3ObjectStore", FakeS3
+    )
+    monkeypatch.setattr(
+        "laclaugpt_data_collection.distributed_capture.RedisCoordinator", FailingRedis
+    )
+
+    sink = DistributedCaptureSink(settings(tmp_path))
+    record = sink.ingest(
+        {
+            "collection_id": "ai26",
+            "source_url": "https://example.invalid/post/redis-failure",
+            "source": {"platform": "rss", "created_at": "2026-09-16T10:00:00Z"},
+            "content": {"text": "mongo remains authoritative"},
+        }
+    )
+
+    assert len(sink.records.records) == 1
+    assert sink.records.records[0].source_url == record.source_url
+    assert [event[0] for event in sink.redis.events] == ["collected", "analysis-ready"]
+    assert len(sink.notification_errors) == 2

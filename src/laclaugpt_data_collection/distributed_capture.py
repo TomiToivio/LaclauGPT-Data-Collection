@@ -46,7 +46,12 @@ class DistributedCaptureSink:
             signature_version=settings.s3_signature_version,
             addressing_style=settings.s3_addressing_style,
         )
-        self.redis = RedisCoordinator(settings.redis_url, namespace)
+        self.redis = (
+            RedisCoordinator(settings.redis_url, namespace)
+            if settings.messaging_backend == "redis"
+            else None
+        )
+        self.notification_errors: list[str] = []
 
     def assert_private_config(self, study_config: str | Path) -> Path:
         """Require distributed study config to live in an ignored runtime config root.
@@ -99,6 +104,20 @@ class DistributedCaptureSink:
         record.raw_capture.ref = uri
         return uri
 
+    def _publish(self, name: str, fields: dict[str, Any]) -> None:
+        """Publish best-effort coordination after durable persistence.
+
+        Redis messaging is optional in Phase 1. A missing or failed event must never
+        invalidate a record that MongoDB has already accepted; Analysis can recover
+        by polling the durable record collection.
+        """
+        if self.redis is None:
+            return
+        try:
+            self.redis.publish_stream(name, fields)
+        except Exception as exc:  # coordination failure is non-fatal by contract
+            self.notification_errors.append(f"{name}: {exc}")
+
     def ingest(self, record_data: dict[str, Any]) -> CanonicalRecord:
         """Persist idempotently and publish lightweight collection/handoff events."""
         collection_id = str(record_data.get("collection_id") or self.settings.project_id)
@@ -135,10 +154,7 @@ class DistributedCaptureSink:
             "source_url": record.source_url,
             "record_collection": self.settings.distributed_namespace.mongo_collection("records"),
         }
-        self.redis.publish_stream(
-            "collected",
-            {**common, "raw_ref": raw_ref},
-        )
+        self._publish("collected", {**common, "raw_ref": raw_ref})
 
         handoff = build_handoff(
             record.model_dump(mode="json"),
@@ -146,7 +162,7 @@ class DistributedCaptureSink:
             run_id=self.settings.run_id,
         )
         if handoff["status"] == "ready":
-            self.redis.publish_stream(
+            self._publish(
                 "analysis-ready",
                 {
                     **common,
@@ -163,7 +179,11 @@ class DistributedCaptureSink:
         return {
             "project_id": self.settings.project_id,
             "run_id": self.settings.run_id,
-            "redis": "ok" if self.redis.ping() else "failed",
+            "redis": (
+                "disabled"
+                if self.redis is None
+                else ("ok" if self.redis.ping() else "failed")
+            ),
             "mongodb_collection": self.settings.distributed_namespace.mongo_collection("records"),
             "s3_bucket": self.settings.s3_bucket,
             "s3_prefix": f"{self.settings.s3_prefix_root}/{self.settings.project_id}",

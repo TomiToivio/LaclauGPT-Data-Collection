@@ -6,6 +6,7 @@ stamped with project provenance and handed to backend-neutral canonical storage.
 """
 from __future__ import annotations
 
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, Protocol
@@ -124,12 +125,63 @@ class PluginRegistry:
         return [self._plugins[plugin_id].spec for plugin_id in self.ids()]
 
 
+@dataclass(frozen=True, slots=True)
+class RetryPolicy:
+    """Bounded retry policy owned by orchestration rather than source adapters."""
+
+    max_attempts: int = 3
+    base_delay_seconds: float = 1.0
+    max_delay_seconds: float = 30.0
+
+    def __post_init__(self) -> None:
+        if self.max_attempts < 1:
+            raise ValueError("max_attempts must be at least 1")
+        if self.base_delay_seconds < 0:
+            raise ValueError("base_delay_seconds must be non-negative")
+        if self.max_delay_seconds < 0:
+            raise ValueError("max_delay_seconds must be non-negative")
+
+    def delay_for(self, attempt: int, *, retry_after: str | None = None) -> float:
+        """Return capped exponential backoff while honoring numeric Retry-After."""
+        delay = min(
+            self.max_delay_seconds,
+            self.base_delay_seconds * (2 ** max(0, attempt - 1)),
+        )
+        if retry_after:
+            try:
+                delay = max(delay, float(retry_after))
+            except ValueError:
+                pass
+        return min(delay, self.max_delay_seconds)
+
+
+class CollectionRunError(RuntimeError):
+    """Terminal or exhausted collection attempt with retry state preserved."""
+
+    def __init__(
+        self,
+        plugin_id: str,
+        *,
+        attempts: int,
+        cause: Exception,
+        retryable: bool,
+        retry_after: str | None = None,
+    ) -> None:
+        super().__init__(f"collection plugin {plugin_id!r} failed after {attempts} attempt(s): {cause}")
+        self.plugin_id = plugin_id
+        self.attempts = attempts
+        self.cause = cause
+        self.retryable = retryable
+        self.retry_after = retry_after
+
+
 @dataclass(slots=True)
 class PluginRunResult:
     plugin_id: str
     records_seen: int
     records_written: int
     duplicates_skipped: int
+    attempts: int = 1
     next_cursor: str | None = None
     warnings: list[str] = field(default_factory=list)
 
@@ -142,9 +194,18 @@ class CollectionRunner:
     and runs only after the canonical record has been written to durable storage.
     """
 
-    def __init__(self, registry: PluginRegistry, store: RecordStore) -> None:
+    def __init__(
+        self,
+        registry: PluginRegistry,
+        store: RecordStore,
+        *,
+        retry_policy: RetryPolicy | None = None,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
         self.registry = registry
         self.store = store
+        self.retry_policy = retry_policy or RetryPolicy()
+        self.sleep = sleep
 
     def run(
         self,
@@ -154,7 +215,33 @@ class CollectionRunner:
         notify: RecordNotifier | None = None,
     ) -> PluginRunResult:
         plugin = self.registry.get(plugin_id)
-        result = plugin.collect(context)
+        attempts = 0
+        while True:
+            attempts += 1
+            try:
+                result = plugin.collect(context)
+                break
+            except Exception as exc:
+                retryable = bool(getattr(exc, "retryable", False))
+                retry_after_value = getattr(exc, "retry_after", None)
+                retry_after = (
+                    str(retry_after_value) if retry_after_value not in (None, "") else None
+                )
+                exhausted = attempts >= self.retry_policy.max_attempts
+                if not retryable or exhausted:
+                    raise CollectionRunError(
+                        plugin_id,
+                        attempts=attempts,
+                        cause=exc,
+                        retryable=retryable,
+                        retry_after=retry_after,
+                    ) from exc
+                delay = self.retry_policy.delay_for(
+                    attempts,
+                    retry_after=retry_after,
+                )
+                self.sleep(delay)
+
         written = 0
         duplicates = 0
         for record in result.records:
@@ -170,6 +257,7 @@ class CollectionRunner:
             records_seen=len(result.records),
             records_written=written,
             duplicates_skipped=duplicates,
+            attempts=attempts,
             next_cursor=result.next_cursor,
             warnings=list(result.warnings),
         )
@@ -187,6 +275,7 @@ def default_registry() -> PluginRegistry:
     can migrate through the same adapter without changing their source-specific implementation.
     """
     from .collectors.bluesky import BlueskyCollector
+    from .collectors.mastodon import MastodonCollector
     from .collectors.rss import RSSCollector
 
     registry = PluginRegistry()
@@ -229,6 +318,7 @@ def default_registry() -> PluginRegistry:
             actor=str(actor) if actor else None,
             max_results=max_results,
             access_token=str(token) if token else None,
+            cursor=context.cursor,
         )
 
     registry.register(
@@ -250,6 +340,43 @@ def default_registry() -> PluginRegistry:
                 authentication="public XRPC by default; optional runtime access token",
             ),
             bluesky_factory,
+        )
+    )
+
+    def mastodon_factory(context: CollectionContext) -> LegacyCollector:
+        instance_url = str(context.require("instance_url"))
+        hashtag = context.config.get("hashtag")
+        limit = int(context.config.get("limit", 20))
+        token = context.config.get("access_token")
+        return MastodonCollector(
+            instance_url=instance_url,
+            hashtag=str(hashtag) if hashtag else None,
+            limit=limit,
+            access_token=str(token) if token else None,
+            cursor=context.cursor,
+        )
+
+    registry.register(
+        adapt_collector(
+            PluginSpec(
+                plugin_id="mastodon",
+                version="1.0.0",
+                source_type="mastodon",
+                config_schema={
+                    "type": "object",
+                    "required": ["instance_url"],
+                    "properties": {
+                        "instance_url": {"type": "string"},
+                        "hashtag": {"type": "string"},
+                        "limit": {"type": "integer", "minimum": 1},
+                    },
+                },
+                modes=("polling", "batch"),
+                authentication="public timelines by default; optional runtime access token",
+                canonical_identifier="Mastodon status URL",
+                raw_payload_policy="preserve exact status JSON inline",
+            ),
+            mastodon_factory,
         )
     )
     return registry
