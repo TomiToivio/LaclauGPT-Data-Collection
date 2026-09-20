@@ -1,4 +1,4 @@
-from collections.abc import Iterable
+from collections.abc import Iterable  # noqa: I001 - keep typing imports explicit in this fixture
 from typing import Any
 
 import httpx
