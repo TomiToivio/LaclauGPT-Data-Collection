@@ -132,7 +132,7 @@ laclaugpt-collect distributed-sync \
   --limit 25
 ```
 
-Persist pending media and refresh downstream readiness, if the sample has any:
+Persist pending media and refresh downstream readiness, if the sample has any. Pending records are discovered from the shared canonical MongoDB namespace, so Laskin can process media references created by localhost browser capture without a local JSONL copy:
 
 ```bash
 laclaugpt-distributed-media \
