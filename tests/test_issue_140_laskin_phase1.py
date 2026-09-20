@@ -6,7 +6,7 @@ from laclaugpt_data_collection.collectors.base import CollectionResult
 from laclaugpt_data_collection.distributed import ProjectNamespace
 from laclaugpt_data_collection.models import CollectionProvenance, NormalizedRecord
 from laclaugpt_data_collection.server_runner import run_phase1_rss
-from laclaugpt_data_collection.storage.mongodb import MongoRecordStore
+from laclaugpt_data_collection.storage.remote import MongoRecordStore
 
 
 class FakeCursor:
@@ -35,29 +35,10 @@ class FakeMongoCollection:
         return self.last_cursor
 
 
-class FakeMongoDatabase:
-    def __init__(self, collection):
-        self.collection = collection
-
-    def __getitem__(self, name):
-        assert name == "ai26__records"
-        return self.collection
-
-
-class FakeMongoClient:
-    collection = FakeMongoCollection()
-
-    def __init__(self, uri, **kwargs):
-        self.uri = uri
-        self.kwargs = kwargs
-
-    def __getitem__(self, name):
-        assert name == "laclaugpt"
-        return FakeMongoDatabase(self.collection)
-
-
 def test_pending_media_records_are_discovered_from_shared_mongodb() -> None:
-    FakeMongoClient.collection = FakeMongoCollection(
+    store = object.__new__(MongoRecordStore)
+    store.project_id = "ai26"
+    store._collection = FakeMongoCollection(
         [
             {
                 "_id": "mongo-id",
@@ -72,13 +53,6 @@ def test_pending_media_records_are_discovered_from_shared_mongodb() -> None:
                 "handoff": {"status": "ready"},
             }
         ]
-    )
-    store = MongoRecordStore(
-        "mongodb://example.invalid",
-        "laclaugpt",
-        "ai26__records",
-        "ai26",
-        client_factory=FakeMongoClient,
     )
 
     records = store.pending_media_records(collection_id="ai26", limit=25)
@@ -95,11 +69,11 @@ def test_pending_media_records_are_discovered_from_shared_mongodb() -> None:
             },
         }
     ]
-    query = FakeMongoClient.collection.last_query
+    query = store._collection.last_query
     assert query["project_id"] == "ai26"
     assert query["collection_id"] == "ai26"
     assert "content.media_references" in query
-    assert FakeMongoClient.collection.last_cursor.limit_value == 25
+    assert store._collection.last_cursor.limit_value == 25
 
 
 class FakeRSSCollector:
