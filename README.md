@@ -57,18 +57,18 @@ Analysis, simulation, dashboards, research datasets, operational target lists, c
 - Canonical `source_url` or stable URI-like identity across every backend and module handoff.
 - Public-repository hygiene: no research data, target/account lists, browser profiles, cookies, tokens, credentials or real deployment configuration in Git.
 
-## Phase 0 runtime
+## Phase 1 runtime and legacy Phase 0 compatibility
 
 > [!IMPORTANT]
-> **Current development phase: Phase 1.** `main` is based on and synchronized with `phase-1`. The `phase-0` branch remains the preserved Phase 0 baseline; Phase 0 documentation and code remain Phase 0 and are not reclassified as Phase 1.
+> **Current development phase: Phase 1.** `phase-1` is the canonical active development/stable phase branch, and `main` MUST match its current validated state. The `phase-0` branch is a preserved legacy baseline only. New unphased work defaults to Phase 1; Phase 2–4 remain isolated until explicitly promoted.
 
-Phase 0 deliberately uses a narrow RSS/Atom-only path:
+Phase 1 is now the active repository state. The narrow Phase 0 RSS/Atom path below is retained only as a compatibility baseline and rollback reference while Phase 1 capabilities are restored incrementally:
 
 ```text
 RSS/Atom feeds -> canonical text records -> MongoDB -> Data Analysis
 ```
 
-The active Phase 0 collector is `laclaugpt-server-rss` (or `python -m laclaugpt_data_collection.server_runner`). It reads only `[[feed]]` rows from the source manifest and writes directly to MongoDB. Redis, CSC Allas/S3, browser collectors, social-platform collectors, media download, OCR and Whisper are not part of the Phase 0 runtime.
+The legacy Phase 0 collector is `laclaugpt-server-rss` (or `python -m laclaugpt_data_collection.server_runner`). It reads only `[[feed]]` rows from the source manifest and writes directly to MongoDB. Redis, CSC Allas/S3, browser collectors, social-platform collectors, media download, OCR and Whisper are not part of the Phase 0 runtime.
 
 Example CLI invocation:
 
@@ -82,7 +82,7 @@ laclaugpt-server-rss \
   --limit 40
 ```
 
-For cron on Laskin, `scripts/run_ai26_laskin_collect.sh` remains the bounded one-cycle wrapper. Phase 1 code stays in the repository but is inactive for this path. Phase 1 capabilities should be restored later one at a time, validating MongoDB records and Data Analysis compatibility after each addition.
+For legacy Phase 0 cron compatibility on Laskin, `scripts/run_ai26_laskin_collect.sh` remains the bounded one-cycle wrapper. This is not the repository's current-phase definition. Phase 1 capabilities are restored incrementally around the preserved Phase 0 baseline, with MongoDB records and Data Analysis compatibility validated after each addition.
 
 ### Phase 0 MongoDB boundary (shared with Data Analysis)
 
