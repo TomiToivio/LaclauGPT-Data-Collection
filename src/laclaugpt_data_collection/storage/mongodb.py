@@ -121,6 +121,45 @@ class MongoRecordStore:
             query["collection_id"] = collection_id
         return self._collection.find_one(query, {"_id": 1}) is not None
 
+    def pending_media_records(
+        self,
+        *,
+        collection_id: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Return a bounded set of canonical records with unresolved media refs.
+
+        This is the cross-machine discovery path for media workers.  It reads the
+        shared canonical MongoDB collection, so a Laskin worker can discover media
+        references produced by a laptop-only browser capture without depending on
+        the laptop's local JSONL files or a Redis task queue.
+        """
+        if limit < 1:
+            raise ValueError("limit must be at least 1")
+        query: dict[str, Any] = {
+            "project_id": self.project_id,
+            "content.media_references": {
+                "$elemMatch": {
+                    "url": {"$exists": True, "$ne": ""},
+                    "$or": [
+                        {"object_ref": {"$exists": False}},
+                        {"object_ref": ""},
+                    ],
+                }
+            },
+        }
+        if collection_id:
+            query["collection_id"] = collection_id
+        cursor = self._collection.find(query).limit(limit)
+        return [
+            {
+                key: value
+                for key, value in document.items()
+                if key not in {"_id", "handoff"}
+            }
+            for document in cursor
+        ]
+
     def graph_lookup(
         self,
         source_url: str,
