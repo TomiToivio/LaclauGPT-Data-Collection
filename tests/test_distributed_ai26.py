@@ -56,6 +56,7 @@ def distributed_settings(tmp_path: Path) -> Settings:
             run_id="ai26-smoke-001",
             mongodb_uri="mongodb://example.invalid:27017",
             redis_url="redis://example.invalid:6379/0",
+            messaging_backend="redis",
             s3_bucket="laclaugpt-test",
             private_config_dir=private,
             data_root=tmp_path / "data",
