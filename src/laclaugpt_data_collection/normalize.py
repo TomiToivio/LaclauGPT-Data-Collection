@@ -104,6 +104,8 @@ def normalise(
     external_urls = _split_list(mapped.get("urls"))
     if external_urls:
         record.source.raw_metadata["external_urls"] = external_urls
+    if platform == "instagram" and mapped.get("relationship_type"):
+        record.source.raw_metadata["native_relationship_type"] = str(mapped["relationship_type"])
     return record
 
 

@@ -244,6 +244,42 @@ def overwrite_partial(incoming: dict, existing: dict | None) -> bool:
     )
 
 
+def _relationship(item: dict) -> tuple[str, str]:
+    """Return an explicit source-native post/reel relationship when present.
+
+    Instagram response shapes vary. We preserve only relationship identifiers
+    that are actually present in the captured payload; no relationship is
+    inferred from author, caption, timing or carousel membership.
+    """
+    direct = (
+        ("parent", "parent_id"),
+        ("parent", "parent_media_id"),
+        ("repost", "reposted_media_id"),
+        ("reshare", "reshared_from_id"),
+        ("reference", "referenced_media_id"),
+    )
+    for relation, key in direct:
+        value = item.get(key)
+        if value not in (None, ""):
+            return relation, as_string(value)
+
+    nested = (
+        ("repost", "reposted_media"),
+        ("reshare", "reshared_media"),
+        ("parent", "parent_media"),
+        ("reference", "referenced_media"),
+    )
+    for relation, key in nested:
+        value = item.get(key)
+        if isinstance(value, dict):
+            native_id = as_string(
+                first_value(value.get("pk"), value.get("id"), value.get("code"), value.get("shortcode"))
+            )
+            if native_id:
+                return relation, native_id
+    return "", ""
+
+
 def _media_type(item: dict) -> str:
     typename = as_string(item.get("__typename"))
     if item.get("media_type") == 8 or item.get("carousel_media") or item.get("edge_sidecar_to_children"):
@@ -328,6 +364,7 @@ def map_item(item: dict, metadata: dict | None = None) -> dict:
     image_urls = _image_urls(item)
     video_urls = _video_urls(item)
     location_name, location_latlong, location_city, location_id = _location(item)
+    relationship_type, parent_id = _relationship(item)
 
     if shortcode:
         route = "reel" if media_type == "video" else "p"
@@ -353,7 +390,8 @@ def map_item(item: dict, metadata: dict | None = None) -> dict:
         "id": record_id,
         "native_id": native_id,
         "thread_id": record_id,
-        "parent_id": "",
+        "parent_id": parent_id,
+        "relationship_type": relationship_type,
         "author": as_string(first_value(author.get("username"), item.get("owner_username"))),
         "author_full": as_string(first_value(author.get("full_name"), author.get("name"))),
         "author_id": as_string(first_value(author.get("pk"), author.get("id"))),
