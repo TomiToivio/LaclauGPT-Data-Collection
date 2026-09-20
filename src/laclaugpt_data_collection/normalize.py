@@ -46,7 +46,10 @@ def normalise(
     )
 
     parent: str | None = None
-    if platform == "x":
+    if platform == "tiktok":
+        duet_from = str(mapped.get("duet_from_id") or "")
+        parent = duet_from or None
+    elif platform == "x":
         thread = str(mapped.get("thread_id") or "")
         if mapped.get("is_reply") == "yes" and thread and thread != document_id:
             parent = thread

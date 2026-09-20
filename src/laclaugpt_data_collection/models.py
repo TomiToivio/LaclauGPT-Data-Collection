@@ -287,7 +287,18 @@ class NormalizedRecord(CanonicalRecord):
             data.update(
                 source_url=source_url,
                 schema_version=SCHEMA_VERSION,
-                source_native_ids={"document_id": document_id} if document_id else {},
+                source_native_ids=(
+                    {
+                        key: value
+                        for key, value in {
+                            "document_id": document_id,
+                            "parent_document_id": (
+                                str(parent_document_id) if parent_document_id not in (None, "") else ""
+                            ),
+                        }.items()
+                        if value
+                    }
+                ),
                 raw_capture=raw_capture,
                 source=SourceSection(
                     platform=platform,
