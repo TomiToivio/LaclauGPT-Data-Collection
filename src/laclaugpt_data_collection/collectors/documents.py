@@ -75,18 +75,39 @@ def extract_document(path: str | Path) -> NormalizedRecord:
         transformations = ["utf8-text-read"]
     title = str(metadata.get("title") or metadata.get("/Title") or file_path.name)
     author = str(metadata.get("author") or metadata.get("/Author") or "")
-    return NormalizedRecord(
+    media_type = "application/pdf" if suffix == ".pdf" else "text/plain"
+    record = NormalizedRecord(
         document_id=checksum,
         platform="document",
         author=author,
         source_url=f"file+sha256:{checksum}",
         text=text,
+        raw_ref=f"file+sha256:{checksum}",
+        raw_checksum=checksum,
+        raw_content_type=media_type,
         collection_provenance=CollectionProvenance(
             module="local-document",
             transformations=transformations,
-            metadata={"filename": file_path.name, "title": title, "sha256": checksum, **metadata},
+            metadata={
+                "filename": file_path.name,
+                "title": title,
+                "sha256": checksum,
+                "raw_reference_policy": "content-addressed-local-reference; absolute paths are not persisted",
+                **metadata,
+            },
         ),
     )
+    record.content.title = title or None
+    record.content.file_references = [
+        {
+            "kind": "local-document",
+            "ref": f"file+sha256:{checksum}",
+            "filename": file_path.name,
+            "checksum": checksum,
+            "content_type": media_type,
+        }
+    ]
+    return record
 
 
 def infer_abstract(text: str) -> str:
