@@ -279,6 +279,7 @@ def default_registry() -> PluginRegistry:
     from .collectors.mastodon import MastodonCollector
     from .collectors.rss import RSSCollector
     from .collectors.telegram import TelegramCollector
+    from .collectors.youtube import YouTubeCollector
 
     registry = PluginRegistry()
 
@@ -491,6 +492,63 @@ def default_registry() -> PluginRegistry:
             telegram_factory,
         )
     )
+    def youtube_factory(context: CollectionContext) -> LegacyCollector:
+        video_urls = context.require("video_urls")
+        if not isinstance(video_urls, list) or not all(
+            isinstance(url, str) for url in video_urls
+        ):
+            raise ValueError("youtube video_urls must be a list of strings")
+        page_size = int(context.config.get("page_size", 25))
+        raw_ref_prefix = context.config.get("raw_ref_prefix")
+        info_loader = context.config.get("_info_loader")
+        return YouTubeCollector(
+            video_urls=video_urls,
+            page_size=page_size,
+            cursor=context.cursor,
+            raw_ref_prefix=str(raw_ref_prefix) if raw_ref_prefix else None,
+            info_loader=info_loader if callable(info_loader) else None,
+            transcript=False,
+        )
+
+    registry.register(
+        adapt_collector(
+            PluginSpec(
+                plugin_id="youtube",
+                version="1.0.0",
+                source_type="youtube",
+                config_schema={
+                    "type": "object",
+                    "required": ["video_urls"],
+                    "properties": {
+                        "video_urls": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "page_size": {"type": "integer", "minimum": 1},
+                        "raw_ref_prefix": {"type": "string"},
+                    },
+                },
+                modes=("polling", "batch"),
+                authentication=(
+                    "public metadata by default; cookies/credentials remain runtime-private"
+                ),
+                retry_policy=(
+                    "shared bounded retry for rate-limit, 5xx and transport failures; "
+                    "quota and deterministic source errors are terminal"
+                ),
+                canonical_identifier="canonical https://www.youtube.com/watch?v=<video_id> URL",
+                raw_payload_policy=(
+                    "preserve yt-dlp source metadata inline and optional immutable raw_ref"
+                ),
+                media_policy=(
+                    "preserve the video as a source media reference; transcription, frame "
+                    "analysis, OCR and other derived multimodal processing belong in Data Analysis"
+                ),
+            ),
+            youtube_factory,
+        )
+    )
+
     return registry
 
 
