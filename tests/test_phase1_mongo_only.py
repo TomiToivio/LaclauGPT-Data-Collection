@@ -58,7 +58,7 @@ def test_phase1_mongo_only_upsert_is_idempotent_and_nested() -> None:
         "mongodb://synthetic",
         "laclaugpt",
         "records",
-        "AI26",
+        "SYNTH26",
         connect_timeout_ms=50,
         client_factory=FakeClient,
     )
@@ -68,7 +68,7 @@ def test_phase1_mongo_only_upsert_is_idempotent_and_nested() -> None:
         source={
             "platform": "synthetic",
             "source_type": "api",
-            "raw_metadata": {"collection_id": "AI26", "nested": {"kept": True}},
+            "raw_metadata": {"collection_id": "SYNTH26", "nested": {"kept": True}},
         },
         content={
             "text": "Mongo-only Phase 1 fixture",
@@ -79,7 +79,7 @@ def test_phase1_mongo_only_upsert_is_idempotent_and_nested() -> None:
             CollectionProvenance(
                 run_id="run-7",
                 module="collection-plugin:synthetic",
-                metadata={"collection_id": "AI26"},
+                metadata={"collection_id": "SYNTH26"},
             )
         ],
     )
