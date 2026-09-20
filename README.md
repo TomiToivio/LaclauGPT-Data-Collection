@@ -59,6 +59,9 @@ Analysis, simulation, dashboards, research datasets, operational target lists, c
 
 ## Phase 0 runtime
 
+> [!IMPORTANT]
+> **Current development phase: Phase 1.** `main` is based on and synchronized with `phase-1`. The `phase-0` branch remains the preserved Phase 0 baseline; Phase 0 documentation and code remain Phase 0 and are not reclassified as Phase 1.
+
 Phase 0 deliberately uses a narrow RSS/Atom-only path:
 
 ```text
