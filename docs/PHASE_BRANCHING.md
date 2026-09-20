@@ -20,8 +20,9 @@ As of 2026-09-19, **Phase 0 is active**, so `main` and `phase-0` must represent 
 Current invariant:
 
 ```text
-main == phase-0 stable baseline
-phase-1..phase-4 = isolated future work
+main == phase-1 current stable baseline
+phase-0 = preserved Phase 0 baseline
+phase-2..phase-4 = isolated future work
 ```
 
 When the project advances to a later phase, promotion into `main` requires explicit human approval.
