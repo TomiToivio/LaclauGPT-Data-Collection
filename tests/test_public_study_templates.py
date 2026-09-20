@@ -44,7 +44,9 @@ def test_brazil26_public_template_is_phase1_safe_and_loadable() -> None:
 
 def test_brazil26_public_codebook_and_manifest_are_loadable() -> None:
     import tomllib
+
     import yaml
+
     from laclaugpt_data_collection.server_runner import load_feed_manifest
 
     codebook = ROOT / "configs" / "studies" / "brazil26.collection-codebook.yaml"
