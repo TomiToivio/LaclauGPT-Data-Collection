@@ -5,7 +5,6 @@ from types import SimpleNamespace
 from laclaugpt_data_collection import handoff, plugins
 from laclaugpt_data_collection.collectors import arxiv, documents
 
-
 FIXTURE = Path(__file__).parent / "fixtures" / "phase1_arxiv_document.json"
 
 
