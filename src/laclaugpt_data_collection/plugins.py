@@ -229,6 +229,7 @@ def default_registry() -> PluginRegistry:
             actor=str(actor) if actor else None,
             max_results=max_results,
             access_token=str(token) if token else None,
+            cursor=context.cursor,
         )
 
     registry.register(
