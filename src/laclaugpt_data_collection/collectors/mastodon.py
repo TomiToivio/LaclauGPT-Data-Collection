@@ -7,11 +7,29 @@ from __future__ import annotations
 import re
 from html import unescape
 from typing import Any
+from urllib.error import URLError
 
 from ..models import CollectionProvenance, MediaReference, NormalizedRecord
 from .base import CollectionResult
 
 _TAG_RE = re.compile(r"<[^>]+>")
+
+
+class MastodonCollectionError(RuntimeError):
+    """Mastodon acquisition failure with orchestration-readable retry state."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        retryable: bool,
+        retry_after: str | None = None,
+        status_code: int | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.retryable = retryable
+        self.retry_after = retry_after
+        self.status_code = status_code
 
 
 def map_status(status: dict[str, Any], *, instance_url: str) -> NormalizedRecord | None:
@@ -75,12 +93,14 @@ class MastodonCollector:
         hashtag: str | None = None,
         limit: int = 20,
         access_token: str | None = None,
+        cursor: str | None = None,
         client: Any | None = None,
     ) -> None:
         self.instance_url = instance_url.rstrip("/")
         self.hashtag = hashtag.lstrip("#") if hashtag else None
         self.limit = limit
         self.access_token = access_token
+        self.cursor = cursor
         self.client = client
 
     def _client(self) -> Any:
@@ -92,20 +112,56 @@ class MastodonCollector:
             raise RuntimeError("Install the 'mastodon' extra to collect from Mastodon") from exc
         return Mastodon(api_base_url=self.instance_url, access_token=self.access_token)
 
+    @staticmethod
+    def _failure_state(exc: Exception) -> tuple[bool, str | None, int | None]:
+        response = getattr(exc, "response", None)
+        status_value = getattr(exc, "status_code", None) or getattr(response, "status_code", None)
+        try:
+            status_code = int(status_value) if status_value is not None else None
+        except (TypeError, ValueError):
+            status_code = None
+        headers = getattr(response, "headers", None) or getattr(exc, "headers", None) or {}
+        retry_after = None
+        if hasattr(headers, "get"):
+            value = headers.get("Retry-After") or headers.get("retry-after")
+            retry_after = str(value) if value not in (None, "") else None
+        retryable = (
+            status_code == 429
+            or bool(status_code is not None and status_code >= 500)
+            or isinstance(exc, (ConnectionError, TimeoutError, URLError))
+        )
+        return retryable, retry_after, status_code
+
     def collect(self) -> CollectionResult:
         result = CollectionResult(requests_seen=1)
         client = self._client()
-        rows = (
-            client.timeline_hashtag(self.hashtag, limit=self.limit)
-            if self.hashtag
-            else client.timeline_public(limit=self.limit)
-        )
+        kwargs: dict[str, Any] = {"limit": self.limit}
+        if self.cursor:
+            kwargs["max_id"] = self.cursor
+        try:
+            rows = (
+                client.timeline_hashtag(self.hashtag, **kwargs)
+                if self.hashtag
+                else client.timeline_public(**kwargs)
+            )
+        except Exception as exc:  # source library exposes several HTTP exception classes
+            retryable, retry_after, status_code = self._failure_state(exc)
+            raise MastodonCollectionError(
+                str(exc),
+                retryable=retryable,
+                retry_after=retry_after,
+                status_code=status_code,
+            ) from exc
         result.bodies_seen = 1
         result.raw_items_seen = len(rows)
         for row in rows:
             record = map_status(dict(row), instance_url=self.instance_url)
             if record:
                 result.records.append(record)
+        if rows:
+            last = rows[-1]
+            last_id = last.get("id") if isinstance(last, dict) else getattr(last, "id", None)
+            result.next_cursor = str(last_id) if last_id not in (None, "") else None
         if not result.records:
             result.warnings.append(result.zero_result_warning or "No Mastodon statuses collected")
         return result
