@@ -1,44 +1,110 @@
-# SYNTHETIC PUBLIC EXAMPLE ONLY.
-# Copy to an ignored/private runtime location and replace every placeholder.
-# Never commit the real Brazil26 candidate/party/account list, credentials,
-# browser profile, private backend URLs, or collected records.
+# SYNTHETIC PUBLIC BRAZIL26 PHASE 1 REFERENCE ONLY.
+# Live candidate/party/account targets remain in ignored/private overlays.
+# Credentials, cookies, private endpoints and raw study data must never be
+# copied into this file.
+
 study: brazil26
+title: Brazil 2026 election discourse collection
 timezone: America/Sao_Paulo
+reference_case: true
+collection_codebook: brazil26.collection-codebook.yaml
+source_manifest: brazil26.sources.example.toml
+
 window:
-  start: 2026-01-01
-  end: 2026-12-31
+  start: 2026-09-07
+  end: 2026-10-10
+  timestamp_basis: source_publication_time
+
+collection_policy:
+  preserve_exact_raw_payload: true
+  preserve_source_url: true
+  preserve_native_ids: true
+  infer_ideology_during_collection: false
+  deduplicate_by_native_id_and_canonical_url: true
+  youtube_transcript_only_by_default: true
+
+runtime:
+  collection_id: brazil26
+  browser_host: 127.0.0.1
+  browser_mode: manual_interactive
+  non_browser_mode: bounded_worker
+  canonical_schema: CanonicalRecord
+  analysis_handoff: docs/ANALYSIS_HANDOFF.md
 
 platforms:
   x:
     enabled: true
     base_urls:
       - "https://x.com/{handle}"
+      - "https://x.com/{handle}/with_replies"
+    collection_mode: firefox_browser_capture
   tiktok:
     enabled: true
     base_urls:
       - "https://www.tiktok.com/@{handle}"
+    collection_mode: firefox_browser_capture
   instagram:
     enabled: true
     base_urls:
       - "https://www.instagram.com/{handle}/"
+      - "https://www.instagram.com/{handle}/reels/"
+    collection_mode: firefox_browser_capture
+  rss:
+    enabled: true
+    collection_mode: bounded_non_browser
+  web:
+    enabled: true
+    collection_mode: bounded_non_browser
+  youtube:
+    enabled: true
+    transcripts_only: true
+    collection_mode: bounded_non_browser
 
-# Replace with the researcher-approved election sampling frame privately.
-# These names and handles are deliberately fictional.
+# Synthetic browser fixture. These identities are fictional by design.
 expected_candidates: 2
 candidates:
   - name: Example Candidate A
+    party: Example Party A
+    arena: candidate
     handles:
       x: [example_candidate_a]
       tiktok: [example_candidate_a]
       instagram: [example_candidate_a]
   - name: Example Candidate B
+    party: Example Party B
+    arena: candidate
     handles:
       x: [example_candidate_b]
       tiktok: [example_candidate_b]
       instagram: [example_candidate_b]
+
 parties:
   - name: Example Party A
+    arena: party
     handles:
       x: [example_party_a]
       tiktok: [example_party_a]
       instagram: [example_party_a]
+  - name: Example Party B
+    arena: party
+    handles:
+      x: [example_party_b]
+      tiktok: [example_party_b]
+      instagram: [example_party_b]
+
+provenance:
+  preserve:
+    - collection_id
+    - arena
+    - candidate_or_party_name_when_explicitly_configured
+    - source_name
+    - source_url
+    - native_ids
+  forbidden_inference:
+    - ideology_from_actor_identity
+    - political_attribute_from_handle
+    - missing_candidate_autofill
+
+private_overlay:
+  canonical_path: LaclauGPT-Private/collection/brazil26/brazil-election-2026.yaml
+  activation_rule: verify_current_public_accounts_and_resolve_declared_sampling_mismatch

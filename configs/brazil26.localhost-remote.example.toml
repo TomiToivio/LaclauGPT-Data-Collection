@@ -1,0 +1,39 @@
+profile = "brazil26-localhost-remote"
+machine = "laptop"
+execution = "cli"
+browser = "firefox-local"
+project_id = "brazil26"
+
+# Public-safe Phase 1 topology only. Secrets, private endpoints and live
+# election sampling overlays stay in ignored runtime configuration.
+[storage]
+records = "mongodb"
+objects = "s3"
+cache = "memory"
+
+[paths]
+data_root = "./data"
+sqlite_path = "./data/database/collection.sqlite3"
+
+[browser_capture]
+host = "127.0.0.1"
+port = 8766
+interactive = true
+
+[collector]
+mode = "localhost-remote"
+workers = 1
+download_media = true
+non_browser_enabled = true
+source_manifest = "configs/studies/brazil26.sources.example.toml"
+
+[distributed]
+config_backend = "redis"
+messaging_backend = "none"
+task_queue_backend = "direct"
+
+[interoperability]
+schema_version = "1.1.0"
+collection_id = "brazil26"
+emit_jsonl = true
+emit_csv = true

@@ -1,0 +1,34 @@
+# Public-safe Brazil26 Phase 1 source manifest.
+# These are institutional context sources, not candidate/party classifications.
+# Live operational targets may extend this manifest privately.
+
+[[feed]]
+name = "camara_eleicoes"
+feed_url = "https://www.camara.leg.br/noticias/rss/dinamico/ELEICOES"
+homepage = "https://www.camara.leg.br/noticias/rss"
+arena = "institutional"
+source_family = "official legislative election news"
+sampling_rationale = "Official Câmara election coverage provides bounded institutional context without duplicating browser candidate targets."
+priority = "P1"
+active = true
+last_verified = "2026-09-20"
+
+# TSE publishes an official RSS entry point, but the exact machine-consumable
+# feed URL can change. Keep it as a web source until verified in the private
+# operational overlay rather than guessing an RSS endpoint.
+[[web_source]]
+name = "tse_election_news"
+homepage = "https://www.tse.jus.br/comunicacao/noticias"
+arena = "institutional"
+source_family = "official electoral administration"
+sampling_rationale = "Official election-administration news and guidance."
+priority = "P1"
+
+[[youtube_source]]
+name = "justica_eleitoral"
+homepage = "https://www.youtube.com/@justicaeleitoral"
+arena = "institutional"
+source_family = "official electoral administration video"
+sampling_rationale = "Use transcripts when a canonical YouTube transcript collector is enabled; do not download media by default."
+priority = "P2"
+transcripts_only = true
