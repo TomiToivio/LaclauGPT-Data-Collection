@@ -69,14 +69,17 @@ def test_youtube_plugin_maps_fixture_identity_raw_reference_and_handoff() -> Non
     assert record.raw_capture.payload == FIXTURE["videos"][0]
     assert record.raw_capture.ref == "fixture://youtube/raw/synthetic001.json"
     assert record.content.title == "Synthetic AI research briefing"
-    assert record.content.media_references[0].metadata["download_required"] is True
+    assert record.content.media_references[0].ref == record.source_url
+    assert record.content.media_references[0].url == ""
+    assert record.content.media_references[0].metadata["download_required"] is False
+    assert record.content.media_references[0].metadata["resolve_media_downstream"] is True
     assert record.content.transcripts == []
     assert record.intermediate.asr == []
     assert record.intermediate.frames == []
     assert record.analysis == {}
 
     handoff = build_handoff(record.model_dump(mode="json"), project_id="synthetic")
-    assert handoff["status"] == "waiting_media"
+    assert handoff["status"] == "ready"
     assert handoff["source_url"] == record.source_url
     assert handoff["collection_id"] == "SYNTH26"
 
