@@ -68,21 +68,21 @@ Phase 1 is now the active repository state. The narrow Phase 0 RSS/Atom path bel
 RSS/Atom feeds -> canonical text records -> MongoDB -> Data Analysis
 ```
 
-The legacy Phase 0 collector is `laclaugpt-server-rss` (or `python -m laclaugpt_data_collection.server_runner`). It reads only `[[feed]]` rows from the source manifest and writes directly to MongoDB. Redis, CSC Allas/S3, browser collectors, social-platform collectors, media download, OCR and Whisper are not part of the Phase 0 runtime.
+The `laclaugpt-server-rss` entry point is now the bounded Phase 1 Laskin RSS worker. It reads `[[feed]]` rows from the source manifest and writes through the same canonical `DistributedCaptureSink` used by browser capture, so unattended RSS and localhost browser records share the project-scoped `<project>__records` collection. The older flat Phase 0 helpers remain available as compatibility code and tests, but they are no longer the Laskin cron path.
 
-Example CLI invocation:
+Example Phase 1 invocation:
 
 ```bash
 LACLAUGPT_PROJECT_ID=ai26 \
-LACLAUGPT_MONGODB_URI='mongodb://HOST:PORT/' \
 laclaugpt-server-rss \
+  --study-config data/config/ai26.yaml \
   --source-manifest data/config/ai26.sources.toml \
   --max-feeds 8 \
   --per-feed-limit 5 \
   --limit 40
 ```
 
-For legacy Phase 0 cron compatibility on Laskin, `scripts/run_ai26_laskin_collect.sh` remains the bounded one-cycle wrapper. This is not the repository's current-phase definition. Phase 1 capabilities are restored incrementally around the preserved Phase 0 baseline, with MongoDB records and Data Analysis compatibility validated after each addition.
+On Laskin, `scripts/run_ai26_laskin_collect.sh` remains the bounded one-cycle cron wrapper and explicitly refuses browser-enabled runtime configuration. Phase 0 storage adapters remain documented below only for compatibility and rollback work.
 
 ### Phase 0 MongoDB boundary (shared with Data Analysis)
 
