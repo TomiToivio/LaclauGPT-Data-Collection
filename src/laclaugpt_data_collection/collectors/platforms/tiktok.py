@@ -298,6 +298,7 @@ def map_item(post: dict, metadata: dict | None = None) -> dict:
         "timestamp": timestamp,
         "unix_timestamp": unix_ts,
         "is_duet": "yes" if duet_id and duet_id != "0" else "no",
+        "duet_from_id": duet_id if duet_id and duet_id != "0" else "",
         "is_ad": "yes" if post.get("isAd") else "no",
         "is_paid_partnership": "yes" if post.get("adAuthorization") else "no",
         "is_sensitive": "yes" if post.get("maskType") == 3 else "no",
