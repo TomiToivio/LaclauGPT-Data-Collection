@@ -399,11 +399,11 @@ def run_phase1_rss(
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Phase 0 RSS entry point used by `laclaugpt-server-rss` and the cron wrapper.
+    """Phase 1 canonical RSS entry point used by `laclaugpt-server-rss`.
 
-    Writes flat Phase 0 documents into the collection the Phase 0 analysis core
-    reads, so a collected item is directly discoverable by
-    `laclaugpt/laclaugpt_process.py`. Redis/S3 are not involved on this path.
+    Writes nested CanonicalRecord documents through the distributed sink. Legacy Phase 0
+    helpers remain available in this module for compatibility and rollback work;
+    they are not used by the Laskin Phase 1 cron path.
 
     Returns non-zero when collection fails, so cron surfaces the fault.
     """
