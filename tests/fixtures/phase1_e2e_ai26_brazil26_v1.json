@@ -1,0 +1,178 @@
+{
+  "fixture_version": "phase1-e2e-ai26-brazil26-v1",
+  "contract": {
+    "canonical_schema_version": "1.1.0",
+    "ai26_handoff_contract": "ai26-phase1-handoff-v1"
+  },
+  "topology": {
+    "localhost": {
+      "browser": ["ai26", "brazil26"],
+      "non_browser": ["ai26", "brazil26"]
+    },
+    "laskin": {
+      "browser": [],
+      "non_browser": ["ai26", "brazil26"],
+      "shared_media_worker": true
+    }
+  },
+  "records": [
+    {
+      "project_id": "ai26",
+      "collection_id": "ai26",
+      "machine": "localhost",
+      "execution": "browser",
+      "record": {
+        "schema_version": "1.1.0",
+        "source_url": "https://example.invalid/shared/phase1",
+        "source_native_ids": {"platform_post_id": "ai26-browser-001"},
+        "source": {
+          "platform": "x",
+          "source_type": "post",
+          "created_at": "2026-09-20T10:00:00Z",
+          "collection_method": "browser",
+          "raw_metadata": {"collection_id": "ai26"}
+        },
+        "content": {
+          "text": "Synthetic AI26 localhost browser record.",
+          "media_references": [
+            {
+              "kind": "image",
+              "url": "https://media.example.invalid/shared.jpg",
+              "object_ref": "s3://synthetic/projects/ai26/media/shared.jpg",
+              "checksum": "sha256:ai26synthetic"
+            }
+          ]
+        },
+        "provenance": [
+          {
+            "provenance_id": "ai26-browser-prov",
+            "collector": "fixture",
+            "captured_at": "2026-09-20T10:01:00Z",
+            "run_id": "phase1-e2e",
+            "method": "browser",
+            "metadata": {
+              "project_id": "ai26",
+              "collection_id": "ai26",
+              "machine": "localhost",
+              "execution": "browser",
+              "study_config_revision": "sha256:ai26-study-config-public-safe",
+              "collection_codebook_revision": "sha256:ai26-codebook-public-safe",
+              "source_manifest_revision": "sha256:ai26-source-manifest-public-safe"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "project_id": "ai26",
+      "collection_id": "ai26",
+      "machine": "laskin",
+      "execution": "non-browser",
+      "record": {
+        "schema_version": "1.1.0",
+        "source_url": "https://example.invalid/ai26/rss/001",
+        "source_native_ids": {"feed_item_id": "ai26-rss-001"},
+        "source": {
+          "platform": "rss",
+          "source_type": "article",
+          "created_at": "2026-09-20T10:05:00Z",
+          "collection_method": "rss",
+          "raw_metadata": {"collection_id": "ai26"}
+        },
+        "content": {"text": "Synthetic AI26 Laskin non-browser record."},
+        "provenance": [
+          {
+            "provenance_id": "ai26-laskin-prov",
+            "collector": "fixture",
+            "captured_at": "2026-09-20T10:06:00Z",
+            "run_id": "phase1-e2e",
+            "method": "rss",
+            "metadata": {
+              "project_id": "ai26",
+              "collection_id": "ai26",
+              "machine": "laskin",
+              "execution": "non-browser",
+              "study_config_revision": "sha256:ai26-study-config-public-safe",
+              "collection_codebook_revision": "sha256:ai26-codebook-public-safe",
+              "source_manifest_revision": "sha256:ai26-source-manifest-public-safe"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "project_id": "brazil26",
+      "collection_id": "brazil26",
+      "machine": "localhost",
+      "execution": "browser",
+      "record": {
+        "schema_version": "1.1.0",
+        "source_url": "https://example.invalid/shared/phase1",
+        "source_native_ids": {"platform_post_id": "brazil26-browser-001"},
+        "source": {
+          "platform": "instagram",
+          "source_type": "post",
+          "created_at": "2026-09-20T10:10:00Z",
+          "collection_method": "browser",
+          "raw_metadata": {"collection_id": "brazil26"}
+        },
+        "content": {"text": "Synthetic Brazil26 localhost browser record."},
+        "provenance": [
+          {
+            "provenance_id": "brazil26-browser-prov",
+            "collector": "fixture",
+            "captured_at": "2026-09-20T10:11:00Z",
+            "run_id": "phase1-e2e",
+            "method": "browser",
+            "metadata": {
+              "project_id": "brazil26",
+              "collection_id": "brazil26",
+              "machine": "localhost",
+              "execution": "browser",
+              "study_config_revision": "sha256:brazil26-study-config-public-safe",
+              "collection_codebook_revision": "sha256:brazil26-codebook-public-safe",
+              "source_manifest_revision": "sha256:brazil26-source-manifest-public-safe"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "project_id": "brazil26",
+      "collection_id": "brazil26",
+      "machine": "laskin",
+      "execution": "non-browser",
+      "record": {
+        "schema_version": "1.1.0",
+        "source_url": "https://example.invalid/brazil26/rss/001",
+        "source_native_ids": {"feed_item_id": "brazil26-rss-001"},
+        "source": {
+          "platform": "rss",
+          "source_type": "article",
+          "created_at": "2026-09-20T10:15:00Z",
+          "collection_method": "rss",
+          "raw_metadata": {"collection_id": "brazil26"}
+        },
+        "content": {"text": "Synthetic Brazil26 Laskin non-browser record."},
+        "provenance": [
+          {
+            "provenance_id": "brazil26-laskin-prov",
+            "collector": "fixture",
+            "captured_at": "2026-09-20T10:16:00Z",
+            "run_id": "phase1-e2e",
+            "method": "rss",
+            "metadata": {
+              "project_id": "brazil26",
+              "collection_id": "brazil26",
+              "machine": "laskin",
+              "execution": "non-browser",
+              "study_config_revision": "sha256:brazil26-study-config-public-safe",
+              "collection_codebook_revision": "sha256:brazil26-codebook-public-safe",
+              "source_manifest_revision": "sha256:brazil26-source-manifest-public-safe"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
