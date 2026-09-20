@@ -1,0 +1,22 @@
+{
+  "fixture_version": "telegram-v1",
+  "channel": "https://t.me/synthetic_channel",
+  "messages": [
+    {
+      "id": 902,
+      "raw_text": "Synthetic Telegram message with media",
+      "text": "Synthetic Telegram message with media",
+      "date": "2026-09-20T08:00:00+00:00",
+      "channel_id": 123456,
+      "media": true
+    },
+    {
+      "id": 901,
+      "raw_text": "Synthetic Telegram text-only message",
+      "text": "Synthetic Telegram text-only message",
+      "date": "2026-09-20T07:59:00+00:00",
+      "channel_id": 123456,
+      "media": false
+    }
+  ]
+}
