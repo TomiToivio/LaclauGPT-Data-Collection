@@ -274,6 +274,7 @@ def default_registry() -> PluginRegistry:
     RSS and Bluesky exercise both feed-style and API-style collection. Other existing collectors
     can migrate through the same adapter without changing their source-specific implementation.
     """
+    from .collectors.arxiv import ArxivCollector
     from .collectors.bluesky import BlueskyCollector
     from .collectors.mastodon import MastodonCollector
     from .collectors.rss import RSSCollector
