@@ -116,7 +116,7 @@ def _exception_status(exc: Exception) -> tuple[int | None, str | None]:
     if isinstance(status, int):
         return status, str(retry_after) if retry_after not in (None, "") else None
     match = _STATUS_RE.search(str(exc))
-    return (int(match.group(1)), None) if match else (None, None)
+    return (int(match.group(0)), None) if match else (None, None)
 
 
 def _collection_error(exc: Exception) -> YouTubeCollectionError:
