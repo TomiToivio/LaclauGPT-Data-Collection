@@ -6,6 +6,8 @@ LaclauGPT is developed on persistent phase branches: `phase-0`, `phase-1`, `phas
 
 **Current active/stable phase: Phase 1.** Therefore `main` must represent the current Phase-1 state and must stay synchronized with `phase-1`. The `phase-0` branch remains the preserved Phase 0 baseline and must not be repurposed or advanced.
 
+**Operational rule:** treat `phase-1` as the source branch for current work and `main` as its synchronized public baseline. Do not describe Phase 0 runtime behavior as the current repository default; Phase 0 material is legacy compatibility/rollback context unless a task explicitly targets `phase-0`.
+
 Before making any issue-driven change, an agent MUST determine the issue's intended phase from explicit issue text, title, labels, milestone, linked plan, or repository documentation. Then:
 
 1. Work from the matching persistent phase branch, e.g. a Phase-1 issue starts from `phase-1`, not `main` and not `phase-0`.
