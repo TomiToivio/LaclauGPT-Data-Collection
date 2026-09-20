@@ -1,0 +1,11 @@
+{
+  "entry_id": "https://arxiv.org/abs/2609.12345",
+  "title": "Synthetic Phase 1 arXiv paper",
+  "summary": "Synthetic abstract used only for collector contract tests.",
+  "authors": ["A. Researcher", "B. Example"],
+  "categories": ["cs.AI", "cs.CL"],
+  "primary_category": "cs.AI",
+  "published": "2026-09-16T00:00:00+00:00",
+  "updated": "2026-09-17T00:00:00+00:00",
+  "pdf_url": "https://arxiv.org/pdf/2609.12345"
+}
