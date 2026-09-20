@@ -123,12 +123,31 @@ def _run_distributed_media_unlocked(
     sink = DistributedCaptureSink(settings)
     sink.assert_private_config(study_config)
 
-    all_records = load_records(data_root)
-    records = [
+    remote_records = sink.records.pending_media_records(
+        collection_id=settings.project_id,
+        limit=limit,
+    )
+    local_records = [
         record
-        for record in all_records
+        for record in load_records(data_root)
         if routing_metadata(record, default_collection=settings.project_id)[0] == settings.project_id
-    ][:limit]
+    ]
+
+    # MongoDB is authoritative in distributed Phase 1 operation.  Local JSONL is
+    # retained as a recovery/debug fallback and can contribute records that have
+    # not reached the shared plane yet.  Deduplicate on canonical study identity.
+    records_by_route: dict[tuple[str, str], dict[str, Any]] = {}
+    for record in local_records:
+        collection_id, _ = routing_metadata(record, default_collection=settings.project_id)
+        source_url = str(record.get("source_url") or "")
+        if source_url:
+            records_by_route[(collection_id, source_url)] = record
+    for record in remote_records:
+        collection_id, _ = routing_metadata(record, default_collection=settings.project_id)
+        source_url = str(record.get("source_url") or "")
+        if source_url:
+            records_by_route[(collection_id, source_url)] = record
+    records = list(records_by_route.values())[:limit]
     store = CollectionStore(data_root)
     try:
         object_store = S3ObjectStore(
@@ -160,6 +179,8 @@ def _run_distributed_media_unlocked(
             "project_id": settings.project_id,
             "run_id": settings.run_id,
             "records_scanned": len(records),
+            "remote_records": len(remote_records),
+            "local_records": len(local_records),
             "queued": len(jobs),
             "attempted": len(results),
             "completed": sum(row.get("status") == "completed" for row in results),

@@ -118,7 +118,7 @@ Run one bounded non-browser cycle before relying on cron:
 bash scripts/run_ai26_laskin_collect.sh
 ```
 
-The canonical unattended worker begins with RSS/Atom, using the same bounded AI26 source manifest as the localhost setup. RSS/blog/newsletter collection is the high-signal, low-friction baseline. Additional canonical collectors should join this runner rather than creating a second scheduler or schema.
+The canonical unattended worker begins with RSS/Atom, using the same bounded AI26 source manifest as the localhost setup. The Phase 1 runner writes through the same `DistributedCaptureSink` as browser collection, so records land in the shared `ai26__records` canonical collection instead of the legacy Phase 0 flat collection. RSS/blog/newsletter collection remains the high-signal, low-friction baseline. Additional canonical non-browser collectors should join this bounded runner rather than creating a second scheduler or schema.
 
 The wrapper uses `flock`, so a second overlapping invocation exits cleanly. Reproduce cron's empty environment exactly with:
 
@@ -138,11 +138,9 @@ bash scripts/run_ai26_laskin_media.sh
 
 The distributed media worker downloads pending media referenced by canonical records available in Laskin's configured data root, stores deterministic objects in CSC Allas/S3, persists checksums/download state and refreshes affected canonical MongoDB records.
 
-Media is sourced from canonical JSONL records under `data/normalized/`. A tick with no local records is a successful no-op (`records_scanned: 0`), not a failure.
+Media discovery is **shared-plane first**. The worker queries the canonical AI26 MongoDB collection for records with unresolved media references, so browser captures created only on the researcher laptop are visible to Laskin after they have been synchronized. Local canonical JSONL under `data/normalized/` remains a recovery/debug fallback and is merged idempotently with the MongoDB candidates.
 
-### Current cross-machine limitation
-
-Redis task queueing is intentionally left dormant for AI26 at present. Therefore Laskin does **not yet automatically consume every laptop-only browser media reference from a central Redis queue**. Browser captures first need to reach a canonical record path visible to the distributed media workflow. Keep this limitation explicit until the repository's shared MongoDB/Redis download-job reader is implemented.
+Redis task queueing remains intentionally dormant for AI26. Cross-machine media discovery does not require a central task queue: MongoDB is the durable source of canonical media references, while Redis remains available for configuration, coordination and reference-only events. A tick with no pending shared or local records is a successful no-op.
 
 ## 5. Hourly cron jobs
 
