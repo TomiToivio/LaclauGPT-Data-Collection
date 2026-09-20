@@ -1,0 +1,22 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "schema": "https://schema.org/",
+    "dcterms": "http://purl.org/dc/terms/",
+    "prov": "http://www.w3.org/ns/prov#",
+    "oa": "http://www.w3.org/ns/oa#",
+    "laclau": "https://laclaugpt.org/ns/",
+    "id": "@id",
+    "type": "@type",
+    "label": "schema:name",
+    "url": {"@id": "schema:url", "@type": "@id"},
+    "identifier": "dcterms:identifier",
+    "source": {"@id": "dcterms:source", "@type": "@id"},
+    "author": {"@id": "schema:author", "@type": "@id"},
+    "isPartOf": {"@id": "schema:isPartOf", "@type": "@id"},
+    "hasPart": {"@id": "schema:hasPart", "@type": "@id"},
+    "wasGeneratedBy": {"@id": "prov:wasGeneratedBy", "@type": "@id"},
+    "wasDerivedFrom": {"@id": "prov:wasDerivedFrom", "@type": "@id"},
+    "wasAssociatedWith": {"@id": "prov:wasAssociatedWith", "@type": "@id"}
+  }
+}
