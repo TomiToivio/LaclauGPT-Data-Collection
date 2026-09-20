@@ -57,7 +57,11 @@ def map_video(
     created_at = upload_date
     if len(upload_date) == 8 and upload_date.isdigit():
         created_at = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:]}"
-    text = str(info.get("description") or info.get("title") or "")
+    text = transcript or str(info.get("description") or info.get("title") or "")
+    raw_payload = dict(info)
+    if transcript:
+        raw_payload["_laclaugpt_transcript"] = transcript
+        raw_payload["_laclaugpt_transcript_source"] = transcript_source
     record = NormalizedRecord(
         document_id=video_id,
         platform="youtube",
@@ -66,7 +70,7 @@ def map_video(
         timestamp=created_at,
         source_url=source_url,
         text=text,
-        raw_payload=dict(info),
+        raw_payload=raw_payload,
         raw_ref=raw_ref,
         raw_content_type="application/json",
         media_references=[
@@ -85,20 +89,22 @@ def map_video(
         collection_provenance=CollectionProvenance(
             module="yt-dlp",
             visited_url=source_url,
-            transformations=["youtube-source-metadata"],
+            transformations=[
+                "youtube-source-metadata",
+                "legacy-transcript-input" if transcript else "metadata-only",
+            ],
             metadata={
                 "title": info.get("title"),
                 "duration": info.get("duration"),
                 "view_count": info.get("view_count"),
                 "like_count": info.get("like_count"),
                 "webpage_url": info.get("webpage_url"),
-                "transcription_deferred_to_analysis": True,
+                "transcription_deferred_to_analysis": not bool(transcript),
+                "transcript_source": transcript_source,
             },
         ),
     )
     record.content.title = str(info.get("title") or "") or None
-    if transcript or transcript_source:
-        record.provenance[-1].metadata["legacy_transcript_input_ignored"] = True
     return record
 
 
