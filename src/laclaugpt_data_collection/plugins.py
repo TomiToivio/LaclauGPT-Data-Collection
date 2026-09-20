@@ -275,6 +275,7 @@ def default_registry() -> PluginRegistry:
     can migrate through the same adapter without changing their source-specific implementation.
     """
     from .collectors.bluesky import BlueskyCollector
+    from .collectors.mastodon import MastodonCollector
     from .collectors.rss import RSSCollector
 
     registry = PluginRegistry()
@@ -339,6 +340,43 @@ def default_registry() -> PluginRegistry:
                 authentication="public XRPC by default; optional runtime access token",
             ),
             bluesky_factory,
+        )
+    )
+
+    def mastodon_factory(context: CollectionContext) -> LegacyCollector:
+        instance_url = str(context.require("instance_url"))
+        hashtag = context.config.get("hashtag")
+        limit = int(context.config.get("limit", 20))
+        token = context.config.get("access_token")
+        return MastodonCollector(
+            instance_url=instance_url,
+            hashtag=str(hashtag) if hashtag else None,
+            limit=limit,
+            access_token=str(token) if token else None,
+            cursor=context.cursor,
+        )
+
+    registry.register(
+        adapt_collector(
+            PluginSpec(
+                plugin_id="mastodon",
+                version="1.0.0",
+                source_type="mastodon",
+                config_schema={
+                    "type": "object",
+                    "required": ["instance_url"],
+                    "properties": {
+                        "instance_url": {"type": "string"},
+                        "hashtag": {"type": "string"},
+                        "limit": {"type": "integer", "minimum": 1},
+                    },
+                },
+                modes=("polling", "batch"),
+                authentication="public timelines by default; optional runtime access token",
+                canonical_identifier="Mastodon status URL",
+                raw_payload_policy="preserve exact status JSON inline",
+            ),
+            mastodon_factory,
         )
     )
     return registry
