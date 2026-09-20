@@ -1,0 +1,33 @@
+profile = "brazil26-laskin-remote"
+machine = "linux-server"
+execution = "cron"
+browser = "none"
+project_id = "brazil26"
+
+# Public-safe topology only. Runtime secrets, endpoints and the private
+# operational overlay are loaded from ignored environment/config files.
+[storage]
+records = "mongodb"
+objects = "s3"
+cache = "memory"
+
+[paths]
+data_root = "./data"
+sqlite_path = "./data/database/collection.sqlite3"
+
+[collector]
+mode = "laskin-remote"
+workers = 1
+download_media = true
+non_browser_enabled = true
+
+[distributed]
+config_backend = "redis"
+messaging_backend = "none"
+task_queue_backend = "direct"
+
+[interoperability]
+schema_version = "1.1.0"
+collection_id = "brazil26"
+emit_jsonl = true
+emit_csv = true
