@@ -541,8 +541,8 @@ def default_registry() -> PluginRegistry:
                     "preserve yt-dlp source metadata inline and optional immutable raw_ref"
                 ),
                 media_policy=(
-                    "preserve the video as a source media reference; transcription, frame "
-                    "analysis, OCR and other derived multimodal processing belong in Data Analysis"
+                    "preserve the canonical video as a non-downloadable source reference; actual media "
+                    "resolution, transcription, frames and OCR belong in Data Analysis"
                 ),
             ),
             youtube_factory,
