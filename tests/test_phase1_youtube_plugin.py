@@ -76,7 +76,7 @@ def test_youtube_plugin_maps_fixture_identity_raw_reference_and_handoff() -> Non
     assert record.analysis == {}
 
     handoff = build_handoff(record.model_dump(mode="json"), project_id="synthetic")
-    assert handoff["status"] == "ready"
+    assert handoff["status"] == "waiting_media"
     assert handoff["source_url"] == record.source_url
     assert handoff["collection_id"] == "SYNTH26"
 
