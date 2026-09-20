@@ -110,6 +110,8 @@ Two properties make the boundary safe to run from cron:
 
 The boundary is pinned by `tests/test_issue_85_phase0_mongo_contract.py`, which asserts the collection name and required field list against the constants the analysis core uses.
 
+The eventual retirement of this compatibility adapter is governed by [`docs/PHASE0_MONGO_RETIREMENT.md`](docs/PHASE0_MONGO_RETIREMENT.md). That plan requires Collection + Data Analysis parity, end-to-end and production smoke evidence, and a verified rollback path before any runtime switch or deletion.
+
 
 ## Source-plugin architecture
 
