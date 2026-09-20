@@ -8,7 +8,7 @@ from typing import Any
 from ..models import CollectionProvenance, MediaReference, NormalizedRecord
 from .base import CollectionResult
 
-_STATUS_RE = re.compile(r"\\b(\\d{3})\\b")
+_STATUS_RE = re.compile("[0-9][0-9][0-9]")
 
 
 class YouTubeCollectionError(RuntimeError):
