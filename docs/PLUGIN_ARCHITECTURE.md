@@ -45,7 +45,7 @@ Collection preserves source facts, source-native relationships, raw payloads or 
 
 `CollectionPlugin.collect(context)` returns the existing `CollectionResult`, whose records are canonical `NormalizedRecord`/`CanonicalRecord` objects. Existing collectors do not need rewrites: `adapt_collector(spec, factory)` wraps the current `Collector.collect()` interface.
 
-The initial built-in registry migrates RSS and Bluesky as working examples. Mastodon, YouTube, Telegram, arXiv, browser-assisted sources and other existing collectors can move behind the same adapter incrementally without changing the three-module deployment architecture.
+The Phase 1 built-in registry includes RSS, Bluesky, Mastodon, Telegram and arXiv. YouTube, browser-assisted sources and other existing collectors can move behind the same adapter incrementally without changing the three-module deployment architecture.
 
 Inspect the currently registered declarations without contacting source services:
 
@@ -149,6 +149,18 @@ Transcription, OCR, vision interpretation and other derived multimodal processin
 Plugin code and synthetic/public example configuration may be public. Credentials, browser state, private targets, operational endpoints, protected datasets and private study configuration must remain under ignored `data/`, environment variables or external private infrastructure.
 
 `CollectionContext.privacy` is copied into collection provenance metadata on every plugin-produced record. Downstream modules can therefore carry the project's privacy/access policy alongside the source record without Collection changing the canonical schema.
+
+## Telegram Phase 1 policy
+
+The Telegram plugin uses Telethon behind the common plugin seam. Public channels use stable `https://t.me/<channel>/<message_id>` identity; non-web/private targets use the stable `telegram:<channel>:<message_id>` URI form. The message ID is also retained as a source-native identifier.
+
+Pagination uses a numeric Telethon `max_id` cursor and returns the final message ID in the page as `next_cursor`. Shared `CollectionRunner` deduplication therefore remains based on canonical `source_url`, while cursor state is orchestration metadata rather than identity.
+
+The raw-source policy is lossless-at-source: preserve `Message.to_dict()` inline when available and optionally attach an immutable `raw_ref` prefix supplied by private runtime configuration. Media is represented as a source reference for the later media/download stage; OCR, ASR, framing and interpretation remain Analysis responsibilities.
+
+Telethon `FloodWait`/timeout/server/transport failures are surfaced as retryable errors. Flood-wait seconds become retry metadata, but the shared retry policy caps the actual delay and attempt count. Deterministic configuration/session failures are terminal.
+
+API ID/hash, session paths or strings, phone/login material and real channel target lists are runtime-private and must never be committed. CI and public tests use synthetic fixtures and injected clients only. Any authenticated live smoke test is an external deployment check.
 
 ## Data Analysis handoff
 

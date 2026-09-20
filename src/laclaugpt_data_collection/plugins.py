@@ -278,6 +278,7 @@ def default_registry() -> PluginRegistry:
     from .collectors.bluesky import BlueskyCollector
     from .collectors.mastodon import MastodonCollector
     from .collectors.rss import RSSCollector
+    from .collectors.telegram import TelegramCollector
 
     registry = PluginRegistry()
 
@@ -430,6 +431,64 @@ def default_registry() -> PluginRegistry:
                 raw_payload_policy="preserve exact status JSON inline",
             ),
             mastodon_factory,
+        )
+    )
+    def telegram_factory(context: CollectionContext) -> LegacyCollector:
+        channel = str(context.require("channel"))
+        limit = int(context.config.get("limit", 20))
+        api_id_value = context.config.get("api_id")
+        api_id = int(api_id_value) if api_id_value not in (None, "") else None
+        api_hash = context.config.get("api_hash")
+        session = context.config.get("session")
+        raw_ref_prefix = context.config.get("raw_ref_prefix")
+        client = context.config.get("_client")
+        return TelegramCollector(
+            channel=channel,
+            limit=limit,
+            cursor=context.cursor,
+            client=client,
+            api_id=api_id,
+            api_hash=str(api_hash) if api_hash else None,
+            session=str(session) if session else None,
+            raw_ref_prefix=str(raw_ref_prefix) if raw_ref_prefix else None,
+        )
+
+    registry.register(
+        adapt_collector(
+            PluginSpec(
+                plugin_id="telegram",
+                version="1.0.0",
+                source_type="telegram",
+                config_schema={
+                    "type": "object",
+                    "required": ["channel"],
+                    "properties": {
+                        "channel": {"type": "string"},
+                        "limit": {"type": "integer", "minimum": 1},
+                        "api_id": {"type": "integer"},
+                        "api_hash": {"type": "string"},
+                        "session": {"type": "string"},
+                        "raw_ref_prefix": {"type": "string"},
+                    },
+                },
+                modes=("polling", "batch"),
+                authentication=(
+                    "Telethon api_id/api_hash plus pre-authenticated session supplied at runtime"
+                ),
+                retry_policy=(
+                    "shared bounded retry; FloodWait seconds exposed as Retry-After metadata"
+                ),
+                canonical_identifier=(
+                    "public t.me/<channel>/<message_id> URL or telegram:<channel>:<message_id> URI"
+                ),
+                raw_payload_policy=(
+                    "preserve Telethon message dictionary inline and optional immutable raw_ref"
+                ),
+                media_policy=(
+                    "preserve Telegram media references; download only in configured media stage"
+                ),
+            ),
+            telegram_factory,
         )
     )
     return registry
