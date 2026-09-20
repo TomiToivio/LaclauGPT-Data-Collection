@@ -157,10 +157,11 @@ def test_runner_accepts_resume_cursor_and_returns_next_checkpoint() -> None:
 
 def test_default_registry_is_lazy_and_declares_versioned_source_contracts() -> None:
     specs = {spec.plugin_id: spec for spec in default_registry().specs()}
-    assert set(specs) == {"bluesky", "rss"}
+    assert set(specs) == {"arxiv", "bluesky", "mastodon", "rss"}
     assert specs["rss"].version == "1.0.0"
     assert "feed_urls" in specs["rss"].config_schema["required"]
     assert "polling" in specs["bluesky"].modes
+    assert "batch" in specs["arxiv"].modes
 
 
 def test_missing_plugin_configuration_fails_before_collection() -> None:
