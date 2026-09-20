@@ -78,10 +78,10 @@ def map_video(
                 kind="video",
                 media_type="video",
                 ref=source_url,
-                url=source_url,
                 metadata={
                     "video_id": video_id,
-                    "download_required": True,
+                    "download_required": False,
+                    "resolve_media_downstream": True,
                     "duration": info.get("duration"),
                 },
             )
