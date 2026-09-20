@@ -1,5 +1,4 @@
 import json
-from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -21,8 +20,8 @@ def _paper_from_fixture() -> SimpleNamespace:
         authors=[SimpleNamespace(name=name) for name in data["authors"]],
         categories=data["categories"],
         primary_category=data["primary_category"],
-        published=datetime.fromisoformat(data["published"]),
-        updated=datetime.fromisoformat(data["updated"]),
+        published=data["published"],
+        updated=data["updated"],
         pdf_url=data["pdf_url"],
     )
 
