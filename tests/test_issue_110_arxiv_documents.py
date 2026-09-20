@@ -3,8 +3,6 @@ from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
-import pytest
-
 from laclaugpt_data_collection.collectors.arxiv import ArxivCollector, map_paper
 from laclaugpt_data_collection.collectors.documents import extract_document
 from laclaugpt_data_collection.handoff import build_handoff
@@ -74,8 +72,12 @@ def test_arxiv_cursor_pagination_and_batch_dedup_are_deterministic() -> None:
 
 def test_arxiv_invalid_cursor_fails_explicitly() -> None:
     collector = ArxivCollector("synthetic", cursor="not-an-offset", client=lambda **_: [])
-    with pytest.raises(ValueError, match="non-negative integer offset"):
+    try:
         collector.collect()
+    except ValueError as exc:
+        assert "non-negative integer offset" in str(exc)
+    else:
+        raise AssertionError("invalid arXiv cursor should fail")
 
 
 def test_local_document_is_content_addressed_without_absolute_path(tmp_path: Path) -> None:
