@@ -22,6 +22,11 @@ set -a
 source "$ENV_FILE"
 set +a
 
+if [[ "${LACLAUGPT_BROWSER:-none}" != "none" ]]; then
+  echo "refusing Laskin media worker with LACLAUGPT_BROWSER=${LACLAUGPT_BROWSER}; browser collection is localhost-only" >&2
+  exit 2
+fi
+
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
   echo "AI26 Laskin media worker already running; exiting cleanly" >&2
