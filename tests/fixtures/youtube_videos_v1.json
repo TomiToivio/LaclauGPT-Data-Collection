@@ -1,0 +1,29 @@
+{
+  "fixture_version": "1.0",
+  "videos": [
+    {
+      "id": "synthetic001",
+      "title": "Synthetic AI research briefing",
+      "description": "A synthetic YouTube description for Phase 1 collection testing.",
+      "upload_date": "20260919",
+      "channel_id": "UC_SYNTH",
+      "channel": "Synthetic Research Lab",
+      "duration": 123,
+      "view_count": 42,
+      "like_count": 7,
+      "webpage_url": "https://youtu.be/synthetic001"
+    },
+    {
+      "id": "synthetic002",
+      "title": "Second synthetic briefing",
+      "description": "Second page item.",
+      "upload_date": "20260920",
+      "channel_id": "UC_SYNTH",
+      "channel": "Synthetic Research Lab",
+      "duration": 61,
+      "view_count": 9,
+      "like_count": 1,
+      "webpage_url": "https://www.youtube.com/watch?v=synthetic002"
+    }
+  ]
+}
