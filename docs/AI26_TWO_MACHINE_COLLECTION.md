@@ -155,7 +155,7 @@ laclaugpt-server-rss \
   --max-feeds 8 --per-feed-limit 5 --limit 40
 ```
 
-The worker reads the standard `[[feed]]` TOML manifest convention, applies the study's source-publication floor, orders eligible records by the shared handoff priority, acquires a run-scoped lease per source revision, writes through the same distributed sink, and emits the same reference-only events.
+The worker reads the standard `[[feed]]` TOML manifest convention, applies the study's source-publication floor, writes through the same canonical distributed sink as localhost browser capture, and emits the same reference-only events. Both machines therefore upsert into `<project>__records`; the old Phase 0 scraper collection is not part of the Phase 1 cron path.
 
 ### Bounded feed windows
 
@@ -198,6 +198,10 @@ Then schedule it:
 10 * * * * /bin/bash <repo>/scripts/run_ai26_laskin_collect.sh >> <repo>/data/logs/ai26-laskin-collect.log 2>&1
 30 * * * * /bin/bash <repo>/scripts/run_ai26_laskin_media.sh   >> <repo>/data/logs/ai26-laskin-media.log   2>&1
 ```
+
+### Cross-machine media discovery
+
+The Laskin media worker queries the shared canonical MongoDB collection for unresolved media references before consulting local JSONL recovery files. This allows media referenced by laptop-only browser captures to be downloaded and persisted by Laskin without enabling Redis task queueing and without copying the laptop's local data tree.
 
 Design notes for the schedule:
 
