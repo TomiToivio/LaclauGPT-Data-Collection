@@ -28,3 +28,29 @@ CAROUSEL_ITEM = {
         {"pk": "c2", "image_versions2": {"candidates": [{"url": "https://cdn.example.invalid/c2.jpg"}]}},
     ],
 }
+
+PHASE1_REEL_WITH_REFERENCE = {
+    "pk": "3300000000000000132",
+    "id": "3300000000000000132",
+    "code": "SynthReel132",
+    "__typename": "XDTGraphVideo",
+    "media_type": 2,
+    "caption": {"text": "Synthetic Phase 1 reel fixture"},
+    "taken_at": 1789898400,
+    "user": {
+        "username": "synthetic_phase1_ig",
+        "full_name": "Synthetic Researcher",
+        "pk": "ig-user-132",
+        "is_verified": False,
+    },
+    "video_versions": [{"url": "https://cdn.example.invalid/phase1-132.mp4"}],
+    "referenced_media": {
+        "pk": "3300000000000000131",
+        "code": "SynthSource131",
+    },
+}
+
+PHASE1_REEL_RESPONSE = {
+    "items": [PHASE1_REEL_WITH_REFERENCE],
+    "paging_info": {"more_available": False},
+}
