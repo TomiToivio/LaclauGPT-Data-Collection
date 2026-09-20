@@ -2,10 +2,8 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from laclaugpt_data_collection.collectors.arxiv import ArxivCollector, map_paper
-from laclaugpt_data_collection.collectors.documents import extract_document
-from laclaugpt_data_collection.handoff import build_handoff
-from laclaugpt_data_collection.plugins import default_registry
+from laclaugpt_data_collection import handoff, plugins
+from laclaugpt_data_collection.collectors import arxiv, documents
 
 
 FIXTURE = Path(__file__).parent / "fixtures" / "phase1_arxiv_document.json"
@@ -27,7 +25,7 @@ def _paper_from_fixture() -> SimpleNamespace:
 
 
 def test_arxiv_fixture_maps_to_canonical_document_and_analysis_handoff() -> None:
-    record = map_paper(_paper_from_fixture())
+    record = arxiv.map_paper(_paper_from_fixture())
     assert record is not None
     assert record.source_url == "https://arxiv.org/abs/2609.12345"
     assert record.document_id == "2609.12345"
@@ -37,9 +35,9 @@ def test_arxiv_fixture_maps_to_canonical_document_and_analysis_handoff() -> None
     assert record.media_references[0].url == "https://arxiv.org/pdf/2609.12345"
     assert record.media_references[0].metadata["download_required"] is True
 
-    handoff = build_handoff(record.model_dump(mode="json"), project_id="synthetic")
-    assert handoff["source_url"] == record.source_url
-    assert handoff["status"] == "waiting_media"
+    result_handoff = handoff.build_handoff(record.model_dump(mode="json"), project_id="synthetic")
+    assert result_handoff["source_url"] == record.source_url
+    assert result_handoff["status"] == "waiting_media"
 
 
 def test_arxiv_cursor_pagination_and_batch_dedup_are_deterministic() -> None:
@@ -50,7 +48,7 @@ def test_arxiv_cursor_pagination_and_batch_dedup_are_deterministic() -> None:
         paper = _paper_from_fixture()
         return [paper, paper]
 
-    result = ArxivCollector(
+    result = arxiv.ArxivCollector(
         "synthetic AI",
         max_results=2,
         categories=["cs.AI"],
@@ -70,7 +68,7 @@ def test_arxiv_cursor_pagination_and_batch_dedup_are_deterministic() -> None:
 
 
 def test_arxiv_invalid_cursor_fails_explicitly() -> None:
-    collector = ArxivCollector("synthetic", cursor="not-an-offset", client=lambda **_: [])
+    collector = arxiv.ArxivCollector("synthetic", cursor="not-an-offset", client=lambda **_: [])
     try:
         collector.collect()
     except ValueError as exc:
@@ -83,7 +81,7 @@ def test_local_document_is_content_addressed_without_absolute_path(tmp_path: Pat
     source = tmp_path / "synthetic.txt"
     source.write_text("Synthetic local research document.", encoding="utf-8")
 
-    record = extract_document(source)
+    record = documents.extract_document(source)
 
     assert record.source_url.startswith("file+sha256:")
     assert record.raw_ref == record.source_url
@@ -98,7 +96,7 @@ def test_local_document_is_content_addressed_without_absolute_path(tmp_path: Pat
 
 
 def test_phase1_registry_declares_arxiv_contract() -> None:
-    spec = {item.plugin_id: item for item in default_registry().specs()}["arxiv"]
+    spec = {item.plugin_id: item for item in plugins.default_registry().specs()}["arxiv"]
     assert spec.source_type == "scholarly_document"
     assert "query" in spec.config_schema["required"]
     assert spec.canonical_identifier == "canonical https://arxiv.org/abs/<id> URL"
