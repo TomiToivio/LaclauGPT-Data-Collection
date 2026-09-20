@@ -1,15 +1,8 @@
 #!/usr/bin/env bash
 # AI26 non-browser collection on Laskin (cron-safe, one bounded cycle per call).
 #
-# Design constraints (issue #62):
-#   - one bounded collection cycle, then exit; cron is the scheduler
-#   - never starts a nested long-lived scheduler
-#   - secrets are loaded only from the ignored runtime env file
-#   - no Firefox / browser / X collector on this host
-#   - flock prevents overlapping ticks from stacking
-#
-# The runtime env file is ignored by Git. Override it with
-# LACLAUGPT_ENV_FILE if your private runtime contract lives elsewhere.
+# One bounded Phase 1 cycle, no Firefox/browser/X collector, shared AI26
+# MongoDB/Redis/S3 namespace, and flock overlap protection.
 set -euo pipefail
 
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -32,6 +25,10 @@ if [[ "${LACLAUGPT_BROWSER:-none}" != "none" ]]; then
   echo "refusing Laskin collection with LACLAUGPT_BROWSER=${LACLAUGPT_BROWSER}; browser collection is localhost-only" >&2
   exit 2
 fi
+if [[ "${LACLAUGPT_PROJECT_ID:-ai26}" != "ai26" ]]; then
+  echo "refusing Laskin AI26 worker with project id ${LACLAUGPT_PROJECT_ID:-unset}" >&2
+  exit 2
+fi
 
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
@@ -41,22 +38,20 @@ fi
 
 cd "$ROOT_DIR"
 
-# Cron does not inherit an interactive shell, so resolve the console script
-# inside this checkout's venv rather than relying on PATH.
-RUNNER="$ROOT_DIR/.venv/bin/laclaugpt-server-rss"
-if [[ -x "$RUNNER" ]]; then
-  RUN=("$RUNNER")
+if [[ -x "$ROOT_DIR/.venv/bin/python" ]]; then
+  RUN=("$ROOT_DIR/.venv/bin/python" -m laclaugpt_data_collection.ai26_laskin_runner)
 else
-  RUN=(python3 -m laclaugpt_data_collection.server_runner)
+  RUN=(python3 -m laclaugpt_data_collection.ai26_laskin_runner)
 fi
 
 echo "[$(date -Is)] AI26 Laskin collection start"
 "${RUN[@]}" \
   --study-config "$STUDY_CONFIG" \
   --source-manifest "$SOURCE_MANIFEST" \
-  --collection-id "${LACLAUGPT_PROJECT_ID:-ai26}" \
+  --collection-id "ai26" \
   --worker-id "${LACLAUGPT_AI26_WORKER_ID:-laskin-cron}" \
   --max-feeds "${LACLAUGPT_AI26_MAX_FEEDS:-8}" \
-  --per-feed-limit "${LACLAUGPT_AI26_PER_FEED_LIMIT:-5}" \
+  --max-jobs "${LACLAUGPT_AI26_MAX_NON_BROWSER_JOBS:-6}" \
+  --per-source-limit "${LACLAUGPT_AI26_PER_SOURCE_LIMIT:-5}" \
   --limit "${LACLAUGPT_AI26_BATCH_LIMIT:-40}"
 echo "[$(date -Is)] AI26 Laskin collection end"
