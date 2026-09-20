@@ -317,18 +317,100 @@ def run_distributed_rss(
     }
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Phase 0 RSS entry point used by `laclaugpt-server-rss` and the cron wrapper.
+def run_phase1_rss(
+    settings: Settings,
+    *,
+    study_config: str | Path,
+    source_manifest: str | Path,
+    collection_id: str | None = None,
+    worker_id: str = "linux-server-rss",
+    max_feeds: int = 10,
+    per_feed_limit: int = 10,
+    limit: int = 50,
+    rotation: int | None = None,
+) -> dict[str, Any]:
+    """Run one bounded Phase 1 RSS batch through the canonical distributed sink."""
+    from .distributed_capture import DistributedCaptureSink
+    from .realtime import RealtimePolicy, parse_source_time
 
-    Writes flat Phase 0 documents into the collection the Phase 0 analysis core
-    reads, so a collected item is directly discoverable by
-    `laclaugpt/laclaugpt_process.py`. Redis/S3 are not involved on this path.
+    if max_feeds < 1 or per_feed_limit < 1 or limit < 1:
+        raise ValueError("max_feeds, per_feed_limit and limit must be at least 1")
+
+    routed_collection = collection_id or settings.project_id
+    if routed_collection != settings.project_id:
+        raise ValueError(
+            "Phase 1 Laskin worker must use the configured project_id as collection_id"
+        )
+    if rotation is None:
+        rotation = int(time.time() // 3600) * max_feeds
+
+    feeds = select_feed_window(
+        load_feed_manifest(source_manifest),
+        max_feeds=max_feeds,
+        rotation=rotation,
+    )
+    records, warnings = collect_rss_records(
+        feeds,
+        collection_id=routed_collection,
+        worker_id=worker_id,
+        per_feed_limit=per_feed_limit,
+    )
+
+    sink = DistributedCaptureSink(settings)
+    sink.assert_private_config(study_config)
+    policy = RealtimePolicy.ai26()
+    synced = 0
+    skipped_before_floor = 0
+    errors: list[str] = []
+
+    for record in records:
+        published = parse_source_time(record.source.created_at)
+        if policy.publication_date_floor and published and published < policy.publication_date_floor:
+            skipped_before_floor += 1
+            continue
+        if synced >= limit:
+            break
+        payload = record.model_dump(mode="json")
+        payload["collection_id"] = routed_collection
+        arena = str(record.source.raw_metadata.get("arena") or "")
+        if arena:
+            payload["arena"] = arena
+        try:
+            sink.ingest(payload)
+            synced += 1
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"{record.source_url}: {str(exc)[:180]}")
+
+    return {
+        "status": "ok" if not errors else "partial",
+        "project_id": settings.project_id,
+        "collection_id": routed_collection,
+        "worker_id": worker_id,
+        "feeds_considered": len(feeds),
+        "feed_names": [str(feed.get("name") or "") for feed in feeds],
+        "records_collected": len(records),
+        "records_synced": synced,
+        "skipped_before_publication_floor": skipped_before_floor,
+        "mongodb_collection": settings.distributed_namespace.mongo_collection("records"),
+        "warnings": warnings,
+        "errors": errors,
+        "notification_errors": list(sink.notification_errors),
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Phase 1 canonical RSS entry point used by `laclaugpt-server-rss`.
+
+    Writes nested CanonicalRecord documents through the distributed sink. Legacy Phase 0
+    helpers remain available in this module for compatibility and rollback work;
+    they are not used by the Laskin Phase 1 cron path.
 
     Returns non-zero when collection fails, so cron surfaces the fault.
     """
     from .config import Settings
 
-    parser = argparse.ArgumentParser(description="Phase 0 RSS collection into MongoDB")
+    parser = argparse.ArgumentParser(description="Phase 1 RSS collection into canonical storage")
+    parser.add_argument("--study-config", required=True)
     parser.add_argument("--source-manifest", required=True)
     parser.add_argument("--collection-id", default=None)
     parser.add_argument("--worker-id", default="laclaugpt-server-rss")
@@ -340,8 +422,9 @@ def main(argv: list[str] | None = None) -> int:
 
     settings = Settings()
     try:
-        summary = run_distributed_rss(
+        summary = run_phase1_rss(
             settings,
+            study_config=args.study_config,
             source_manifest=args.source_manifest,
             collection_id=args.collection_id,
             worker_id=args.worker_id,
@@ -350,14 +433,14 @@ def main(argv: list[str] | None = None) -> int:
             limit=args.limit,
         )
     except Exception as exc:  # noqa: BLE001 - report, do not traceback under cron
-        print(f"[phase0] collection failed: {str(exc)[:200]}")
+        print(f"[phase1] collection failed: {str(exc)[:200]}")
         return 1
 
     if args.json:
         print(json.dumps(summary, indent=2, default=str))
     else:
         print(
-            f"[phase0] collected={summary['records_collected']} "
+            f"[phase1] collected={summary['records_collected']} "
             f"synced={summary['records_synced']} "
             f"errors={len(summary['errors'])} "
             f"collection={summary.get('mongodb_collection', '')}"

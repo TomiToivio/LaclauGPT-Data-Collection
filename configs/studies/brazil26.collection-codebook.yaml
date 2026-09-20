@@ -1,0 +1,65 @@
+# Brazil26 Phase 1 collection codebook
+# Public-safe sampling/provenance guidance only. Operational candidate, party
+# and account overlays remain private and are never analytical ground truth.
+
+version: brazil26-collection-v1
+study: brazil26
+purpose: election_discourse_collection
+
+principles:
+  - preserve source identity, publication time, arena and explicit study provenance
+  - keep candidate and party identities as sampling metadata, not inferred ideology
+  - do not infer political attributes from source identity during collection
+  - browser and non-browser collectors share the same CanonicalRecord contract
+  - identical source URLs may exist in different studies because collection_id scopes identity
+  - do not activate a private overlay while its declared sampling-frame mismatch is unresolved
+  - credentials, cookies, private endpoints and raw study data never belong in this repository
+
+arenas:
+  candidate:
+    focus: public campaign communication captured from researcher-approved browser targets
+  party:
+    focus: public party communication captured from researcher-approved browser targets
+  institutional:
+    focus: official electoral and legislative information collected through bounded non-browser sources
+  media:
+    focus: public news and long-form context when explicitly enabled in the private overlay
+
+browser_sampling:
+  platforms: [x, instagram, tiktok]
+  mode: manual_interactive
+  backend_host: 127.0.0.1
+  rules:
+    - reuse the shared Firefox extension and capture backend
+    - preserve collection_id, arena and explicit source provenance
+    - never auto-discover or auto-fill missing political actors
+    - verify researcher-approved public accounts before activating a live overlay
+
+non_browser_sampling:
+  preferred_sources: [official_rss, official_web, youtube_transcript]
+  rules:
+    - keep each cycle bounded
+    - prefer canonical collectors over study-specific forks
+    - avoid duplicating browser targets
+    - use canonical URL plus collection_id for study-scoped deduplication
+
+handoff:
+  contract: docs/ANALYSIS_HANDOFF.md
+  schema: CanonicalRecord
+  collection_id: brazil26
+  downstream:
+    analysis_selector: collection_id=brazil26
+    visualization_isolation: collection_id=brazil26
+
+privacy_boundary:
+  public:
+    - sampling and provenance rules
+    - synthetic browser fixtures
+    - official institutional source examples
+    - runtime topology without secrets
+  private:
+    - live candidate and party target overlays
+    - account handles not intentionally published as public examples
+    - credentials and cookies
+    - private endpoints and machine paths
+    - raw collected study data
