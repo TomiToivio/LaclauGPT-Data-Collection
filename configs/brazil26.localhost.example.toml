@@ -1,0 +1,38 @@
+profile = "brazil26-localhost"
+machine = "laptop"
+execution = "cli"
+browser = "firefox-local"
+project_id = "brazil26"
+
+# Local-first researcher profile. No MongoDB, Redis or S3 is required.
+[storage]
+records = "auto"
+objects = "filesystem"
+cache = "memory"
+
+[paths]
+data_root = "./data"
+sqlite_path = "./data/database/collection.sqlite3"
+
+[browser_capture]
+host = "127.0.0.1"
+port = 8765
+interactive = true
+
+[collector]
+mode = "localhost"
+workers = 1
+download_media = true
+non_browser_enabled = true
+source_manifest = "configs/studies/brazil26.sources.example.toml"
+
+[distributed]
+config_backend = "local"
+messaging_backend = "none"
+task_queue_backend = "direct"
+
+[interoperability]
+schema_version = "1.1.0"
+collection_id = "brazil26"
+emit_jsonl = true
+emit_csv = true
