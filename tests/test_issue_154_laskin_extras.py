@@ -43,11 +43,17 @@ def test_preflight_reports_extra_and_job_kind(monkeypatch) -> None:
     assert all("configured jobs:" in error and "missing modules:" in error for error in errors)
 
 
-def test_laskin_docs_install_complete_non_browser_extra() -> None:
+def test_phase1_docs_install_complete_non_browser_extra() -> None:
     runbook = (ROOT / "docs" / "AI26_LASKIN_COLLECTION.md").read_text(encoding="utf-8")
     handoff = (ROOT / "docs" / "HERMES_AI26_LASKIN_HANDOFF.md").read_text(encoding="utf-8")
-    install = "pip install -e '.[distributed,phase1-non-browser]'"
-    assert install in runbook
-    assert install in handoff
-    assert "pip install -e '.[distributed,feeds]'" not in runbook
-    assert "pip install -e '.[distributed,feeds]'" not in handoff
+    smoke = (ROOT / "docs" / "distributed-ai26-smoke-test.md").read_text(encoding="utf-8")
+    complete = "phase1-non-browser"
+    incomplete = "pip install -e '.[distributed,feeds]'"
+    incomplete_python = "python -m pip install -e '.[distributed,feeds]'"
+
+    assert complete in runbook
+    assert complete in handoff
+    assert complete in smoke
+    assert incomplete not in runbook
+    assert incomplete not in handoff
+    assert incomplete_python not in smoke
