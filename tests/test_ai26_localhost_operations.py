@@ -14,13 +14,7 @@ def test_ai26_collection_codebook_is_valid_yaml() -> None:
 
 
 def test_ai26_localhost_cron_wrappers_resolve_repo_virtualenv() -> None:
-    """Cron's PATH excludes both .venv/bin and ~/.local/bin.
-
-    The wrappers resolve their interpreter through the shared
-    ``scripts/ai26_runtime.sh`` helper rather than exporting a literal PATH
-    string, because a literal export silently produces a broken entry when
-    HOME is unset (``${HOME:-}`` expands to nothing under ``env -i``).
-    """
+    """Cron's PATH excludes both .venv/bin and ~/.local/bin."""
     runtime = (ROOT / "scripts/ai26_runtime.sh").read_text(encoding="utf-8")
     assert ".venv/bin" in runtime
     assert ".local/bin" in runtime
@@ -37,6 +31,27 @@ def test_ai26_localhost_cron_wrappers_resolve_repo_virtualenv() -> None:
             f"{name} still guards on a bare `command -v laclaugpt-*`, which "
             "fails under cron"
         )
+
+
+def test_ai26_localhost_collect_uses_one_wrapper_for_rss_and_phase1_plugins() -> None:
+    text = (ROOT / "scripts/run_ai26_localhost_collect.sh").read_text(encoding="utf-8")
+    assert "laclaugpt-server-rss" in text
+    assert "laclaugpt_data_collection.ai26_localhost_collect" in text
+    assert text.count("--collection-id ai26") == 2
+    assert "--project-id ai26" in text
+    assert "run_firefox_study.sh" not in text, "Firefox must remain interactive/manual"
+
+
+def test_ai26_localhost_phase1_runner_preserves_sampling_as_provenance() -> None:
+    text = (
+        ROOT / "src/laclaugpt_data_collection/ai26_localhost_collect.py"
+    ).read_text(encoding="utf-8")
+    assert '"sampling-provenance-only"' in text
+    assert '"ideology_ground_truth": False' in text
+    assert '"collection_machine"' in text
+    assert '"publication_time_unresolved"' in text
+    assert '"bluesky"' in text
+    assert '"arxiv"' in text
 
 
 def test_ai26_localhost_docs_have_no_placeholder_cron_workdir() -> None:
