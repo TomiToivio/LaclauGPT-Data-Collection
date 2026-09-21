@@ -122,15 +122,22 @@ Re-running it is safe: the existing distributed sync/lease logic is responsible 
 
 ## 5. Run non-browser collection
 
-The current unattended non-browser worker intentionally starts with RSS/Atom, the highest-value low-friction source family already implemented for the distributed AI26 test.
+Use the single bounded localhost wrapper:
 
 ```bash
 bash scripts/run_ai26_localhost_collect.sh
 ```
 
-It uses `data/config/ai26.sources.toml`, applies bounded per-feed/batch limits and writes through the existing distributed sink to the same AI26 MongoDB/Redis/S3 namespace.
+One invocation performs two canonical passes under the same lock and scheduler:
 
-Other source collectors should be added to the same bounded runner as their canonical implementations mature. Do not create a second scheduler or parallel schema merely to add another platform.
+1. RSS/Atom through the mature `laclaugpt-server-rss` worker.
+2. Executable Phase 1 plugins from the same source manifest: bounded Bluesky account collection and arXiv-backed scholarly queries.
+
+Both passes use `project_id=ai26` and `collection_id=ai26`, write through the configured canonical record backend, and remain idempotent by canonical source identity. The Phase 1 plugin pass applies the study's `publication_date_floor` (currently `2026-09-01`). Missing publication timestamps are retained but explicitly marked unresolved, matching the public study policy.
+
+Source-family labels, arena, priority and machine identity are sampling/collection provenance only. They are not ideology ground truth and must not become Laclaudian or ideological classifications during Collection.
+
+X remains browser-assisted and manual. Firefox itself is never scheduled. Mastodon account rows are not guessed through the current public-timeline-only plugin, and YouTube channel-name rows are not converted into invented video URLs. Those source families should join this same wrapper once their canonical target-specific execution path can consume the manifest safely. Do not create a second scheduler or study-specific schema to add them.
 
 ## 6. Download media/files and upload to Allas
 
@@ -184,11 +191,12 @@ Use only public-safe/synthetic material when testing:
 2. `laclaugpt-collect distributed-check --study-config data/config/ai26.yaml` confirms configured remote services.
 3. Start the Firefox backend and capture one public-safe page.
 4. Run `bash scripts/run_ai26_localhost_sync.sh`; verify the canonical record in MongoDB has AI26 routing metadata.
-5. Run `bash scripts/run_ai26_localhost_collect.sh`; verify at least one public RSS item is written or safely deduplicated.
+5. Run `bash scripts/run_ai26_localhost_collect.sh`; verify at least one public RSS, Bluesky or arXiv item is written or safely deduplicated in the same AI26 namespace.
 6. Run `bash scripts/run_ai26_localhost_media.sh` against one small public-safe downloadable object.
 7. Verify the object under the AI26 Allas/S3 project prefix and the corresponding checksum/object metadata in canonical state.
 8. Repeat the sync/collection/media commands and confirm no duplicate canonical records or duplicate object identities are created.
 9. Repeat a wrapper with a cron-like `PATH=/usr/bin:/bin`; it must still find the repository virtualenv command.
+10. Run `python tools/verify_contracts.py`.
 
 ## 10. Troubleshooting
 
