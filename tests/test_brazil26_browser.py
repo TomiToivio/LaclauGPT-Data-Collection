@@ -47,10 +47,17 @@ def test_brazil26_study_guard_rejects_other_study(monkeypatch) -> None:
         brazil26_browser._ensure_brazil26_study("private.yaml")
 
 
-def test_brazil26_settings_defaults_project_and_run_id(monkeypatch) -> None:
+def test_brazil26_settings_defaults_project_and_run_id(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".env").write_text(
+        "LACLAUGPT_PROJECT_ID=ai26\nLACLAUGPT_RUN_ID=ambient-dotenv\n",
+        encoding="utf-8",
+    )
     monkeypatch.delenv("LACLAUGPT_PROJECT_ID", raising=False)
     monkeypatch.delenv("LACLAUGPT_RUN_ID", raising=False)
-    settings = brazil26_browser._brazil26_settings()
+
+    settings = brazil26_browser._brazil26_settings(env_file=None)
+
     assert settings.project_id == "brazil26"
     assert settings.run_id.startswith("brazil26-browser-")
 
@@ -58,7 +65,7 @@ def test_brazil26_settings_defaults_project_and_run_id(monkeypatch) -> None:
 def test_brazil26_settings_rejects_cross_study_namespace(monkeypatch) -> None:
     monkeypatch.setenv("LACLAUGPT_PROJECT_ID", "ai26")
     with pytest.raises(ValueError, match="must be 'brazil26'"):
-        brazil26_browser._brazil26_settings()
+        brazil26_browser._brazil26_settings(env_file=None)
 
 
 def test_mirror_is_incremental_and_persists_collection_id(tmp_path, monkeypatch) -> None:
