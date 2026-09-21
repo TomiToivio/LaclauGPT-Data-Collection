@@ -53,6 +53,44 @@ def test_ai26_study_config_uses_historical_environment_name(
     assert ai26_browser._study_config(None) == "/private/ai26.yaml"
 
 
+
+def test_ai26_settings_ignore_conflicting_ambient_dotenv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / ".env").write_text(
+        "LACLAUGPT_PROJECT_ID=brazil26\n"
+        "LACLAUGPT_RUN_ID=wrong-run\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("LACLAUGPT_PROJECT_ID", raising=False)
+    monkeypatch.delenv("LACLAUGPT_RUN_ID", raising=False)
+
+    settings = ai26_browser._ai26_settings()
+
+    assert settings.project_id == "ai26"
+    assert settings.run_id.startswith("ai26-browser-")
+    assert settings.run_id != "wrong-run"
+
+
+def test_ai26_settings_can_load_explicit_dotenv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    env_file = tmp_path / "explicit.env"
+    env_file.write_text(
+        "LACLAUGPT_PROJECT_ID=ai26\n"
+        "LACLAUGPT_RUN_ID=explicit-run\n",
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("LACLAUGPT_PROJECT_ID", raising=False)
+    monkeypatch.delenv("LACLAUGPT_RUN_ID", raising=False)
+
+    settings = ai26_browser._ai26_settings(env_file=env_file)
+
+    assert settings.project_id == "ai26"
+    assert settings.run_id == "explicit-run"
+
+
 def test_ai26_backend_refuses_non_loopback_before_network_calls(tmp_path: Path) -> None:
     config = _write_study(tmp_path / "ai26.yaml", "ai26")
     with pytest.raises(ValueError, match="localhost/loopback"):
