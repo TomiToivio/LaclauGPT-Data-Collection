@@ -10,9 +10,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import signal
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -685,7 +685,7 @@ def run_validate(*, data_root: str | Path) -> int:
                     payload = json.loads(line)
                     if not isinstance(payload, dict):
                         raise ValueError("row is not a JSON object")
-                    collection_id = payload.get("collection_id")
+                    collection_id = payload.pop("collection_id", None)
                     if collection_id not in (None, "", PROJECT_ID):
                         raise ValueError(f"cross-study collection_id={collection_id!r}")
                     record = CanonicalRecord.model_validate(payload)
