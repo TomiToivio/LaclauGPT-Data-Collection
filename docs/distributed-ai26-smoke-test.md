@@ -12,10 +12,10 @@ On the laptop:
 python -m pip install -e '.[distributed]'
 ```
 
-On the Linux server, add RSS support for the first non-browser worker:
+On the Linux server, install the complete Phase 1 non-browser dependency set:
 
 ```bash
-python -m pip install -e '.[distributed,feeds]'
+python -m pip install -e '.[distributed,phase1-non-browser]'
 ```
 
 ## 2. Export the shared run contract
