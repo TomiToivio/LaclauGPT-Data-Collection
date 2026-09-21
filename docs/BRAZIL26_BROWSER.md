@@ -1,6 +1,6 @@
 # Brazil26 Firefox browser collection
 
-Brazil26 is a human-researcher workflow built on the shared LaclauGPT Firefox capture stack. Operational study configuration remains private. The canonical study file is:
+Brazil26 is a human-researcher workflow built on the shared LaclauGPT Firefox capture stack. For the complete one-researcher localhost workflow, including preflight/status/stop/validation, see [`brazil26-localhost.md`](brazil26-localhost.md). Operational study configuration remains private. The canonical study file is:
 
 ```text
 LaclauGPT-Private/collection/brazil26/brazil-election-2026.yaml
@@ -22,7 +22,7 @@ That command:
 2. refuses to fall back to the public example config when the private file is missing;
 3. reuses the existing Brazil26 data root and durable SQLite/media/mirror state;
 4. ensures the marker-managed Brazil26 cron block exists;
-5. starts the localhost-only capture backend and distributed mirror;
+5. starts the localhost-only capture backend; distributed mirroring is enabled only when the effective runtime explicitly requests MongoDB/Redis/S3;
 6. launches Firefox using the configured Brazil26 research profile;
 7. keeps the process attached so Ctrl-C stops the local session cleanly.
 
@@ -37,8 +37,10 @@ The launcher does not rename or migrate the active dataset.
 ## Runtime environment
 
 The launcher reads `data/config/brazil26-localhost.env` when present and then
-forces the study identity to `LACLAUGPT_PROJECT_ID=brazil26`. MongoDB, Redis
-and CSC Allas/S3 settings should stay in ignored/private runtime configuration.
+forces the study identity to `LACLAUGPT_PROJECT_ID=brazil26`. The public default
+is local-only (`auto`/filesystem/memory/local), so MongoDB, Redis and CSC
+Allas/S3 are not required. Distributed settings remain optional and must stay
+in ignored/private runtime configuration.
 
 Useful browser variables:
 
@@ -102,7 +104,7 @@ records even when both accidentally exist below one local data root.
 
 ## Cron
 
-The one-command launcher runs `scripts/install_cron_brazil26.sh`. The installer
+The one-command launcher runs `scripts/install_cron_brazil26.sh` unless `--no-cron` is used. The installer
 owns a marker-delimited block:
 
 ```text
