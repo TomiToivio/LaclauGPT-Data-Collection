@@ -86,7 +86,7 @@ Analysis, simulation, dashboards, research datasets, operational target lists, c
 ## Phase 1 runtime and legacy Phase 0 compatibility
 
 > [!IMPORTANT]
-> **Current development phase: Phase 1.** `phase-1` is the canonical active development/stable phase branch, and `main` MUST match its current validated state. The `phase-0` branch is a preserved legacy baseline only. New unphased work defaults to Phase 1; Phase 2–4 remain isolated until explicitly promoted.
+> **Current development phase: Phase 1.** All Phase 1 work goes directly to `main`. The `phase-1` branch is a passive mirror of the validated `main` tree. The `phase-0` branch is a preserved legacy baseline only. New unphased work defaults to Phase 1 on `main`; Phase 2–4 remain isolated until explicitly promoted.
 
 Phase 1 is now the active repository state. The narrow Phase 0 RSS/Atom path below is retained only as a compatibility baseline and rollback reference while Phase 1 capabilities are restored incrementally:
 
