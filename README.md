@@ -141,6 +141,8 @@ source .venv/bin/activate
 python -m pip install -e '.[dev]'
 ```
 
+The `dev` extra is the supported contract for running the full test suite. It includes the test-time RDF/SHACL dependencies used by the knowledge-graph tests. Install the separate `kg` extra when developing or running the optional knowledge-graph backends themselves.
+
 Optional distributed backends:
 
 ```bash

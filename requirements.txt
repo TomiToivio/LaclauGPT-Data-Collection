@@ -1,4 +1,4 @@
 # Reproducible workstation install for issue #76.
 # Run from the repository root:
 #   python -m pip install -r requirements.txt
--e .[distributed,feeds,browser,telegram,youtube,documents,web-mining]
+-e .[distributed,feeds,browser,telegram,youtube,documents,web-mining,dev]

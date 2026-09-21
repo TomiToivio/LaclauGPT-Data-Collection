@@ -54,7 +54,7 @@ On Laskin:
 cd /mnt/workspace/LaclauGPT-Data-Collection
 python -m venv .venv
 source .venv/bin/activate
-pip install -e '.[distributed,phase1-non-browser]'
+pip install -e '.[distributed,phase1-non-browser,dev]'
 mkdir -p data/config data/logs data/tmp
 cp configs/studies/ai26.example.yaml data/config/ai26.yaml
 cp configs/studies/ai26.sources.example.toml data/config/ai26.sources.toml
