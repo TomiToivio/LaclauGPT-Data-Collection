@@ -55,6 +55,37 @@ def test_brazil26_settings_defaults_project_and_run_id(monkeypatch) -> None:
     assert settings.run_id.startswith("brazil26-browser-")
 
 
+def test_brazil26_settings_ignore_conflicting_ambient_dotenv(tmp_path, monkeypatch) -> None:
+    (tmp_path / ".env").write_text(
+        "LACLAUGPT_PROJECT_ID=ai26\n"
+        "LACLAUGPT_RUN_ID=wrong-run\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("LACLAUGPT_PROJECT_ID", raising=False)
+    monkeypatch.delenv("LACLAUGPT_RUN_ID", raising=False)
+
+    settings = brazil26_browser._brazil26_settings()
+
+    assert settings.project_id == "brazil26"
+    assert settings.run_id.startswith("brazil26-browser-")
+    assert settings.run_id != "wrong-run"
+
+
+def test_settings_can_still_load_an_explicit_dotenv(tmp_path) -> None:
+    env_file = tmp_path / "explicit.env"
+    env_file.write_text(
+        "LACLAUGPT_PROJECT_ID=from-file\n"
+        "LACLAUGPT_RUN_ID=explicit-run\n",
+        encoding="utf-8",
+    )
+
+    settings = Settings(_env_file=env_file)
+
+    assert settings.project_id == "from-file"
+    assert settings.run_id == "explicit-run"
+
+
 def test_brazil26_settings_rejects_cross_study_namespace(monkeypatch) -> None:
     monkeypatch.setenv("LACLAUGPT_PROJECT_ID", "ai26")
     with pytest.raises(ValueError, match="must be 'brazil26'"):
