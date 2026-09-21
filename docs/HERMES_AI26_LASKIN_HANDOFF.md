@@ -26,7 +26,7 @@ cd /mnt/workspace/LaclauGPT-Data-Collection
 git pull --ff-only origin main
 python -m venv .venv
 source .venv/bin/activate
-pip install -e '.[distributed,phase1-non-browser]'
+pip install -e '.[distributed,phase1-non-browser,dev]'
 ```
 
 The aggregate extra above must remain aligned with the checked-in source manifest. A missing optional dependency is a setup failure, not a routine partial collection tick.\n\n6. Run repository/offline gates first:
