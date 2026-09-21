@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import signal
 import shlex
 import shutil
 import subprocess
@@ -25,6 +26,7 @@ from .capture_server import CaptureServer
 from .config import Settings
 from .distributed_capture import DistributedCaptureSink
 from .distributed_media_runner import MediaRunLockedError, run_distributed_media
+from .models import CanonicalRecord
 from .store import utc_stamp
 from .study import load_config
 
@@ -255,13 +257,16 @@ def run_backend(
         raise ValueError("Brazil26 browser backend must bind to localhost/loopback")
     study = _ensure_brazil26_study(study_config)
     settings = _brazil26_settings()
-    mirror = JsonlDistributedMirror(
-        settings,
-        study_config=study_config,
-        data_root=data_root,
-        interval_seconds=sync_interval,
-    )
-    remote = mirror.sink.smoke_check()
+    mirror: JsonlDistributedMirror | None = None
+    remote: dict[str, Any] = {"status": "disabled", "reason": "local-only profile"}
+    if settings.distributed_requested:
+        mirror = JsonlDistributedMirror(
+            settings,
+            study_config=study_config,
+            data_root=data_root,
+            interval_seconds=sync_interval,
+        )
+        remote = {"status": "enabled", **mirror.sink.smoke_check()}
     print(
         json.dumps(
             {
@@ -277,19 +282,22 @@ def run_backend(
         flush=True,
     )
 
-    mirror.scan_once()
+    if mirror is not None:
+        mirror.scan_once()
     server = CaptureServer(study_config, data_root, host=host, port=port)
-    mirror.start()
+    if mirror is not None:
+        mirror.start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
-        mirror.stop()
-        try:
-            mirror.scan_once()
-        except Exception as exc:  # noqa: BLE001
-            print(f"final distributed mirror failed: {exc}", flush=True)
+        if mirror is not None:
+            mirror.stop()
+            try:
+                mirror.scan_once()
+            except Exception as exc:  # noqa: BLE001
+                print(f"final distributed mirror failed: {exc}", flush=True)
         server.store.write_manifest(
             {
                 "study": server.cfg.study,
@@ -297,8 +305,9 @@ def run_backend(
                 "run_id": settings.run_id,
                 "stats": dict(server.stats),
                 "seen_total": server.store.seen_count(),
-                "distributed_synced_total": mirror.synced_total,
-                "distributed_last_error": mirror.last_error,
+                "distributed_enabled": mirror is not None,
+                "distributed_synced_total": mirror.synced_total if mirror is not None else 0,
+                "distributed_last_error": mirror.last_error if mirror is not None else "",
             }
         )
         server.store.close()
@@ -429,8 +438,24 @@ def run_researcher_session(
         str(sync_interval),
     ]
     backend = subprocess.Popen(command, cwd=root, env=env)
+    session_path = _session_file(chosen_data_root)
+    previous_sigterm: Any = None
+    if hasattr(signal, "SIGTERM"):
+        previous_sigterm = signal.getsignal(signal.SIGTERM)
+
+        def _stop_signal(_signum: int, _frame: Any) -> None:
+            raise KeyboardInterrupt
+
+        signal.signal(signal.SIGTERM, _stop_signal)
     try:
         _wait_for_backend(host, port, backend)
+        _write_session(
+            chosen_data_root,
+            backend_pid=backend.pid,
+            host=host,
+            port=port,
+            study_config=config,
+        )
         if launch_browser:
             subprocess.Popen(_firefox_command(env), cwd=root, env=env)
         print(
@@ -453,6 +478,7 @@ def run_researcher_session(
     except KeyboardInterrupt:
         return 0
     finally:
+        session_path.unlink(missing_ok=True)
         if backend.poll() is None:
             backend.terminate()
             try:
@@ -460,7 +486,225 @@ def run_researcher_session(
             except subprocess.TimeoutExpired:
                 backend.kill()
                 backend.wait()
+        if previous_sigterm is not None:
+            signal.signal(signal.SIGTERM, previous_sigterm)
 
+
+
+def _session_file(data_root: str | Path) -> Path:
+    return Path(data_root) / ".brazil26-session.json"
+
+
+def _load_session(data_root: str | Path) -> dict[str, Any]:
+    path = _session_file(data_root)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _write_session(
+    data_root: str | Path, *, backend_pid: int, host: str, port: int, study_config: Path
+) -> None:
+    path = _session_file(data_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "project_id": PROJECT_ID,
+                "pid": os.getpid(),
+                "backend_pid": backend_pid,
+                "backend": f"http://{host}:{port}",
+                "study_config": str(study_config),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _backend_status(host: str, port: int) -> dict[str, Any] | None:
+    try:
+        with urlopen(f"http://{host}:{port}/status", timeout=0.5) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (OSError, URLError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def run_preflight(
+    *,
+    study_config: str | Path | None = None,
+    data_root: str | Path | None = None,
+    require_browser: bool = True,
+    repo_root: Path | None = None,
+) -> int:
+    root = (repo_root or _repo_root()).resolve()
+    problems: list[str] = []
+    warnings: list[str] = []
+    try:
+        config = _resolve_study_config(study_config, repo_root=root)
+        study = _ensure_brazil26_study(config)
+    except (FileNotFoundError, ValueError) as exc:
+        config = Path(study_config or "")
+        study = ""
+        problems.append(str(exc))
+
+    chosen_data_root = Path(
+        data_root or os.environ.get("LACLAUGPT_DATA_ROOT", root / "data")
+    ).expanduser().resolve()
+    try:
+        chosen_data_root.mkdir(parents=True, exist_ok=True)
+        probe = chosen_data_root / ".brazil26-write-test"
+        probe.write_text("ok\n", encoding="utf-8")
+        probe.unlink()
+    except OSError as exc:
+        problems.append(f"data root is not writable: {chosen_data_root}: {exc}")
+
+    env_file = Path(
+        os.environ.get("LACLAUGPT_ENV_FILE", root / "data/config/brazil26-localhost.env")
+    )
+    runtime = _read_env_file(env_file)
+    configured_project = runtime.get("LACLAUGPT_PROJECT_ID", PROJECT_ID)
+    if configured_project != PROJECT_ID:
+        problems.append(
+            f"runtime env must use LACLAUGPT_PROJECT_ID={PROJECT_ID}, got {configured_project!r}"
+        )
+    if not env_file.is_file():
+        warnings.append(
+            f"runtime env not found: {env_file}; copy configs/brazil26.env.example for explicit settings"
+        )
+
+    extension = root / "browser/firefox/manifest.json"
+    if not extension.is_file():
+        problems.append(f"Firefox extension manifest missing: {extension}")
+
+    browser_command: list[str] = []
+    if require_browser:
+        env = dict(os.environ)
+        env.update(runtime)
+        try:
+            browser_command = _firefox_command(env)
+        except RuntimeError as exc:
+            problems.append(str(exc))
+
+    distributed_keys = (
+        runtime.get("LACLAUGPT_RECORD_BACKEND") == "mongodb"
+        or runtime.get("LACLAUGPT_OBJECT_BACKEND") == "s3"
+        or runtime.get("LACLAUGPT_CACHE_BACKEND") == "redis"
+        or runtime.get("LACLAUGPT_DISTRIBUTED_CONFIG_BACKEND") == "redis"
+    )
+    result = {
+        "status": "ok" if not problems else "invalid",
+        "project_id": PROJECT_ID,
+        "study": study,
+        "study_config": str(config) if config else "",
+        "data_root": str(chosen_data_root),
+        "env_file": str(env_file),
+        "extension_manifest": str(extension),
+        "browser_command": browser_command,
+        "distributed_requested": bool(distributed_keys),
+        "problems": problems,
+        "warnings": warnings,
+    }
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return 0 if not problems else 2
+
+
+def run_status(*, data_root: str | Path, host: str, port: int) -> int:
+    root = Path(data_root).expanduser().resolve()
+    session = _load_session(root)
+    live = _backend_status(host, port)
+    normalized = root / "normalized"
+    files = sorted(normalized.glob("*.jsonl")) if normalized.is_dir() else []
+    rows = 0
+    for path in files:
+        try:
+            with path.open("r", encoding="utf-8") as handle:
+                rows += sum(1 for line in handle if line.strip())
+        except OSError:
+            continue
+    result = {
+        "status": "running" if live is not None else "stopped",
+        "project_id": PROJECT_ID,
+        "backend": f"http://{host}:{port}",
+        "backend_status": live,
+        "session": session,
+        "data_root": str(root),
+        "normalized_files": len(files),
+        "normalized_rows": rows,
+    }
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return 0 if live is not None else 3
+
+
+def run_stop(*, data_root: str | Path) -> int:
+    root = Path(data_root).expanduser().resolve()
+    path = _session_file(root)
+    session = _load_session(root)
+    pid = int(session.get("pid") or 0)
+    if pid <= 0:
+        print(json.dumps({"status": "stopped", "project_id": PROJECT_ID, "message": "no active session"}))
+        return 0
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        path.unlink(missing_ok=True)
+        print(json.dumps({"status": "stopped", "project_id": PROJECT_ID, "message": "stale session cleared"}))
+        return 0
+    except OSError as exc:
+        print(json.dumps({"status": "error", "project_id": PROJECT_ID, "error": str(exc)}))
+        return 2
+    print(json.dumps({"status": "stopping", "project_id": PROJECT_ID, "pid": pid}))
+    return 0
+
+
+def run_validate(*, data_root: str | Path) -> int:
+    root = Path(data_root).expanduser().resolve()
+    normalized = root / "normalized"
+    errors: list[str] = []
+    checked = 0
+    urls: set[str] = set()
+    duplicates = 0
+    files = sorted(normalized.glob("*.jsonl")) if normalized.is_dir() else []
+    for path in files:
+        try:
+            handle = path.open("r", encoding="utf-8")
+        except OSError as exc:
+            errors.append(f"{path}: {exc}")
+            continue
+        with handle:
+            for line_number, line in enumerate(handle, 1):
+                if not line.strip():
+                    continue
+                checked += 1
+                try:
+                    payload = json.loads(line)
+                    if not isinstance(payload, dict):
+                        raise ValueError("row is not a JSON object")
+                    collection_id = payload.get("collection_id")
+                    if collection_id not in (None, "", PROJECT_ID):
+                        raise ValueError(f"cross-study collection_id={collection_id!r}")
+                    record = CanonicalRecord.model_validate(payload)
+                    if record.source_url in urls:
+                        duplicates += 1
+                    urls.add(record.source_url)
+                except Exception as exc:  # noqa: BLE001
+                    errors.append(f"{path.name}:{line_number}: {exc}")
+    result = {
+        "status": "ok" if not errors else "invalid",
+        "project_id": PROJECT_ID,
+        "data_root": str(root),
+        "files": len(files),
+        "records_checked": checked,
+        "duplicate_source_urls": duplicates,
+        "errors": errors[:50],
+    }
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return 0 if not errors else 2
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -483,10 +727,26 @@ def _parser() -> argparse.ArgumentParser:
     backend.add_argument("--port", type=int, default=8765)
     backend.add_argument("--sync-interval", type=float, default=1.0)
 
-    check = sub.add_parser("check", help="verify Brazil26 identity and remote control plane")
+    preflight = sub.add_parser("preflight", help="check localhost researcher setup before collection")
+    preflight.add_argument("--study-config", default=None)
+    preflight.add_argument("--data-root", default=None)
+    preflight.add_argument("--no-browser", action="store_true")
+
+    status = sub.add_parser("status", help="show the localhost Brazil26 session and data status")
+    status.add_argument("--data-root", default="./data")
+    status.add_argument("--host", default="127.0.0.1")
+    status.add_argument("--port", type=int, default=8765)
+
+    stop = sub.add_parser("stop", help="stop the active localhost Brazil26 researcher session")
+    stop.add_argument("--data-root", default="./data")
+
+    validate = sub.add_parser("validate", help="validate local canonical JSONL for analysis handoff")
+    validate.add_argument("--data-root", default="./data")
+
+    check = sub.add_parser("check", help="verify Brazil26 identity and configured remote control plane")
     check.add_argument("--study-config", required=True)
 
-    media = sub.add_parser("media", help="download pending Brazil26 media to S3/Allas")
+    media = sub.add_parser("media", help="download pending Brazil26 media to configured storage")
     media.add_argument("--study-config", required=True)
     media.add_argument("--data-root", required=True)
     media.add_argument("--workers", type=int, default=4)
@@ -510,6 +770,18 @@ def main(argv: list[str] | None = None) -> int:
         except (FileNotFoundError, RuntimeError, ValueError, subprocess.CalledProcessError) as exc:
             print(f"Brazil26 startup failed: {exc}", file=sys.stderr)
             return 2
+    if args.command == "preflight":
+        return run_preflight(
+            study_config=args.study_config,
+            data_root=args.data_root,
+            require_browser=not args.no_browser,
+        )
+    if args.command == "status":
+        return run_status(data_root=args.data_root, host=args.host, port=args.port)
+    if args.command == "stop":
+        return run_stop(data_root=args.data_root)
+    if args.command == "validate":
+        return run_validate(data_root=args.data_root)
     if args.command == "backend":
         return run_backend(
             study_config=args.study_config,
