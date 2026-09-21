@@ -35,8 +35,9 @@ def _ensure_ai26_study(study_config: str | Path) -> str:
     return study
 
 
-def _ai26_settings() -> Settings:
-    settings = Settings()
+def _ai26_settings(*, env_file: str | Path | None = None) -> Settings:
+    """Load AI26 settings without reading an ambient dotenv by default."""
+    settings = Settings(_env_file=env_file)
     if settings.project_id in {"", "default"}:
         settings.project_id = PROJECT_ID
     if settings.project_id != PROJECT_ID:
