@@ -115,7 +115,6 @@ def _records_for_job(
     row: dict[str, Any], *, collection_id: str, worker_id: str, per_source_limit: int
 ) -> tuple[list[NormalizedRecord], list[str]]:
     kind = str(row["kind"])
-    warnings: list[str] = []
     if kind == "bluesky_account":
         handle = str(row.get("handle") or "").strip()
         if not handle:
