@@ -54,14 +54,14 @@ On Laskin:
 cd /mnt/workspace/LaclauGPT-Data-Collection
 python -m venv .venv
 source .venv/bin/activate
-pip install -e '.[distributed,feeds]'
+pip install -e '.[distributed,phase1-non-browser]'
 mkdir -p data/config data/logs data/tmp
 cp configs/studies/ai26.example.yaml data/config/ai26.yaml
 cp configs/studies/ai26.sources.example.toml data/config/ai26.sources.toml
 cp configs/studies/ai26.collection-codebook.yaml data/config/ai26.collection-codebook.yaml
 ```
 
-Runtime credentials are supplied through the gitignored `.env` at the repository root (the wrapper loads it itself, because cron inherits no interactive shell). The relevant contract:
+The `phase1-non-browser` extra is the dependency contract for every non-browser source family declared by the shipped AI26 manifest. The runner also performs a manifest-aware preflight and exits with a setup error naming the missing extra and job kind before collection starts.\n\nRuntime credentials are supplied through the gitignored `.env` at the repository root (the wrapper loads it itself, because cron inherits no interactive shell). The relevant contract:
 
 ```bash
 LACLAUGPT_PROJECT_ID=ai26
@@ -215,7 +215,7 @@ A healthy tick logs one JSON line with `"status": "ok"` and `"errors": []`. `dup
 cd /mnt/workspace/LaclauGPT-Data-Collection
 git pull --ff-only origin main
 source .venv/bin/activate
-pip install -e '.[distributed,feeds]'
+pip install -e '.[distributed,phase1-non-browser]'
 ```
 
 An editable install means `git pull` alone updates the code; the `pip install` refresh is only needed when dependencies change. Then rerun the profile check and one manual collection cycle before relying on the next cron invocation.
