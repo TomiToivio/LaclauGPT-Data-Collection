@@ -1,8 +1,8 @@
 """Regression tests for issue #154: Laskin optional dependency contract."""
 from __future__ import annotations
 
-from pathlib import Path
 import tomllib
+from pathlib import Path
 
 from laclaugpt_data_collection import ai26_laskin_runner as runner
 
