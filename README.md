@@ -19,21 +19,29 @@ The framework is developed around Ernesto Laclau and Chantal Mouffe's discourse 
 <!-- project-background:start -->
 ## Project background and funding
 
-LaclauGPT grew out of research-software work at the **[Helsinki Hub on Emotions, Populism and Polarisation (HEPPsinki)](https://www.helsinki.fi/en/researchgroups/emotions-populism-and-polarisation), University of Helsinki**, and has been developed in connection with three international research projects:
+LaclauGPT grew out of research-software work at the **[Helsinki Hub on Emotions, Populism and Polarisation (HEPP)](https://www.helsinki.fi/en/researchgroups/emotions-populism-and-polarisation), University of Helsinki**, and the **2024 European Parliament election (EP24)** research programme. The EP24 pipeline collected and analysed multimodal TikTok and Instagram material across multiple European countries; the current modular LaclauGPT framework generalises that work into reusable Data Collection, Data Analysis and Data Visualization components.
+
+The software has been developed in connection with three international research projects supported by the **European Union** and the **Research Council of Finland / Academy of Finland**. The project logos below link to the official project pages.
 
 <p align="center">
-  <a href="https://www.co3socialcontract.eu/"><img src="https://www.google.com/s2/favicons?domain_url=https://www.co3socialcontract.eu/&sz=128" width="72" height="72" alt="CO3 project logo"></a>
+  <a href="https://www.co3socialcontract.eu/" title="CO3 — Continuous Construction of Resilient Social Contracts Through Societal Transformations">
+    <img src="https://www.helsinki.fi/assets/drupal/styles/16_10_fallback/s3/media-image/co3_rgb%20%281%29.jpg.jpeg?itok=2G8xjx4J" height="92" alt="CO3 project logo">
+  </a>
   &nbsp;&nbsp;&nbsp;&nbsp;
-  <a href="https://www.endure-project.org/"><img src="https://www.google.com/s2/favicons?domain_url=https://www.endure-project.org/&sz=128" width="72" height="72" alt="ENDURE project logo"></a>
+  <a href="https://www.endure-project.org/" title="ENDURE — Inequalities, Community Resilience and New Governance Modalities in a Post-Pandemic World">
+    <img src="https://www.endure-project.org/favicon.ico" height="72" alt="ENDURE project logo">
+  </a>
   &nbsp;&nbsp;&nbsp;&nbsp;
-  <a href="https://www.pledgeproject.eu/"><img src="https://www.google.com/s2/favicons?domain_url=https://www.pledgeproject.eu/&sz=128" width="72" height="72" alt="PLEDGE project logo"></a>
+  <a href="https://www.pledgeproject.eu/" title="PLEDGE — Politics of Grievance and Democratic Governance">
+    <img src="https://cdn.myportfolio.com/80780752-1793-414b-936a-f0cd10a2ac7d/57c00d24-bb6a-4af2-a001-c65a765651f9_rw_1920.png?h=41199a43847532a5a8800551fe811ed5" height="92" alt="PLEDGE project logo">
+  </a>
 </p>
 
-- **[CO3 — Continuous Construction of Resilient Social Contracts Through Societal Transformations](https://www.co3socialcontract.eu/)** studies how more democratic, inclusive and resilient social contracts can be built and renewed. CO3 is funded by the European Union's Horizon Europe programme (grant agreement No. 101132631).
-- **[ENDURE — Inequalities, Community Resilience and New Governance Modalities in a Post-Pandemic World](https://www.endure-project.org/)** examines inequalities, community resilience and governance after COVID-19. ENDURE was funded through the Trans-Atlantic Platform Recovery, Renewal and Resilience call; Finnish participation was supported by the Academy of Finland / Research Council of Finland.
-- **[PLEDGE — Politics of Grievance and Democratic Governance](https://www.pledgeproject.eu/)** studies the emotional dynamics of political grievances and democratic governance. PLEDGE is funded by the European Union's Horizon Europe programme.
+- **[CO3 — Continuous Construction of Resilient Social Contracts Through Societal Transformations](https://www.co3socialcontract.eu/)** studies more democratic, inclusive and resilient social contracts. It is funded by the European Union's Horizon Europe programme under grant agreement **No. 101132631**.
+- **[ENDURE — Inequalities, Community Resilience and New Governance Modalities in a Post-Pandemic World](https://www.endure-project.org/)** examined inequalities, community resilience and governance after COVID-19. It was funded through the **Trans-Atlantic Platform (T-AP) Recovery, Renewal and Resilience** call; Finnish participation was supported by the Academy of Finland / Research Council of Finland.
+- **[PLEDGE — Politics of Grievance and Democratic Governance](https://www.pledgeproject.eu/)** studies the emotional dynamics of political grievances and democratic governance. It is funded by the European Union's Horizon Europe programme under grant agreement **No. 101132560**.
 
-The original LaclauGPT pipeline was used in the **2024 European Parliament election** research programme to collect and analyse multimodal TikTok and Instagram material across multiple European countries. The present modular framework generalises that work into reusable Data Collection, Data Analysis and Data Visualization components.
+LaclauGPT is open research software. References to these projects describe the research and funding context in which the software has been developed; they do not imply that every current LaclauGPT research question or software component is a deliverable of each project.
 
 <!-- project-background:end -->
 
