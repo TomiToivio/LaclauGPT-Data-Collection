@@ -7,6 +7,7 @@ MongoDB/Redis/S3 plane. Machine identity is provenance only.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import time
 import tomllib
@@ -31,6 +32,34 @@ _NON_BROWSER_TABLES = (
     "youtube_source",
     "scholarly_query",
 )
+
+# Optional dependency contract for configured source families. Keep this aligned with
+# pyproject.toml's phase1-non-browser aggregate extra. Kinds absent here use core deps.
+_OPTIONAL_DEPENDENCY_CONTRACT: dict[str, tuple[str, tuple[str, ...]]] = {
+    "mastodon_account": ("mastodon", ("mastodon",)),
+    "youtube_source": ("youtube", ("yt_dlp",)),
+    "scholarly_query": ("documents", ("arxiv",)),
+}
+
+
+def preflight_optional_dependencies(jobs: list[dict[str, Any]]) -> list[str]:
+    """Return loud setup errors for configured job kinds missing optional packages."""
+    configured: dict[str, list[str]] = {}
+    for row in jobs:
+        kind = str(row.get("kind") or "")
+        if kind in _OPTIONAL_DEPENDENCY_CONTRACT:
+            configured.setdefault(kind, []).append(str(row.get("name") or "unnamed"))
+
+    errors: list[str] = []
+    for kind, names in sorted(configured.items()):
+        extra, modules = _OPTIONAL_DEPENDENCY_CONTRACT[kind]
+        missing = [module for module in modules if importlib.util.find_spec(module) is None]
+        if missing:
+            errors.append(
+                f"missing optional extra '{extra}' for job kind '{kind}' "
+                f"(configured jobs: {', '.join(names)}; missing modules: {', '.join(missing)})"
+            )
+    return errors
 
 
 def load_non_browser_jobs(path: str | Path) -> list[dict[str, Any]]:
@@ -161,6 +190,27 @@ def run_phase1_laskin(
     if rotation is None:
         rotation = int(time.time() // 3600)
 
+    all_jobs = load_non_browser_jobs(source_manifest)
+    setup_errors = preflight_optional_dependencies(all_jobs)
+    if setup_errors:
+        return {
+            "status": "setup_error",
+            "project_id": settings.project_id,
+            "collection_id": routed,
+            "worker_id": worker_id,
+            "browser_sources_started": 0,
+            "rss_records_synced": 0,
+            "non_browser_jobs_considered": 0,
+            "non_browser_records_collected": 0,
+            "non_browser_records_synced": 0,
+            "records_synced": 0,
+            "skipped_before_publication_floor": 0,
+            "warnings": [],
+            "errors": setup_errors,
+            "setup_errors": setup_errors,
+            "notification_errors": [],
+        }
+
     rss = run_phase1_rss(
         settings,
         study_config=study_config,
@@ -176,7 +226,7 @@ def run_phase1_laskin(
     sink = DistributedCaptureSink(settings)
     sink.assert_private_config(study_config)
     policy = RealtimePolicy.ai26()
-    jobs = select_job_window(load_non_browser_jobs(source_manifest), max_jobs=max_jobs, rotation=rotation * max_jobs)
+    jobs = select_job_window(all_jobs, max_jobs=max_jobs, rotation=rotation * max_jobs)
     synced = 0
     collected = 0
     skipped_before_floor = 0
