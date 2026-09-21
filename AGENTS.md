@@ -1,3 +1,24 @@
+<!-- PHASE-BRANCH-POLICY:v2 -->
+
+## Mandatory phase-branch policy
+
+LaclauGPT keeps persistent phase branches: `phase-0`, `phase-1`, `phase-2`, `phase-3`, and `phase-4`.
+
+**Current active/stable phase: Phase 1.** All Phase 1 development, fixes, issue work, and pull requests target `main` directly. The `phase-1` ref is a passive compatibility/mirror branch and MUST represent the same validated tree as `main`; agents must not use it as the source or target branch for Phase 1 work. The `phase-0` branch remains the preserved Phase 0 baseline.
+
+Before making any issue-driven change, an agent MUST determine the issue's intended phase from explicit issue text, title, labels, milestone, linked plan, or repository documentation. Then:
+
+1. Phase 1 work starts from `main` and targets `main` directly. Short-lived issue branches, when useful, are created from `main` and PR back to `main`.
+2. Do not create new Phase 1 work from `phase-1`, and do not target Phase 1 PRs at `phase-1`.
+3. After validated Phase 1 changes land on `main`, keep the passive `phase-1` mirror synchronized to the same commit/tree.
+4. Phase 2 through Phase 4 work stays on the matching persistent `phase-N` branch (or a short-lived branch created from it) and must not land on `main` while Phase 1 is current.
+5. Phase 0 maintenance fixes target `phase-0` only and do not move `main` backward.
+6. If an issue has no phase information, treat it as belonging to the current phase unless the task or roadmap clearly says otherwise. Currently that means Phase 1 on `main`.
+7. Do not silently move work between phases. If implementation reveals that an issue belongs to another phase, update/document the issue or report the mismatch before merging.
+8. Preserve `TOMI-LOCKED`, privacy, public/private, runtime-data, scientific-method, and module-boundary rules on every branch.
+
+See `docs/PHASE_BRANCHING.md` for the repository-wide workflow.
+
 <!-- PHASE-BRANCH-POLICY:v1 -->
 
 ## Mandatory phase-branch policy
