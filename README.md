@@ -29,7 +29,7 @@ LaclauGPT grew out of research-software work at the **[Helsinki Hub on Emotions,
   <a href="https://www.endure-project.org/"><img src="https://www.endure-project.org/favicon.ico" width="88" height="88" alt="ENDURE project logo"></a>
 </p>
 
-<p align="center"><strong>🇪🇺 European Union</strong></p>
+<p align="center">\n  <a href="https://european-union.europa.eu/principles-countries-history/symbols/european-flag_en"><img src="https://www.pledgeproject.eu/wp-content/uploads/2024/04/co-funded-by-european-union.png" height="64" alt="European Union flag and funding acknowledgement"></a>\n</p>
 
 - **[CO3 — Continuous Construction of Resilient Social Contracts Through Societal Transformations](https://www.co3socialcontract.eu/)** studies how more democratic, inclusive and resilient social contracts can be built and renewed.
 - **[PLEDGE — Politics of Grievance and Democratic Governance](https://www.pledgeproject.eu/)** studies the emotional dynamics of political grievances and democratic governance.
