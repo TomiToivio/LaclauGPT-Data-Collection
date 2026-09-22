@@ -149,4 +149,4 @@ def test_ai26_public_env_template_has_placeholders_only() -> None:
     assert "LACLAUGPT_PROJECT_ID=ai26" in text
     assert "127.0.0.1" in text
     assert "mongodb://HOST:PORT/" in text
-    assert "LaclauGPT-Private/collection/ai26" in text
+    assert "/path/to/private-config/ai26" in text
