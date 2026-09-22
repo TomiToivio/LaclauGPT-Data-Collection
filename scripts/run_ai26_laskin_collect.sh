@@ -16,10 +16,23 @@ mkdir -p "$ROOT_DIR/data/tmp" "$ROOT_DIR/data/logs"
 [[ -f "$STUDY_CONFIG" ]] || { echo "missing study config: $STUDY_CONFIG" >&2; exit 2; }
 [[ -f "$SOURCE_MANIFEST" ]] || { echo "missing source manifest: $SOURCE_MANIFEST" >&2; exit 2; }
 
+CALLER_OVERRIDE=${LACLAUGPT_CALLER-}
+EXECUTION_OVERRIDE=${LACLAUGPT_EXECUTION-}
+
 set -a
 # shellcheck disable=SC1090
 source "$ENV_FILE"
 set +a
+
+# Explicit invocation metadata wins over defaults in .env. This lets Hermes run the
+# same operational wrapper with LACLAUGPT_CALLER=hermes-agent and
+# LACLAUGPT_EXECUTION=agent without the sourced file silently erasing provenance.
+if [[ -n "$CALLER_OVERRIDE" ]]; then
+  export LACLAUGPT_CALLER="$CALLER_OVERRIDE"
+fi
+if [[ -n "$EXECUTION_OVERRIDE" ]]; then
+  export LACLAUGPT_EXECUTION="$EXECUTION_OVERRIDE"
+fi
 
 if [[ "${LACLAUGPT_BROWSER:-none}" != "none" ]]; then
   echo "refusing Laskin collection with LACLAUGPT_BROWSER=${LACLAUGPT_BROWSER}; browser collection is localhost-only" >&2
