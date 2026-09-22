@@ -88,3 +88,22 @@ def test_openstack_plumbing_is_not_a_false_positive() -> None:
         f"{password_var}=replace-locally\n"
     )
     assert POLICY.content_policy_violations(Path("allas_conf.example.sh"), safe) == []
+
+
+def test_machine_specific_personal_paths_are_rejected_outside_tests() -> None:
+    samples = [
+        "/home/" + "researcher/private/project",
+        "/Users/" + "researcher/private/project",
+        "/mnt/c/Users/" + "researcher/project",
+        "C:\\Users\\" + "researcher\\project",
+    ]
+    for value in samples:
+        assert POLICY.content_policy_violations(Path("docs/runbook.md"), value), value
+
+
+def test_placeholder_paths_are_allowed() -> None:
+    safe = """
+REPO_ROOT=<absolute-repo-path>
+LACLAUGPT_PRIVATE_CONFIG_DIR=<private-config-root>
+"""
+    assert POLICY.content_policy_violations(Path("docs/runbook.md"), safe) == []
