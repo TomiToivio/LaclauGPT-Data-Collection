@@ -16,6 +16,7 @@ from typing import Any
 
 from .collectors.arxiv import ArxivCollector
 from .collectors.bluesky import BlueskyCollector
+from .collectors.rss import RSSCollector
 from .collectors.youtube import YouTubeCollector
 from .config import Settings
 from .distributed_capture import DistributedCaptureSink
@@ -25,6 +26,10 @@ from .server_runner import run_phase1_rss
 from .web_fetch import fetch_web_child
 
 _BROWSER_ONLY_TABLES = {"x_account", "browser_source", "instagram_account", "tiktok_account"}
+_WEB_SOURCE_FEED_FALLBACKS = {
+    "https://openai.com/news": "https://openai.com/news/rss.xml",
+}
+
 _NON_BROWSER_TABLES = (
     "web_source",
     "bluesky_account",
@@ -143,6 +148,15 @@ def _records_for_job(
         url = str(row.get("homepage") or row.get("url") or "").strip()
         if not url:
             return [], ["web_source missing homepage/url"]
+        fallback_feed = _WEB_SOURCE_FEED_FALLBACKS.get(url.rstrip("/"))
+        if fallback_feed:
+            result = RSSCollector(
+                [fallback_feed], max_items_per_feed=per_source_limit
+            ).collect()
+            return [
+                _stamp(r, row, collection_id=collection_id, worker_id=worker_id)
+                for r in result.records
+            ], list(result.warnings)
         parent = NormalizedRecord(
             document_id=url,
             platform="web",
