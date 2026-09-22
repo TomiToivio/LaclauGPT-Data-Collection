@@ -22,14 +22,16 @@ The framework is developed around Ernesto Laclau and Chantal Mouffe's discourse 
 LaclauGPT grew out of research-software work at the **[Helsinki Hub on Emotions, Populism and Polarisation (HEPPsinki)](https://www.helsinki.fi/en/researchgroups/emotions-populism-and-polarisation), University of Helsinki**, and has been developed in connection with the **CO3**, **PLEDGE**, and **ENDURE** international research projects.
 
 <p align="center">
-  <a href="https://www.co3socialcontract.eu/"><img src="https://www.co3socialcontract.eu/favicon.ico" width="88" height="88" alt="CO3 project logo"></a>
+  <a href="https://www.co3socialcontract.eu/"><img src="https://www.google.com/s2/favicons?domain_url=https://www.co3socialcontract.eu/&sz=128" width="88" height="88" alt="CO3 project logo"></a>
   &nbsp;&nbsp;&nbsp;&nbsp;
-  <a href="https://www.pledgeproject.eu/"><img src="https://www.pledgeproject.eu/favicon.ico" width="88" height="88" alt="PLEDGE project logo"></a>
+  <a href="https://www.pledgeproject.eu/"><img src="https://www.google.com/s2/favicons?domain_url=https://www.pledgeproject.eu/&sz=128" width="88" height="88" alt="PLEDGE project logo"></a>
   &nbsp;&nbsp;&nbsp;&nbsp;
-  <a href="https://www.endure-project.org/"><img src="https://www.endure-project.org/favicon.ico" width="88" height="88" alt="ENDURE project logo"></a>
+  <a href="https://www.endure-project.org/"><img src="https://www.google.com/s2/favicons?domain_url=https://www.endure-project.org/&sz=128" width="88" height="88" alt="ENDURE project logo"></a>
 </p>
 
-<p align="center">\n  <a href="https://european-union.europa.eu/principles-countries-history/symbols/european-flag_en"><img src="https://www.pledgeproject.eu/wp-content/uploads/2024/04/co-funded-by-european-union.png" height="64" alt="European Union flag and funding acknowledgement"></a>\n</p>
+<p align="center">
+  <a href="https://european-union.europa.eu/principles-countries-history/symbols/european-flag_en"><img src="https://www.pledgeproject.eu/wp-content/uploads/2024/04/co-funded-by-european-union.png" height="64" alt="European Union flag and funding acknowledgement"></a>
+</p>
 
 - **[CO3 — Continuous Construction of Resilient Social Contracts Through Societal Transformations](https://www.co3socialcontract.eu/)** studies how more democratic, inclusive and resilient social contracts can be built and renewed.
 - **[PLEDGE — Politics of Grievance and Democratic Governance](https://www.pledgeproject.eu/)** studies the emotional dynamics of political grievances and democratic governance.
