@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from laclaugpt_data_collection.models import CanonicalRecord, SCHEMA_VERSION
+from laclaugpt_data_collection.models import SCHEMA_VERSION, CanonicalRecord
 
 FIXTURE = Path(__file__).parent / "fixtures" / "ai26_phase1_handoff_v1.json"
 

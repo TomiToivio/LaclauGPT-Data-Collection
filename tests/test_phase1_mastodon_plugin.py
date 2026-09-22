@@ -14,7 +14,6 @@ from laclaugpt_data_collection.handoff import build_handoff
 from laclaugpt_data_collection.models import CanonicalRecord
 from laclaugpt_data_collection.plugins import CollectionContext, CollectionRunner, default_registry
 
-
 STATUS = {
     "id": "899",
     "url": "https://social.example/@synthetic/899",
