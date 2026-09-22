@@ -7,7 +7,7 @@ Firefox/browser-assisted capture stays on the researcher's laptop. Laskin runs b
 ## Read this first
 
 ```text
-WORKDIR          -> /mnt/workspace/LaclauGPT-Data-Collection
+WORKDIR          -> <absolute-repo-path>
 WHAT to collect  -> configs/studies/ai26.example.yaml
 SOURCE manifest  -> configs/studies/ai26.sources.example.toml
 COLLECTION cues  -> configs/studies/ai26.collection-codebook.yaml
@@ -51,7 +51,7 @@ Use the existing SSH configuration/key setup. No root access is required for the
 On Laskin:
 
 ```bash
-cd /mnt/workspace/LaclauGPT-Data-Collection
+cd <absolute-repo-path>
 python -m venv .venv
 source .venv/bin/activate
 pip install -e '.[distributed,phase1-non-browser,dev]'
@@ -81,7 +81,7 @@ LACLAUGPT_TASK_QUEUE_BACKEND=direct
 LACLAUGPT_MONGODB_URI=<same remote MongoDB URI as the AI26 laptop profile>
 LACLAUGPT_MONGODB_DATABASE=<same database as the laptop profile>
 LACLAUGPT_REDIS_URL=<same remote Redis URL as the AI26 laptop profile>
-LACLAUGPT_S3_ENDPOINT_URL=<CSC Allas S3 endpoint, a3s.fi>
+LACLAUGPT_S3_ENDPOINT_URL=<private object-storage endpoint>
 LACLAUGPT_S3_REGION=<region>
 LACLAUGPT_S3_BUCKET=<same AI26 bucket>
 LACLAUGPT_S3_ACCESS_KEY_ID=<private value>
@@ -147,8 +147,8 @@ Redis task queueing remains intentionally dormant for AI26. Cross-machine media 
 Cron is the scheduler. Both commands run once and exit; no nested long-lived scheduler is started.
 
 ```cron
-10 * * * * /bin/bash /mnt/workspace/LaclauGPT-Data-Collection/scripts/run_ai26_laskin_collect.sh >> /mnt/workspace/LaclauGPT-Data-Collection/data/logs/ai26-laskin-collect.log 2>&1
-30 * * * * /bin/bash /mnt/workspace/LaclauGPT-Data-Collection/scripts/run_ai26_laskin_media.sh >> /mnt/workspace/LaclauGPT-Data-Collection/data/logs/ai26-laskin-media.log 2>&1
+10 * * * * /bin/bash <absolute-repo-path>/scripts/run_ai26_laskin_collect.sh >> <absolute-repo-path>/data/logs/ai26-laskin-collect.log 2>&1
+30 * * * * /bin/bash <absolute-repo-path>/scripts/run_ai26_laskin_media.sh >> <absolute-repo-path>/data/logs/ai26-laskin-media.log 2>&1
 ```
 
 Install or update them with:
@@ -212,7 +212,7 @@ A healthy tick logs one JSON line with `"status": "ok"` and `"errors": []`. `dup
 ## 8. Update safely
 
 ```bash
-cd /mnt/workspace/LaclauGPT-Data-Collection
+cd <absolute-repo-path>
 git pull --ff-only origin main
 source .venv/bin/activate
 pip install -e '.[distributed,phase1-non-browser]'
@@ -222,7 +222,7 @@ An editable install means `git pull` alone updates the code; the `pip install` r
 
 ## 9. Smoke test
 
-1. Repository root resolves to `/mnt/workspace/LaclauGPT-Data-Collection`.
+1. Repository root resolves to `<absolute-repo-path>`.
 2. Virtual environment/package loads.
 3. `doctor` validates the `ai26-laskin-remote` profile.
 4. MongoDB/Redis/Allas distributed check succeeds.
