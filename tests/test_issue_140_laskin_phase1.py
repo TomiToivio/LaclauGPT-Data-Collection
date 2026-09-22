@@ -5,7 +5,7 @@ from pathlib import Path
 from laclaugpt_data_collection.collectors.base import CollectionResult
 from laclaugpt_data_collection.distributed import ProjectNamespace
 from laclaugpt_data_collection.models import CollectionProvenance, NormalizedRecord
-from laclaugpt_data_collection.server_runner import run_phase1_rss
+from laclaugpt_data_collection.server_runner import load_feed_manifest, run_phase1_rss
 from laclaugpt_data_collection.storage.remote import MongoRecordStore
 
 
@@ -174,3 +174,18 @@ def test_phase1_laskin_rss_uses_canonical_sink_and_date_floor(
     assert stored[0]["arena"] == "elites"
     assert stored[0]["source_url"].endswith("/new")
     assert stored[0]["provenance"][-1]["metadata"]["worker_id"] == "linux-server-rss"
+
+
+def test_issue_170_openai_news_uses_official_rss_feed_not_blocked_html() -> None:
+    manifest = Path(__file__).resolve().parents[1] / "configs" / "studies" / "ai26.sources.example.toml"
+    feeds = load_feed_manifest(manifest)
+    openai = [row for row in feeds if row.get("name") == "openai_news"]
+
+    assert len(openai) == 1
+    assert openai[0]["feed_url"] == "https://openai.com/news/rss.xml"
+    assert openai[0]["homepage"] == "https://openai.com/news/"
+    assert openai[0]["priority"] == "P1"
+
+    text = manifest.read_text(encoding="utf-8")
+    web_section = text.split("# Public web endpoints", 1)[1]
+    assert '[[web_source]]\nname = "openai_news"' not in web_section
