@@ -37,7 +37,7 @@ def test_brazil26_public_template_is_phase1_safe_and_loadable() -> None:
     assert "collection_codebook: brazil26.collection-codebook.yaml" in text
     assert "source_manifest: brazil26.sources.example.toml" in text
     assert "Example Candidate" in text
-    assert "LaclauGPT-Private/collection/brazil26/brazil-election-2026.yaml" in text
+    assert "<private-config-root>/brazil26/study.yaml" in text
     assert "password" not in text.casefold()
     assert "token:" not in text.casefold()
 
