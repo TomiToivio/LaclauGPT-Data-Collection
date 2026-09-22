@@ -1,7 +1,8 @@
 """Issue #140: AI26 Laskin Phase 1 non-browser worker invariants."""
+
 import os
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 from laclaugpt_data_collection.ai26_laskin_runner import load_non_browser_jobs, select_job_window
 
