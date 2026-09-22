@@ -9,11 +9,11 @@ bash scripts/install_common.sh
 bash scripts/install_brazil26.sh
 ```
 
-The installer copies public-safe defaults to `data/config/`: a synthetic study YAML, a bounded institutional source manifest and the localhost environment template. Live candidate/party/account overlays, credentials, cookies and private endpoints stay in `LaclauGPT-Private/collection/brazil26/`.
+The installer copies public-safe defaults to `data/config/`: a synthetic study YAML, a bounded institutional source manifest and the localhost environment template. Live candidate/party/account overlays, credentials, cookies and private endpoints stay in `<private-config-root>/brazil26/`.
 
 ## Activation gate
 
-The legacy private study file is `LaclauGPT-Private/collection/brazil26/brazil-election-2026.yaml`. It deliberately preserves its declared candidate-count mismatch. Do not invent or auto-fill a missing actor. Before live activation, verify the researcher-approved public accounts and resolve that mismatch in the private repository.
+The legacy private study file is `<private-config-root>/brazil26/study.yaml`. It deliberately preserves its declared candidate-count mismatch. Do not invent or auto-fill a missing actor. Before live activation, verify the researcher-approved public accounts and resolve that mismatch in the private repository.
 
 ## Browser collection
 
