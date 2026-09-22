@@ -18,7 +18,7 @@ The machine is **execution provenance, not study identity**. Do not create machi
 ## Read this first
 
 ```text
-WORKDIR (Laskin)  -> /mnt/workspace/LaclauGPT-Data-Collection
+WORKDIR (Laskin)  -> <absolute-repo-path>
 WHAT to collect   -> configs/studies/ai26.example.yaml
 SOURCE manifest   -> configs/studies/ai26.sources.example.toml
 COLLECTION cues   -> configs/studies/ai26.collection-codebook.yaml
@@ -73,7 +73,7 @@ export LACLAUGPT_DISTRIBUTED_CONFIG_BACKEND=redis
 export LACLAUGPT_MONGODB_URI=<private>
 export LACLAUGPT_MONGODB_DATABASE=<private, shared>
 export LACLAUGPT_REDIS_URL=<private>
-export LACLAUGPT_S3_ENDPOINT_URL=<private, a3s.fi>
+export LACLAUGPT_S3_ENDPOINT_URL=<private>
 export LACLAUGPT_S3_REGION=<private>
 export LACLAUGPT_S3_BUCKET=<private, shared>
 export LACLAUGPT_S3_ACCESS_KEY_ID=<private>
