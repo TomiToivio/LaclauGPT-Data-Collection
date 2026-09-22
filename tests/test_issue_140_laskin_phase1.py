@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from laclaugpt_data_collection.ai26_laskin_runner import _records_for_job
 from laclaugpt_data_collection.collectors.base import CollectionResult
 from laclaugpt_data_collection.distributed import ProjectNamespace
 from laclaugpt_data_collection.models import CollectionProvenance, NormalizedRecord
-from laclaugpt_data_collection.ai26_laskin_runner import _records_for_job
 from laclaugpt_data_collection.server_runner import load_feed_manifest, run_phase1_rss
 from laclaugpt_data_collection.storage.remote import MongoRecordStore
 
