@@ -3,7 +3,7 @@
 Brazil26 is a human-researcher workflow built on the shared LaclauGPT Firefox capture stack. For the complete one-researcher localhost workflow, including preflight/status/stop/validation, see [`brazil26-localhost.md`](brazil26-localhost.md). Operational study configuration remains private. The canonical study file is:
 
 ```text
-LaclauGPT-Private/collection/brazil26/brazil-election-2026.yaml
+<private-config-root>/brazil26/study.yaml
 ```
 
 The public repository contains only reusable runtime code, synthetic tests and public-safe documentation.
@@ -27,7 +27,7 @@ That command:
 7. keeps the process attached so Ctrl-C stops the local session cleanly.
 
 By default the private repository is expected next to this checkout as
-`../LaclauGPT-Private`. Override it with `LACLAUGPT_PRIVATE_REPO`, or set
+`<private-config-checkout>`. Override it with `LACLAUGPT_PRIVATE_REPO`, or set
 `BRAZIL26_CONFIG` / `LACLAUGPT_STUDY_CONFIG` to the exact YAML path.
 
 The existing data root is taken from `LACLAUGPT_DATA_ROOT`; when unset it
