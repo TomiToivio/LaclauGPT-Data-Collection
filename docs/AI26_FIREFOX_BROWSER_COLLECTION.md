@@ -2,7 +2,7 @@
 
 AI26 uses the shared LaclauGPT Firefox collector with a localhost-only capture backend and the distributed AI26 storage stack. Firefox remains interactive on the research workstation; structured records are mirrored to the configured remote MongoDB, coordination uses Redis, and raw/media objects use CSC Allas/S3. Media downloading is independent from browser capture and is intended to run from cron.
 
-Operational configuration is private. The canonical private location is `TomiToivio/LaclauGPT-Private/collection/ai26/`. Do not copy real credentials, endpoints, machine paths, account lists, study targets, raw captures or `.env` files into this public repository.
+Operational configuration is private. The canonical private location is `<private-config-root>/ai26/`. Do not copy real credentials, endpoints, machine paths, account lists, study targets, raw captures or `.env` files into this public repository.
 
 ## 1. Install
 
@@ -21,12 +21,12 @@ On Windows/WSL, run the Python backend in the environment that can receive reque
 
 ## 2. Load private AI26 configuration
 
-Use the private configuration under `LaclauGPT-Private/collection/ai26/` as the source of truth. `configs/ai26.browser.env.example` contains only public-safe variable names and placeholders.
+Use the private configuration under `<private-config-root>/ai26/` as the source of truth. `configs/ai26.browser.env.example` contains only public-safe variable names and placeholders.
 
 The runtime accepts the historical convention:
 
 ```bash
-export AI26_CONFIG=/path/to/LaclauGPT-Private/collection/ai26/ai26.private.yaml
+export AI26_CONFIG=/path/to/<private-config-root>/ai26/ai26.private.yaml
 export AI26_MONGO_DATABASE=laclaugpt
 ```
 
