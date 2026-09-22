@@ -110,6 +110,9 @@ class FakeRSSCollector:
 class SettingsStub:
     project_id = "ai26"
     distributed_namespace = ProjectNamespace("ai26")
+    caller = "linux-server-cron"
+    execution = "cron"
+    run_id = "rss-test-run"
 
 
 class FakeSink:
@@ -174,7 +177,11 @@ def test_phase1_laskin_rss_uses_canonical_sink_and_date_floor(
     assert stored[0]["collection_id"] == "ai26"
     assert stored[0]["arena"] == "elites"
     assert stored[0]["source_url"].endswith("/new")
-    assert stored[0]["provenance"][-1]["metadata"]["worker_id"] == "linux-server-rss"
+    provenance = stored[0]["provenance"][-1]
+    assert provenance["metadata"]["worker_id"] == "linux-server-rss"
+    assert provenance["metadata"]["caller"] == "linux-server-cron"
+    assert provenance["metadata"]["execution"] == "cron"
+    assert provenance["run_id"] == "rss-test-run"
 
 
 def test_issue_170_openai_news_uses_official_rss_feed_not_blocked_html() -> None:
