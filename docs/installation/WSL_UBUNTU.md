@@ -10,14 +10,14 @@ Keep the repositories next to each other:
 
 ```text
 ~/src/LaclauGPT-Data-Collection
-~/src/LaclauGPT-Private
+<private-config-checkout>
 ```
 
 The public repository contains code, installers, examples and documentation. Real feeds, source lists, codebooks, endpoints and other research-sensitive settings belong under:
 
 ```text
-LaclauGPT-Private/collection/ai26/
-LaclauGPT-Private/collection/brazil26/
+<private-config-root>/ai26/
+<private-config-root>/brazil26/
 ```
 
 Do not copy those values into tracked public files.
