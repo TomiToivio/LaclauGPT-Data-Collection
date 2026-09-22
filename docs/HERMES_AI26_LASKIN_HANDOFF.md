@@ -20,7 +20,7 @@ Do not create machine-specific MongoDB collections, Redis namespaces, S3 prefixe
 2. Verify the checkout is current and clean enough to operate. Do not discard unrelated local work.
 
 ```bash
-cd /mnt/workspace/LaclauGPT-Data-Collection
+cd <absolute-repo-path>
 git status --short
 git pull --ff-only origin main
 git rev-parse HEAD
