@@ -370,6 +370,12 @@ def run_phase1_rss(
             continue
         if synced >= limit:
             break
+        if record.provenance:
+            provenance = record.provenance[-1]
+            provenance.metadata["caller"] = settings.caller
+            provenance.metadata["execution"] = settings.execution
+            if settings.run_id and not provenance.run_id:
+                provenance.run_id = settings.run_id
         payload = record.model_dump(mode="json")
         payload["collection_id"] = routed_collection
         arena = str(record.source.raw_metadata.get("arena") or "")
