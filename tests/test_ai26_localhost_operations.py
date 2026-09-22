@@ -54,8 +54,10 @@ def test_ai26_localhost_phase1_runner_preserves_sampling_as_provenance() -> None
     assert '"arxiv"' in text
 
 
-def test_ai26_localhost_docs_have_no_placeholder_cron_workdir() -> None:
+def test_ai26_localhost_docs_do_not_expose_personal_workstation_paths() -> None:
     text = (ROOT / "docs/AI26_LOCALHOST_COLLECTION.md").read_text(encoding="utf-8")
-    cron_section = text.split("## 7. Cron", 1)[1].split("## 8.", 1)[0]
-    assert "cd /path/to/LaclauGPT-Data-Collection" not in cron_section
-    assert "cd /mnt/c/Users/totoivio/LaclauGPT-Data-Collection" in cron_section
+    lowered = text.casefold()
+    assert "totoivio" not in lowered
+    assert "/mnt/c/users/" not in lowered
+    assert "c:\\users\\" not in lowered
+    assert "<absolute-repo-path>" in text
