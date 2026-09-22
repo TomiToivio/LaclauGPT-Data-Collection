@@ -4,16 +4,12 @@ This is the researcher-laptop profile for AI26. Firefox capture and ordinary CLI
 
 The public AI26 files are methodology/templates only. Copy them under ignored `data/config/` before use. Do not commit endpoints, credentials, cookies, private target lists or browser profiles.
 
-For the research laptop covered by issue #61, the repository must live at exactly:
-
-```text
-/mnt/c/Users/totoivio/LaclauGPT-Data-Collection
-```
+Choose an absolute checkout path locally and keep it out of the public repository. In commands below, replace `<absolute-repo-path>` at deployment time.
 
 ## 1. Install
 
 ```bash
-cd /mnt/c/Users/totoivio/LaclauGPT-Data-Collection
+cd <absolute-repo-path>
 python -m venv .venv
 source .venv/bin/activate
 pip install -e '.[distributed,feeds,youtube,documents]'
@@ -31,11 +27,7 @@ pwd
 git rev-parse --show-toplevel
 ```
 
-Both must print:
-
-```text
-/mnt/c/Users/totoivio/LaclauGPT-Data-Collection
-```
+Both must resolve to the same local checkout. Do not commit that machine-specific path.
 
 Edit only `data/config/ai26-localhost.env`. At minimum set:
 
@@ -98,7 +90,7 @@ The profile consolidates conservative settings seen repeatedly in predecessor La
 ## 3. Start Firefox backend
 
 ```bash
-cd /mnt/c/Users/totoivio/LaclauGPT-Data-Collection
+cd <absolute-repo-path>
 bash scripts/run_firefox_study.sh data/config/ai26.yaml data 8765
 ```
 
@@ -151,19 +143,19 @@ The existing distributed media worker scans locally captured canonical records, 
 
 All wrappers use `flock`, so overlapping invocations exit cleanly instead of double-running. They also prepend the repository `.venv/bin` and the user's `~/.local/bin` to `PATH`, because cron normally starts with a minimal environment.
 
-Install these exact laptop entries rather than copying a placeholder path:
+Install entries using your local absolute checkout path; keep the real path only in the local crontab:
 
 ```cron
-10 * * * * cd /mnt/c/Users/totoivio/LaclauGPT-Data-Collection && bash scripts/run_ai26_localhost_sync.sh >> data/logs/ai26-sync.log 2>&1
-17 * * * * cd /mnt/c/Users/totoivio/LaclauGPT-Data-Collection && bash scripts/run_ai26_localhost_collect.sh >> data/logs/ai26-collect.log 2>&1
-27 * * * * cd /mnt/c/Users/totoivio/LaclauGPT-Data-Collection && bash scripts/run_ai26_localhost_media.sh >> data/logs/ai26-media.log 2>&1
+10 * * * * cd <absolute-repo-path> && bash scripts/run_ai26_localhost_sync.sh >> data/logs/ai26-sync.log 2>&1
+17 * * * * cd <absolute-repo-path> && bash scripts/run_ai26_localhost_collect.sh >> data/logs/ai26-collect.log 2>&1
+27 * * * * cd <absolute-repo-path> && bash scripts/run_ai26_localhost_media.sh >> data/logs/ai26-media.log 2>&1
 ```
 
 Do not put secrets directly in crontab. The wrappers load the ignored `data/config/ai26-localhost.env` file.
 
 Firefox itself is manual and must not be added to cron.
 
-After installing the crontab, verify there is no literal `/path/to/` left:
+After installing the crontab, verify the placeholder was replaced locally:
 
 ```bash
 crontab -l | grep -F '/path/to/' && echo 'ERROR: placeholder cron path remains' || true
