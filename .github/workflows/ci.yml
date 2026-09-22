@@ -24,44 +24,18 @@ jobs:
         run: python scripts/check_public_tree.py
 
   lint:
-    name: lint changed Python files
+    name: lint Python tree
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
       - name: Install lint tooling
         run: python -m pip install --upgrade pip && python -m pip install -e '.[dev]'
-      - name: Lint changed Python files
-        shell: bash
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BEFORE_SHA: ${{ github.event.before }}
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          set -euo pipefail
-
-          if [[ "$EVENT_NAME" == "pull_request" ]]; then
-            BASE_SHA="$PR_BASE_SHA"
-          elif [[ "$EVENT_NAME" == "push" && -n "${BEFORE_SHA:-}" && "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ]]; then
-            BASE_SHA="$BEFORE_SHA"
-          else
-            BASE_SHA="HEAD^"
-          fi
-
-          mapfile -t FILES < <(git diff --name-only --diff-filter=ACMR "$BASE_SHA" HEAD -- '*.py')
-          if (( ${#FILES[@]} == 0 )); then
-            echo "No changed Python files to lint."
-            exit 0
-          fi
-
-          echo "Linting changed Python files:"
-          printf '  %s\n' "${FILES[@]}"
-          ruff check -- "${FILES[@]}"
+      - name: Lint Python tree
+        run: ruff check src tools tests
 
   typecheck:
     name: type check stable core
