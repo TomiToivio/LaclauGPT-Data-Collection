@@ -273,6 +273,7 @@ def ambient_configuration_note() -> str | None:
 
 def check_ai26_phase1_handoff() -> None:
     """Pin the Collection -> Analysis AI26 Phase 1 boundary."""
+
     from laclaugpt_data_collection.models import CanonicalRecord, SCHEMA_VERSION
 
     payload = _load_fixture(AI26_HANDOFF_FIXTURE)
