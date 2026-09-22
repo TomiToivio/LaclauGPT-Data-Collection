@@ -26,7 +26,7 @@ LaclauGPT grew out of research-software work at the **[Helsinki Hub on Emotions,
   &nbsp;&nbsp;&nbsp;&nbsp;
   <a href="https://www.pledgeproject.eu/"><img src="https://www.google.com/s2/favicons?domain_url=https://www.pledgeproject.eu/&sz=128" width="88" height="88" alt="PLEDGE project logo"></a>
   &nbsp;&nbsp;&nbsp;&nbsp;
-  <a href="https://www.endure-project.org/"><img src="https://www.google.com/s2/favicons?domain_url=https://www.endure-project.org/&sz=128" width="88" height="88" alt="ENDURE project logo"></a>
+  <a href="https://www.endure-project.org/"><img src="https://www.endure-project.org/_inhaltselemente/logo-kurz.png?width=500" height="88" alt="ENDURE project logo"></a>
 </p>
 
 <p align="center">
