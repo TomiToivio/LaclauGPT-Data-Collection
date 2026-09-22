@@ -1,4 +1,5 @@
 """Phase 1 Mastodon plugin contract for issue #107."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable
