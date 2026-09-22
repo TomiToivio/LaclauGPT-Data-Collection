@@ -5,6 +5,7 @@ from pathlib import Path
 from laclaugpt_data_collection.collectors.base import CollectionResult
 from laclaugpt_data_collection.distributed import ProjectNamespace
 from laclaugpt_data_collection.models import CollectionProvenance, NormalizedRecord
+from laclaugpt_data_collection.ai26_laskin_runner import _records_for_job
 from laclaugpt_data_collection.server_runner import load_feed_manifest, run_phase1_rss
 from laclaugpt_data_collection.storage.remote import MongoRecordStore
 
@@ -189,3 +190,53 @@ def test_issue_170_openai_news_uses_official_rss_feed_not_blocked_html() -> None
     text = manifest.read_text(encoding="utf-8")
     web_section = text.split("# Public web endpoints", 1)[1]
     assert '[[web_source]]\nname = "openai_news"' not in web_section
+
+
+def test_issue_170_legacy_web_source_uses_fake_rss_fallback(monkeypatch) -> None:
+    seen = {}
+
+    class OneItemRSSCollector:
+        def __init__(self, feed_urls, *, max_items_per_feed=100):
+            seen["feed_urls"] = list(feed_urls)
+            seen["max_items_per_feed"] = max_items_per_feed
+
+        def collect(self):
+            return CollectionResult(
+                records=[
+                    NormalizedRecord(
+                        document_id="openai-item",
+                        platform="rss",
+                        timestamp="Wed, 16 Sep 2026 10:00:00 GMT",
+                        source_url="https://openai.com/index/example",
+                        text="OpenAI news item",
+                        raw_payload={"id": "openai-item"},
+                        collection_provenance=CollectionProvenance(module="issue-170-test"),
+                    )
+                ]
+            )
+
+    monkeypatch.setattr(
+        "laclaugpt_data_collection.ai26_laskin_runner.RSSCollector",
+        OneItemRSSCollector,
+    )
+
+    records, warnings = _records_for_job(
+        {
+            "kind": "web_source",
+            "name": "openai_news",
+            "homepage": "https://openai.com/news/",
+            "arena": "elites",
+            "priority": "P1",
+            "source_family": "frontier lab",
+        },
+        collection_id="ai26",
+        worker_id="laskin-test",
+        per_source_limit=3,
+    )
+
+    assert seen["feed_urls"] == ["https://openai.com/news/rss.xml"]
+    assert seen["max_items_per_feed"] == 3
+    assert warnings == []
+    assert len(records) == 1
+    assert records[0].source.raw_metadata["source_name"] == "openai_news"
+    assert records[0].source.raw_metadata["arena"] == "elites"
