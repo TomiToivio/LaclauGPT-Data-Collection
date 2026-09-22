@@ -4,7 +4,7 @@ Brazil26 uses one canonical Phase 1 namespace across localhost and Laskin. Local
 
 The operational study overlay remains private and is derived from:
 
-`LaclauGPT-Private/collection/brazil26/brazil-election-2026.yaml`
+`<private-config-root>/brazil26/study.yaml`
 
 Do not fork Brazil26 study semantics for Laskin. Machine identity is provenance only.
 
