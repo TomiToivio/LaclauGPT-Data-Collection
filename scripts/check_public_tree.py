@@ -81,6 +81,12 @@ ALLOWED_EXACT = {
     "configs/laptop.example.toml",
     "configs/server.example.toml",
 }
+PRIVATE_PATH_PATTERNS = [
+    re.compile(r"(?i)(?:^|[\s'\"=])/(?:home|Users)/[A-Za-z0-9._-]+/"),
+    re.compile(r"(?i)(?:^|[\s'\"=])/mnt/[a-z]/Users/[A-Za-z0-9._-]+/"),
+    re.compile(r"(?i)\b[A-Za-z]:\\\\Users\\\\[A-Za-z0-9._-]+\\\\"),
+]
+
 SECRET_PATTERNS = [
     re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
     # Flag literal secret-looking assignments, not variable-to-variable plumbing such as
@@ -136,10 +142,20 @@ def path_policy_violations(path: Path) -> list[str]:
 
 def content_policy_violations(path: Path, text: str) -> list[str]:
     """Return publication-policy violations detected from UTF-8 text content."""
+    violations: list[str] = []
     for pattern in SECRET_PATTERNS:
         if pattern.search(text):
-            return [f"possible secret material: {path}"]
-    return []
+            violations.append(f"possible secret material: {path}")
+            break
+
+    # Tests may contain synthetic forbidden examples to exercise the policy. Public-facing
+    # docs, configs, scripts and source code must not expose real workstation identities.
+    if "tests/" not in path.as_posix():
+        for pattern in PRIVATE_PATH_PATTERNS:
+            if pattern.search(text):
+                violations.append(f"possible machine-specific personal path: {path}")
+                break
+    return violations
 
 
 def main() -> int:
