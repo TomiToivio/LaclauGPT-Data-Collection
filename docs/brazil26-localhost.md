@@ -5,7 +5,7 @@ This is the simplest supported Brazil26 workflow for one human researcher on one
 Operational target lists and the real study configuration remain private. The expected private study file is:
 
 ```text
-LaclauGPT-Private/collection/brazil26/brazil-election-2026.yaml
+<private-config-root>/brazil26/study.yaml
 ```
 
 ## First-time setup
