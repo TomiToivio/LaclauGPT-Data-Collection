@@ -216,12 +216,13 @@ last_verified = "2026-09-17"
 
 # --- No-feed sources: web/article collector targets (see issue #4) ---
 
-[[web_source]]
+[[feed]]
 name = "openai_news"
+feed_url = "https://openai.com/news/rss.xml"
 homepage = "https://openai.com/news/"
 arena = "elites"
 source_family = "frontier lab / deployment / governance / safety"
-sampling_rationale = "Major frontier-lab discourse around capabilities, products, safety and policy."
+sampling_rationale = "Major frontier-lab discourse around capabilities, products, safety and policy. Uses the official RSS feed because the news landing page blocks automated HTML collection."
 priority = "P1"
 
 [[web_source]]
