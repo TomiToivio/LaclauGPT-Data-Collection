@@ -1,4 +1,5 @@
 """AI26 Phase 1 Collection -> Analysis handoff contract."""
+
 from __future__ import annotations
 
 import json
