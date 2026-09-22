@@ -75,8 +75,8 @@ Completed objects use deterministic Brazil26 S3/Allas keys and refresh the same 
 Both wrappers use non-blocking `flock`; an overlapping invocation exits successfully instead of stacking.
 
 ```cron
-12 * * * * /bin/bash /mnt/workspace/LaclauGPT-Data-Collection/scripts/run_brazil26_laskin_collect.sh >> /mnt/workspace/LaclauGPT-Data-Collection/data/logs/brazil26-laskin-collect.log 2>&1
-32 * * * * /bin/bash /mnt/workspace/LaclauGPT-Data-Collection/scripts/run_brazil26_laskin_media.sh >> /mnt/workspace/LaclauGPT-Data-Collection/data/logs/brazil26-laskin-media.log 2>&1
+12 * * * * /bin/bash <absolute-repo-path>/scripts/run_brazil26_laskin_collect.sh >> <absolute-repo-path>/data/logs/brazil26-laskin-collect.log 2>&1
+32 * * * * /bin/bash <absolute-repo-path>/scripts/run_brazil26_laskin_media.sh >> <absolute-repo-path>/data/logs/brazil26-laskin-media.log 2>&1
 ```
 
 The offsets are deliberately separate from the AI26 example schedule so concurrent studies do not stampede the same remote services.
