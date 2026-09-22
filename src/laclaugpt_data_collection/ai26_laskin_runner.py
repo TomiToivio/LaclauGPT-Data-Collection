@@ -265,6 +265,12 @@ def run_phase1_laskin(
                     continue
                 if synced >= remaining:
                     break
+                if record.provenance:
+                    provenance = record.provenance[-1]
+                    provenance.metadata["caller"] = settings.caller
+                    provenance.metadata["execution"] = settings.execution
+                    if settings.run_id and not provenance.run_id:
+                        provenance.run_id = settings.run_id
                 payload = record.model_dump(mode="json")
                 payload["collection_id"] = routed
                 arena = str(record.source.raw_metadata.get("arena") or "")
