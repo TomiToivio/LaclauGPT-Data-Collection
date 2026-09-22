@@ -106,5 +106,5 @@ provenance:
     - missing_candidate_autofill
 
 private_overlay:
-  canonical_path: LaclauGPT-Private/collection/brazil26/brazil-election-2026.yaml
+  canonical_path: <private-config-root>/brazil26/study.yaml
   activation_rule: verify_current_public_accounts_and_resolve_declared_sampling_mismatch
