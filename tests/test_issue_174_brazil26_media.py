@@ -50,9 +50,22 @@ def test_local_brazil26_media_handles_three_platforms_idempotently(
         record_backend="auto",
     )
 
+    # The local runner requires the private study configuration to exist before
+    # it will process media (it does not read the contents). The test previously
+    # passed a path it never created, so it failed on its own precondition.
+    study_config = tmp_path / "private-study.yaml"
+    study_config.write_text(
+        "study: synthetic-brazil26-media-test\n"
+        "platforms:\n"
+        "  instagram: {enabled: true}\n"
+        "  x: {enabled: true}\n"
+        "  tiktok: {enabled: true}\n",
+        encoding="utf-8",
+    )
+
     first = run_distributed_media(
         settings,
-        study_config=tmp_path / "private-study.yaml",
+        study_config=study_config,
         data_root=tmp_path,
         workers=1,
         limit=10,
@@ -60,7 +73,7 @@ def test_local_brazil26_media_handles_three_platforms_idempotently(
     )
     second = run_distributed_media(
         settings,
-        study_config=tmp_path / "private-study.yaml",
+        study_config=study_config,
         data_root=tmp_path,
         workers=1,
         limit=10,
