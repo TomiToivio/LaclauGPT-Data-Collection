@@ -1,4 +1,4 @@
-﻿"""Normalize parser output into the stable LaclauGPT record envelope.
+"""Normalize parser output into the stable LaclauGPT record envelope.
 
 Adapted from the public `collector/normalize.py` in
 TomiToivio/LaclauGPT-Discourse-Analysis, extended with the auxiliary
@@ -79,6 +79,11 @@ def normalise(
         visited_url=str(metadata.get("source_platform_url") or ""),
         api_url=str(metadata.get("source_url") or ""),
         transformations=["laclaugpt-network-capture", "map-item-normalise"],
+        metadata={
+            key: str(metadata[key])
+            for key in ("project_id", "collection_id", "study")
+            if metadata.get(key)
+        },
     )
 
     record = NormalizedRecord(
