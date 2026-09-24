@@ -166,7 +166,7 @@ Use public-safe material:
 
 ## Troubleshooting
 
-If preflight cannot find Firefox, set `LACLAUGPT_FIREFOX_COMMAND`, `LACLAUGPT_FIREFOX_PROFILE`, or `LACLAUGPT_FIREFOX_PROFILE_PATH` in the ignored env file.
+If preflight cannot find Firefox, set `LACLAUGPT_FIREFOX_COMMAND`, `LACLAUGPT_FIREFOX_PROFILE`, or `LACLAUGPT_FIREFOX_PROFILE_PATH` in the ignored env file. A path containing spaces is fine unquoted (`LACLAUGPT_FIREFOX_COMMAND=/mnt/c/Program Files/Mozilla Firefox/firefox.exe`); if preflight reports the executable as *not runnable*, the discovered browser is a distribution placeholder (such as Ubuntu's snap shim) and must be replaced with a working one.
 
 If status says `stopped`, start the researcher session and verify no other service is occupying the configured loopback port.
 

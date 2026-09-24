@@ -372,12 +372,62 @@ def _wait_for_backend(host: str, port: int, process: subprocess.Popen[bytes]) ->
     raise RuntimeError(f"Brazil26 backend did not become ready at {endpoint}")
 
 
+def _split_firefox_command(configured: str) -> list[str]:
+    """Split a configured Firefox command, keeping a spaced executable path intact.
+
+    ``_read_env_file`` strips surrounding quotes from values, so a value such as
+    ``/mnt/c/Program Files/Mozilla Firefox/firefox.exe`` arrives unquoted and a
+    plain ``shlex.split`` would shred it into three bogus tokens.  The runtime env
+    format is one ``KEY=VALUE`` per line with no quoting, so the whole value is
+    the primary interpretation: treat it as a single executable path when that
+    path exists on disk, and only fall back to shell-style word splitting for
+    genuine command lines (e.g. ``powershell.exe -Command ...``) or a bare name
+    resolved through ``PATH``.
+    """
+    candidate = Path(configured).expanduser()
+    if candidate.exists():
+        return [str(candidate)]
+    return shlex.split(configured)
+
+
+def _resolve_firefox_executable(env: dict[str, str]) -> str:
+    """Return a usable Firefox executable, or "" when none can be resolved."""
+    configured = env.get("LACLAUGPT_FIREFOX_COMMAND", "").strip()
+    if configured:
+        command = _split_firefox_command(configured)
+        return command[0] if command else ""
+
+    for name in ("firefox", "firefox.exe"):
+        # which() can hand back an executable placeholder that cannot actually
+        # run.  On Ubuntu, /usr/bin/firefox is a shim that aborts unless the
+        # firefox snap is installed, so verify the candidate executes.
+        executable = shutil.which(name)
+        if executable and _is_runnable_executable(executable):
+            return executable
+    return ""
+
+
+def _is_runnable_executable(executable: str) -> bool:
+    """True when the executable starts and answers ``--version``."""
+    try:
+        probe = subprocess.run(
+            [executable, "--version"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=15,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return probe.returncode == 0
+
+
 def _firefox_command(env: dict[str, str]) -> list[str]:
     configured = env.get("LACLAUGPT_FIREFOX_COMMAND", "").strip()
     if configured:
-        command = shlex.split(configured)
+        command = _split_firefox_command(configured)
     else:
-        executable = shutil.which("firefox") or shutil.which("firefox.exe")
+        executable = _resolve_firefox_executable(env)
         if not executable:
             raise RuntimeError(
                 "Firefox executable not found. Set LACLAUGPT_FIREFOX_COMMAND to the "
@@ -588,9 +638,22 @@ def run_preflight(
         env = dict(os.environ)
         env.update(runtime)
         try:
-            browser_command = _firefox_command(env)
+            candidate = _firefox_command(env)
         except RuntimeError as exc:
             problems.append(str(exc))
+        else:
+            # A resolvable command is not necessarily a runnable one: Ubuntu's
+            # /usr/bin/firefox is a shim that aborts unless the firefox snap is
+            # installed.  Report that here rather than launching the researcher
+            # session at a dead executable.
+            if _is_runnable_executable(candidate[0]):
+                browser_command = candidate
+            else:
+                problems.append(
+                    f"Firefox executable is not runnable: {candidate[0]} "
+                    "(it may be a distribution placeholder that requires a snap/apt "
+                    "install). Set LACLAUGPT_FIREFOX_COMMAND to a working browser."
+                )
 
     distributed_keys = (
         runtime.get("LACLAUGPT_RECORD_BACKEND") == "mongodb"

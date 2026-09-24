@@ -52,8 +52,20 @@ LACLAUGPT_FIREFOX_PROFILE_PATH=/private/path/to/firefox/profile
 LACLAUGPT_FIREFOX_COMMAND='powershell.exe ... firefox.exe'
 ```
 
-If Firefox is not discoverable, startup fails clearly instead of opening an
-uncontrolled browser profile.
+A value that names an existing executable is used as the executable path, so a
+path containing spaces needs no quoting (quotes in the env file are stripped):
+
+```bash
+# Windows Firefox under WSL — the whole value is treated as one path:
+LACLAUGPT_FIREFOX_COMMAND=/mnt/c/Program Files/Mozilla Firefox/firefox.exe
+```
+
+If Firefox is not discoverable, preflight reports a problem and the researcher
+session fails clearly instead of opening an uncontrolled browser profile. A
+discovered executable must also actually start: distributions that ship an
+`/usr/bin/firefox` placeholder (for example the snap shim on Ubuntu) are
+reported as not runnable rather than accepted, so set
+`LACLAUGPT_FIREFOX_COMMAND` to a working browser on those hosts.
 
 For backend-only maintenance or debugging:
 

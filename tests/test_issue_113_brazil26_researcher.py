@@ -67,6 +67,11 @@ def test_session_environment_forces_brazil26_identity(tmp_path: Path, monkeypatc
 
 
 def test_firefox_command_supports_dedicated_profile(monkeypatch) -> None:
+    # Profile wiring is the subject here, so pin discovery to a real, runnable
+    # executable and assert only that the profile flags are appended.
+    monkeypatch.setattr(
+        brazil26_browser, "_is_runnable_executable", lambda executable: True
+    )
     monkeypatch.setattr(brazil26_browser.shutil, "which", lambda name: "/usr/bin/firefox")
     command = brazil26_browser._firefox_command(
         {"LACLAUGPT_FIREFOX_PROFILE": "Brazil26 Research"}
