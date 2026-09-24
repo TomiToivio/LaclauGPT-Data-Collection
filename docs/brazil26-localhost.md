@@ -121,7 +121,11 @@ or use the existing lock-protected wrapper:
 bash scripts/run_brazil26_localhost_media.sh
 ```
 
-With the local-first profile, objects remain local. Configure S3/Allas only when remote object storage is intentionally enabled.
+With the local-first profile, objects remain local and the existing SQLite media index tracks completed files and retries. The 15-minute cron entry invokes this same worker; it does not require MongoDB/S3 for the default filesystem profile. Downstream local handoff should read the media index via `CollectionStore.media_states(source_url, collection_id="brazil26")`, rather than assuming the original append-only browser JSONL rows are rewritten in place. Configure distributed MongoDB/S3 only when the private runtime explicitly enables it.
+
+The media cron entry is `*/15 * * * *` inside the marker-managed Brazil26 block. An existing `data/config/brazil26-localhost.env` can provide `BRAZIL26_CONFIG` for direct installation and manual media runs; the launcher-pinned study config and data root take precedence. Verify the actual host installation and one scheduled tick on the research workstation. CI exercises only synthetic media, not authenticated platform downloads.
+
+For each of Instagram, X and TikTok, capture a permitted public record containing a video reference, run the media worker, and inspect a completed or explicit failed/unsupported media-index entry. URL expiry, access restrictions and platform-specific signed URLs may prevent an individual video from downloading; do not interpret a synthetic test as proof of live platform coverage.
 
 ## Optional remote sync
 
