@@ -11,7 +11,7 @@ from typing import Any, Iterator
 from .config import Settings
 from .distributed_capture import DistributedCaptureSink
 from .handoff import routing_metadata
-from .media import MediaBackend, MediaDownloader, MediaJob
+from .media import FilesystemBackend, MediaBackend, MediaDownloader, MediaJob
 from .media_runner import load_records
 from .storage.remote import S3ObjectStore
 from .store import CollectionStore
@@ -112,6 +112,50 @@ def apply_media_results(
     return list(touched.values())
 
 
+def _run_local_media_unlocked(
+    settings: Settings,
+    *,
+    study_config: str | Path,
+    data_root: str | Path,
+    workers: int,
+    limit: int,
+) -> dict[str, Any]:
+    """Use the existing persistent media index without instantiating remote services."""
+    if not Path(study_config).is_file():
+        raise FileNotFoundError("Private study configuration is required for media collection")
+    records = [
+        record
+        for record in load_records(data_root)
+        if routing_metadata(record, default_collection=settings.project_id)[0]
+        == settings.project_id
+    ][:limit]
+    store = CollectionStore(data_root)
+    try:
+        downloader = MediaDownloader(
+            store,
+            backend=FilesystemBackend(store.media_dir, store.root),
+            workers=workers,
+        )
+        jobs = downloader.enqueue_from_records(records)
+        results = downloader.run_queue(jobs)
+        return {
+            "project_id": settings.project_id,
+            "run_id": settings.run_id,
+            "storage": "filesystem",
+            "records_scanned": len(records),
+            "remote_records": 0,
+            "local_records": len(records),
+            "queued": len(jobs),
+            "attempted": len(results),
+            "completed": sum(row.get("status") == "completed" for row in results),
+            "failed": sum(row.get("status") == "failed" for row in results),
+            "skipped": max(len(records) - len(jobs), 0),
+            "mongo_refreshed": 0,
+        }
+    finally:
+        store.close()
+
+
 def _run_distributed_media_unlocked(
     settings: Settings,
     *,
@@ -204,8 +248,13 @@ def run_distributed_media(
     """Download a bounded media batch, update MongoDB and emit readiness events."""
     if limit < 1:
         raise ValueError("limit must be at least 1")
+    runner = (
+        _run_distributed_media_unlocked
+        if settings.distributed_requested
+        else _run_local_media_unlocked
+    )
     if not use_lock:
-        return _run_distributed_media_unlocked(
+        return runner(
             settings,
             study_config=study_config,
             data_root=data_root,
@@ -213,7 +262,7 @@ def run_distributed_media(
             limit=limit,
         )
     with media_run_lock(data_root):
-        return _run_distributed_media_unlocked(
+        return runner(
             settings,
             study_config=study_config,
             data_root=data_root,
