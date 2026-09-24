@@ -34,7 +34,7 @@ cat >> "$TMP" <<EOF
 $BEGIN
 12 * * * * cd $ROOT_Q && /bin/bash scripts/run_brazil26_localhost_sync.sh >> data/logs/brazil26-sync.log 2>&1
 22 * * * * cd $ROOT_Q && /bin/bash scripts/run_brazil26_localhost_collect.sh >> data/logs/brazil26-collect.log 2>&1
-*/15 * * * * cd $ROOT && LACLAUGPT_ENV_FILE=$ENV_Q LACLAUGPT_STUDY_CONFIG=$STUDY_Q LACLAUGPT_DATA_ROOT=$DATA_Q /bin/bash scripts/run_brazil26_localhost_media.sh >> data/logs/brazil26-media.log 2>&1
+*/15 * * * * cd $ROOT_Q && LACLAUGPT_ENV_FILE=$ENV_Q LACLAUGPT_STUDY_CONFIG=$STUDY_Q LACLAUGPT_DATA_ROOT=$DATA_Q /bin/bash scripts/run_brazil26_localhost_media.sh >> data/logs/brazil26-media.log 2>&1
 $END
 EOF
 crontab "$TMP"
