@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from laclaugpt_data_collection.config import Settings
 from laclaugpt_data_collection import distributed_media_runner as runner
+from laclaugpt_data_collection.config import Settings
 from laclaugpt_data_collection.media import MediaDownloader
 
 
