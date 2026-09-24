@@ -84,7 +84,15 @@ ALLOWED_EXACT = {
 PRIVATE_PATH_PATTERNS = [
     re.compile(r"(?i)(?:^|[\s'\"=])/(?:home|Users)/[A-Za-z0-9._-]+/"),
     re.compile(r"(?i)(?:^|[\s'\"=])/mnt/[a-z]/Users/[A-Za-z0-9._-]+/"),
-    re.compile(r"(?i)\b[A-Za-z]:\\\\Users\\\\[A-Za-z0-9._-]+\\\\"),
+    # A real Windows path uses a SINGLE separator, either the native backslash form or
+    # the forward-slash form. This is a raw string, so `\\` in the pattern matches one
+    # literal backslash and `[\\/]` accepts either separator; the quantifier also still
+    # catches the doubly-escaped form that appears inside quoted/embedded text. No
+    # trailing separator is required: the sample in test_public_repo_policy ends at the
+    # username, and a guard that only fired on directory-terminated paths would miss a
+    # path pointing directly at a user directory. Concrete examples are deliberately
+    # written with a placeholder segment so this guard does not flag its own source.
+    re.compile(r"(?i)\b[A-Za-z]:[\\/]+Users[\\/]+[A-Za-z0-9._-]+"),
 ]
 
 SECRET_PATTERNS = [
