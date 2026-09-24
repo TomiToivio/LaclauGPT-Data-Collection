@@ -37,6 +37,13 @@ def test_local_brazil26_media_handles_three_platforms_idempotently(
         encoding="utf-8",
     )
 
+    # The local-only media profile requires a real private study config on disk.
+    # That is the contract pinned by
+    # test_issue_174_brazil26_local_media.py::test_local_media_still_requires_private_study,
+    # so this test must provide one rather than a non-existent path.
+    study_config = tmp_path / "private-study.yaml"
+    study_config.write_text("study: brazil26\n", encoding="utf-8")
+
     monkeypatch.setattr(
         MediaDownloader,
         "_fetch",
@@ -52,7 +59,7 @@ def test_local_brazil26_media_handles_three_platforms_idempotently(
 
     first = run_distributed_media(
         settings,
-        study_config=tmp_path / "private-study.yaml",
+        study_config=study_config,
         data_root=tmp_path,
         workers=1,
         limit=10,
@@ -60,7 +67,7 @@ def test_local_brazil26_media_handles_three_platforms_idempotently(
     )
     second = run_distributed_media(
         settings,
-        study_config=tmp_path / "private-study.yaml",
+        study_config=study_config,
         data_root=tmp_path,
         workers=1,
         limit=10,
