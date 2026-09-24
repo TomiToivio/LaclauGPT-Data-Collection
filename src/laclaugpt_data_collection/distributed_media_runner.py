@@ -1,4 +1,4 @@
-"""Download pending media locally or to S3/Allas and refresh handoff state."""
+"""Download pending media to S3/Allas and refresh distributed handoff state."""
 from __future__ import annotations
 
 import argparse
@@ -164,16 +164,13 @@ def _run_distributed_media_unlocked(
     workers: int,
     limit: int,
 ) -> dict[str, Any]:
-    local_only = not settings.distributed_requested
-    sink: DistributedCaptureSink | None = None
-    remote_records: list[dict[str, Any]] = []
-    if not local_only:
-        sink = DistributedCaptureSink(settings)
-        sink.assert_private_config(study_config)
-        remote_records = sink.records.pending_media_records(
-            collection_id=settings.project_id,
-            limit=limit,
-        )
+    sink = DistributedCaptureSink(settings)
+    sink.assert_private_config(study_config)
+
+    remote_records = sink.records.pending_media_records(
+        collection_id=settings.project_id,
+        limit=limit,
+    )
     local_records = [
         record
         for record in load_records(data_root)
@@ -197,23 +194,19 @@ def _run_distributed_media_unlocked(
     records = list(records_by_route.values())[:limit]
     store = CollectionStore(data_root)
     try:
-        if local_only:
-            backend: MediaBackend = FilesystemBackend(store.media_dir, store.root)
-        else:
-            object_store = S3ObjectStore(
-                bucket=settings.s3_bucket,
-                endpoint_url=settings.effective_s3_endpoint,
-                region_name=settings.s3_region,
-                access_key_id=settings.effective_s3_access_key,
-                secret_access_key=settings.effective_s3_secret_key,
-                prefix=f"{settings.s3_prefix_root}/{settings.project_id}",
-                signature_version=settings.s3_signature_version,
-                addressing_style=settings.s3_addressing_style,
-            )
-            backend = S3MediaBackend(object_store)
+        object_store = S3ObjectStore(
+            bucket=settings.s3_bucket,
+            endpoint_url=settings.effective_s3_endpoint,
+            region_name=settings.s3_region,
+            access_key_id=settings.effective_s3_access_key,
+            secret_access_key=settings.effective_s3_secret_key,
+            prefix=f"{settings.s3_prefix_root}/{settings.project_id}",
+            signature_version=settings.s3_signature_version,
+            addressing_style=settings.s3_addressing_style,
+        )
         downloader = MediaDownloader(
             store,
-            backend=backend,
+            backend=S3MediaBackend(object_store),
             workers=workers,
         )
         jobs = downloader.enqueue_from_records(records)
@@ -224,9 +217,8 @@ def _run_distributed_media_unlocked(
             results,
             default_collection=settings.project_id,
         )
-        if sink is not None:
-            for record in touched:
-                sink.ingest(record)
+        for record in touched:
+            sink.ingest(record)
         return {
             "project_id": settings.project_id,
             "run_id": settings.run_id,
@@ -238,8 +230,7 @@ def _run_distributed_media_unlocked(
             "completed": sum(row.get("status") == "completed" for row in results),
             "failed": sum(row.get("status") == "failed" for row in results),
             "skipped": max(len(records) - len(jobs), 0),
-            "mongo_refreshed": len(touched) if sink is not None else 0,
-            "storage": "filesystem" if local_only else "s3",
+            "mongo_refreshed": len(touched),
         }
     finally:
         store.close()
