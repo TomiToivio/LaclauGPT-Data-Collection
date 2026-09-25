@@ -8,7 +8,11 @@ from laclaugpt_data_collection.store import CollectionStore
 
 
 def _record(platform: str) -> dict:
-    media_host = "v16-webapp-prime.tiktok.com" if platform == "tiktok" else "cdn.example.invalid"
+    media_host = (
+        "v16-webapp-prime.tiktok.com"
+        if platform == "tiktok"
+        else "cdn.example.invalid"
+    )
     return {
         "collection_id": "brazil26",
         "source_url": f"https://{platform}.example.invalid/public/1",

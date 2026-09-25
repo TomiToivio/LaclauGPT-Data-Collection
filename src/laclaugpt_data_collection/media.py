@@ -184,6 +184,8 @@ class MediaDownloader:
                 )
             )
             outcome_status = "access_restricted" if session_bound else "failed"
+            # urllib errors may embed signed URLs or query parameters. Persist
+            # only an HTTP code or exception class, never exception detail.
             reason = (
                 f"HTTP {status}: access restricted" if session_bound
                 else f"HTTP {status}" if status is not None
