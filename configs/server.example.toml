@@ -14,7 +14,6 @@ data_root = "./data"
 [collector]
 mode = "distributed"
 workers = 4
-download_media = true
 
 [mongodb]
 uri_env = "LACLAUGPT_MONGODB_URI"
