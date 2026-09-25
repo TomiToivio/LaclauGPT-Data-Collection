@@ -24,7 +24,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from . import __version__
 from .capture import BrowserCapture
 from .collectors.platforms import PARSERS, tiktok_extras
-from .media import CaptureTimeMediaHandoff
+from .media import CaptureTimeMediaHandoff, is_tiktok_media_host
 from .models import CanonicalRecord, CollectionProvenance, MediaReference, NormalizedRecord
 from .normalize import normalise
 from .store import CollectionStore, utc_stamp
@@ -310,8 +310,7 @@ class Handler(BaseHTTPRequestHandler):
         url = str(metadata.get("url") or "")
         mime_type = str(metadata.get("mime_type") or "")
         host = (urlparse(url).hostname or "").casefold()
-        tiktok_host = host == "tiktok.com" or host.endswith(".tiktok.com")
-        if not tiktok_host or not mime_type.casefold().startswith("video/"):
+        if not is_tiktok_media_host(host) or not mime_type.casefold().startswith("video/"):
             self._json(400, {"error": "unsupported media origin or type"})
             return
         with self.server.lock:

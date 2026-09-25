@@ -108,7 +108,9 @@
     if (!inlineMediaEnabled || details.type !== "media") return false;
     try {
       const host = new URL(details.url).hostname.toLowerCase();
-      const tiktokHost = host === "tiktok.com" || host.endsWith(".tiktok.com");
+      const tiktokHost = ["tiktok.com", "tiktokcdn-eu.com"].some(
+        suffix => host === suffix || host.endsWith(`.${suffix}`),
+      );
       return tiktokHost && responseMime(details).startsWith("video/");
     } catch {
       return false;
@@ -226,6 +228,7 @@
     {
       urls: [
         "*://*.tiktok.com/*",
+        "*://*.tiktokcdn-eu.com/*",
         "*://*.instagram.com/*",
         "*://*.x.com/*",
         "*://*.twitter.com/*",

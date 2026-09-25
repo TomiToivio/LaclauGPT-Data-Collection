@@ -13,6 +13,7 @@
     "http://127.0.0.1/*",
     "http://localhost/*",
     "*://*.tiktok.com/*",
+    "*://*.tiktokcdn-eu.com/*",
     "*://*.instagram.com/*",
     "*://*.x.com/*",
     "*://*.twitter.com/*"
@@ -24,6 +25,7 @@
   "content_scripts": [
     {
       "matches": [
+        "*://*.tiktokcdn-eu.com/*",
         "*://*.tiktok.com/*",
         "*://*.instagram.com/*",
         "*://*.x.com/*",

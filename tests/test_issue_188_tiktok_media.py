@@ -3,25 +3,31 @@ from __future__ import annotations
 
 from urllib.error import HTTPError
 
-from laclaugpt_data_collection.media import MediaDownloader
+import pytest
+
+from laclaugpt_data_collection.media import MediaDownloader, is_tiktok_media_host
 from laclaugpt_data_collection.store import CollectionStore
 
 
-def _record(platform: str) -> dict:
+def _record(platform: str, media_host: str = "v16-webapp-prime.tiktok.com") -> dict:
     return {
         "collection_id": "brazil26",
         "source_url": f"https://{platform}.example.invalid/public/1",
         "source": {"platform": platform},
         "content": {"media_references": [
             {"kind": "video", "media_index": 0,
-             "url": (f"https://v16-webapp-prime.tiktok.com/{platform}.mp4?signature=SENSITIVE"
+             "url": (f"https://{media_host}/{platform}.mp4?signature=SENSITIVE"
                      if platform == "tiktok" else
                      f"https://cdn.example.invalid/{platform}.mp4?signature=SENSITIVE")}
         ]},
     }
 
 
-def test_tiktok_session_bound_403_is_terminal_and_redacted(tmp_path):
+@pytest.mark.parametrize(
+    "media_host",
+    ["v16-webapp-prime.tiktok.com", "p16-common-sign.tiktokcdn-eu.com"],
+)
+def test_tiktok_session_bound_403_is_terminal_and_redacted(tmp_path, media_host):
     store = CollectionStore(tmp_path)
     calls = []
 
@@ -30,17 +36,25 @@ def test_tiktok_session_bound_403_is_terminal_and_redacted(tmp_path):
         raise HTTPError(url, 403, "SENSITIVE", None, None)
 
     downloader = MediaDownloader(store, fetcher=denied)
-    job = downloader.enqueue_from_records([_record("tiktok")])[0]
+    record = _record("tiktok", media_host)
+    job = downloader.enqueue_from_records([record])[0]
     result = downloader.run_queue([job])[0]
 
     assert result["status"] == "access_restricted"
     assert result["http_status"] == 403
     assert "SENSITIVE" not in str(result)
     assert store.media_states(job.source_id, collection_id="brazil26")[0]["status"] == "access_restricted"
-    assert downloader.enqueue_from_records([_record("tiktok")]) == []
+    assert downloader.enqueue_from_records([record]) == []
     assert downloader.run_queue([job])[0]["status"] == "skipped"
     assert len(calls) == 1
     store.close()
+
+
+def test_tiktok_media_host_families_are_explicitly_bounded():
+    assert is_tiktok_media_host("v16-webapp-prime.tiktok.com")
+    assert is_tiktok_media_host("p16-common-sign.tiktokcdn-eu.com")
+    assert not is_tiktok_media_host("tiktokcdn-eu.com.example.invalid")
+    assert not is_tiktok_media_host("example.invalid")
 
 
 def test_other_platform_http_error_remains_retryable(tmp_path):

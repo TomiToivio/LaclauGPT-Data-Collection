@@ -29,7 +29,8 @@ def test_manifest_is_valid_and_minimal() -> None:
     assert "cookies" not in permissions
     hosts = [p for p in permissions if "*://" in p]
     assert hosts == [
-        "*://*.tiktok.com/*", "*://*.instagram.com/*",
+        "*://*.tiktok.com/*", "*://*.tiktokcdn-eu.com/*",
+        "*://*.instagram.com/*",
         "*://*.x.com/*", "*://*.twitter.com/*",
     ]
     gecko = manifest["browser_specific_settings"]["gecko"]
@@ -59,6 +60,7 @@ def test_capture_posts_to_local_backend() -> None:
     assert "/capture" in text
     assert "filterResponseData" in text
     assert 'filter.write(event.data)' in text  # byte-exact site passthrough
+    assert '"*://*.tiktokcdn-eu.com/*"' in text
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
