@@ -11,8 +11,8 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import subprocess
 import struct
+import subprocess
 import threading
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
