@@ -53,7 +53,7 @@ def test_preflight_probe_accepts_working_executable(tmp_path: Path, monkeypatch)
         return SimpleNamespace(returncode=0)
     monkeypatch.setattr(browser.subprocess, "run", probe)
     browser._check_firefox_command([str(executable), "-P", "Brazil26"], env={})
-    assert seen == [[str(executable), "--version"]]
+    assert seen == [[str(executable), "-P", "Brazil26", "--version"]]
 
 
 def test_preflight_probe_reports_timeout(tmp_path: Path, monkeypatch) -> None:
@@ -64,3 +64,19 @@ def test_preflight_probe_reports_timeout(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(browser.subprocess, "run", timeout)
     with pytest.raises(RuntimeError, match="failed its --version probe"):
         browser._check_firefox_command([str(executable)], env={})
+
+
+def test_preflight_probe_checks_wrapper_target(tmp_path: Path, monkeypatch) -> None:
+    """A working wrapper cannot hide a missing downstream Firefox target."""
+    wrapper = tmp_path / "env"
+    wrapper.touch()
+    seen = []
+    def probe(args, **kwargs):
+        seen.append(args)
+        return SimpleNamespace(returncode=127)
+    monkeypatch.setattr(browser.subprocess, "run", probe)
+    with pytest.raises(RuntimeError, match="unusable"):
+        browser._check_firefox_command(
+            [str(wrapper), "missing-firefox", "-P", "Brazil26"], env={}
+        )
+    assert seen == [[str(wrapper), "missing-firefox", "-P", "Brazil26", "--version"]]
