@@ -102,6 +102,7 @@ class CaptureServer(ThreadingHTTPServer):
         data_root: str,
         host: str = "127.0.0.1",
         port: int = 8765,
+        project_id: str = "",
     ) -> None:
         if host not in {"127.0.0.1", "localhost", "::1"}:
             raise ValueError("Firefox local capture server must bind to localhost")
@@ -116,6 +117,7 @@ class CaptureServer(ThreadingHTTPServer):
             "web_fetch_errors": 0,
         }
         self.run_id = utc_stamp()
+        self.project_id = project_id.strip()
         self.lock = threading.RLock()
         self._tz = self._load_timezone(self.cfg.timezone)
         super().__init__((host, port), Handler)
@@ -267,6 +269,8 @@ class Handler(BaseHTTPRequestHandler):
             "source_url": api_url,
             "run_id": self.server.run_id,
             "study": self.server.cfg.study,
+            "project_id": self.server.project_id,
+            "collection_id": self.server.project_id,
             "account": account,
         }
 

@@ -201,7 +201,9 @@ def run_backend(
     )
 
     mirror.scan_once()
-    server = CaptureServer(study_config, data_root, host=host, port=port)
+    server = CaptureServer(
+        study_config, data_root, host=host, port=port, project_id=settings.project_id
+    )
     mirror.start()
     try:
         server.serve_forever()

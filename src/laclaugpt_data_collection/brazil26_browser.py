@@ -285,7 +285,9 @@ def run_backend(
 
     if mirror is not None:
         mirror.scan_once()
-    server = CaptureServer(study_config, data_root, host=host, port=port)
+    server = CaptureServer(
+        study_config, data_root, host=host, port=port, project_id=settings.project_id
+    )
     if mirror is not None:
         mirror.start()
     try:
