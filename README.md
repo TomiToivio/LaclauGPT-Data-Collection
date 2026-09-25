@@ -21,17 +21,23 @@ The framework is developed around Ernesto Laclau and Chantal Mouffe's discourse 
 
 LaclauGPT grew out of research-software work at the **[Helsinki Hub on Emotions, Populism and Polarisation (HEPPsinki)](https://www.helsinki.fi/en/researchgroups/emotions-populism-and-polarisation), University of Helsinki**, and has been developed in connection with the **CO3**, **PLEDGE**, and **ENDURE** international research projects.
 
+<!-- project-logos:start -->
 <p align="center">
   <a href="https://www.co3socialcontract.eu/"><img src="https://raw.githubusercontent.com/TomiToivio/LaclauGPT/main/assets/co3-logo.svg" width="180" alt="CO3 project logo"></a>
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <a href="https://www.pledgeproject.eu/"><img src="https://www.pledgeproject.eu/wp-content/uploads/2024/04/Pledge-Logo.png" width="88" height="88" alt="PLEDGE project logo"></a>
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <a href="https://www.endure-project.org/"><img src="https://www.endure-project.org/_inhaltselemente/logo-kurz.png?width=500" height="88" alt="ENDURE project logo"></a>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <a href="https://www.pledgeproject.eu/"><img src="https://www.pledgeproject.eu/wp-content/uploads/2024/04/Pledge-Logo.png" height="88" alt="PLEDGE project logo"></a>
 </p>
-
 <p align="center">
-  <a href="https://european-union.europa.eu/principles-countries-history/symbols/european-flag_en"><img src="https://www.pledgeproject.eu/wp-content/uploads/2024/04/co-funded-by-european-union.png" height="64" alt="European Union flag and funding acknowledgement"></a>
+  <small>CO3 and PLEDGE: European Union funding</small><br>
+  <a href="https://european-union.europa.eu/principles-countries-history/symbols/european-flag_en"><img src="https://www.pledgeproject.eu/wp-content/uploads/2024/04/co-funded-by-european-union.png" height="54" alt="European Union funding acknowledgement for CO3 and PLEDGE"></a>
 </p>
+<p align="center">
+  <a href="https://www.endure-project.org/"><img src="https://www.endure-project.org/_inhaltselemente/logo-kurz.png?width=500" height="54" alt="ENDURE project logo"></a>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <a href="https://www.aka.fi/"><img src="https://www.aka.fi/globalassets/aka_fi_vaaka_sininen.svg" height="44" alt="Research Council of Finland (Suomen Akatemia) logo"></a>
+</p>
+<p align="center"><small>ENDURE: University of Helsinki research funded by the Research Council of Finland</small></p>
+<!-- project-logos:end -->
 
 - **[CO3 — Continuous Construction of Resilient Social Contracts Through Societal Transformations](https://www.co3socialcontract.eu/)** studies how more democratic, inclusive and resilient social contracts can be built and renewed.
 - **[PLEDGE — Politics of Grievance and Democratic Governance](https://www.pledgeproject.eu/)** studies the emotional dynamics of political grievances and democratic governance.
