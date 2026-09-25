@@ -17,6 +17,7 @@ sqlite_path = "./data/database/collection.sqlite3"
 [collector]
 mode = "laskin-remote"
 workers = 1
+download_media = true
 
 [distributed]
 # Match the AI26 localhost profile: distributed configuration is active, while

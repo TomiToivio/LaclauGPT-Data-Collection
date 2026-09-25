@@ -8,13 +8,14 @@ from laclaugpt_data_collection.store import CollectionStore
 
 
 def _record(platform: str) -> dict:
+    media_host = "v16-webapp-prime.tiktok.com" if platform == "tiktok" else "cdn.example.invalid"
     return {
         "collection_id": "brazil26",
         "source_url": f"https://{platform}.example.invalid/public/1",
         "source": {"platform": platform},
         "content": {"media_references": [
             {"kind": "video", "media_index": 0,
-             "url": f"https://cdn.example.invalid/{platform}.mp4?signature=SENSITIVE"}
+             "url": f"https://{media_host}/{platform}.mp4?signature=SENSITIVE"}
         ]},
     }
 
@@ -34,7 +35,8 @@ def test_tiktok_session_bound_403_is_terminal_and_redacted(tmp_path):
     assert result["status"] == "access_restricted"
     assert result["http_status"] == 403
     assert "SENSITIVE" not in str(result)
-    assert store.media_states(job.source_id, collection_id="brazil26")[0]["status"] == "access_restricted"
+    states = store.media_states(job.source_id, collection_id="brazil26")
+    assert states[0]["status"] == "access_restricted"
     assert downloader.enqueue_from_records([_record("tiktok")]) == []
     assert downloader.run_queue([job])[0]["status"] == "skipped"
     assert len(calls) == 1

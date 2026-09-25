@@ -2,11 +2,11 @@
 
 ## Current outcome and boundary
 
-The existing human-operated Firefox capture, canonical source identity, study provenance, media index, and 15-minute cron are retained. A detached worker receiving TikTok HTTP 401/403 records `access_restricted`, HTTP status, and a generic reason in the private media index. The same media key is not automatically retried by later cron runs; the system never attempts to replay cookies, copy browser credentials, spoof authentication, or bypass access controls. A new, independently authorized capture-time media-bytes handoff remains required for an eligible video to be stored.
+The existing human-operated Firefox capture, canonical source identity, study provenance, media index, and 15-minute cron are retained. A detached worker receiving TikTok HTTP 401/403 records `access_restricted`, HTTP status, and a generic reason in the private media index. The same media key is not automatically retried by later cron runs; the system never attempts to replay cookies, copy browser credentials, spoof authentication, or bypass access controls. The independently authorized capture-time media-bytes handoff is now implemented; a human-operated workstation capture remains required for live acceptance.
 
 The status is **not** evidence that a public TikTok media URL is universally unavailable; it is a specific failure of this detached request. Avoid reporting it as a completed download or as a defect in the existing X/Instagram collection.
 
-## Implementation and operational requirements still to verify
+## Implemented contract and remaining operational verification
 
 1. Capture media bytes only from a full, successful response already delivered to the researcher's authorized Firefox session. Never initiate a hidden second collection/navigation path or use credentials outside the browser. Range/partial responses must not be saved as a complete video.
 2. Use a bounded, nonblocking capture-to-loopback handoff; the original media response must remain byte-identical and the researcher's navigation must remain human-controlled.
@@ -18,4 +18,4 @@ The status is **not** evidence that a public TikTok media URL is universally una
 
 Report only aggregate counts per platform, e.g. completed, access-restricted, transient failed, and pending; whether a permitted TikTok video was linked to its canonical record; whether the 15-minute cron remains installed; whether loopback binding and human navigation remain enforced; and quality gate results. Never include cookies, signed URLs, handles, full local paths, private study YAML, or row-level records.
 
-The old `download_media` entries in generic example TOMLs were nonfunctional and are removed in this branch; the independent actual media cron scripts remain unchanged.
+The existing `download_media` profile setting is now wired to the bounded capture-time handoff. The independent media cron scripts remain unchanged.

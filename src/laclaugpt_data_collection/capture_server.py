@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
+import struct
 import subprocess
 import threading
 from datetime import datetime, timezone
@@ -22,6 +24,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from . import __version__
 from .capture import BrowserCapture
 from .collectors.platforms import PARSERS, tiktok_extras
+from .media import CaptureTimeMediaHandoff
 from .models import CanonicalRecord, CollectionProvenance, MediaReference, NormalizedRecord
 from .normalize import normalise
 from .store import CollectionStore, utc_stamp
@@ -79,6 +82,20 @@ def git_commit(repo: Path | None = None) -> str:
     return _git_commit_cache
 
 
+def _complete_media_response(status_code: int, content_range: str, byte_size: int) -> bool:
+    """Accept only complete successful responses, never unassembled range fragments."""
+    if status_code == 200:
+        return byte_size > 0
+    if status_code != 206:
+        return False
+    match = re.fullmatch(r"bytes 0-(\d+)/(\d+)", content_range)
+    return (
+        match is not None
+        and int(match.group(1)) + 1 == int(match.group(2))
+        and byte_size == int(match.group(2))
+    )
+
+
 def _decode_platform_body(body: Any) -> Any:
     """Accept JSON objects/strings or common JSON response prefixes."""
     if isinstance(body, (dict, list)):
@@ -103,11 +120,16 @@ class CaptureServer(ThreadingHTTPServer):
         host: str = "127.0.0.1",
         port: int = 8765,
         project_id: str = "",
+        capture_media_inline: bool = False,
+        capture_media_max_bytes: int = 64 * 1024 * 1024,
     ) -> None:
         if host not in {"127.0.0.1", "localhost", "::1"}:
             raise ValueError("Firefox local capture server must bind to localhost")
         self.cfg: StudyConfig = load_config(study_config)
         self.store = CollectionStore(data_root)
+        self.media_handoff = CaptureTimeMediaHandoff(self.store)
+        self.capture_media_inline = capture_media_inline
+        self.capture_media_max_bytes = max(1, capture_media_max_bytes)
         self.stats = {
             "captures": 0,
             "posts": 0,
@@ -115,6 +137,9 @@ class CaptureServer(ThreadingHTTPServer):
             "skipped": 0,
             "web_children": 0,
             "web_fetch_errors": 0,
+            "media_captures": 0,
+            "media_linked": 0,
+            "media_rejected": 0,
         }
         self.run_id = utc_stamp()
         self.project_id = project_id.strip()
@@ -175,6 +200,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):  # noqa: N802
         path = self.path.split("?", 1)[0]
         length = int(self.headers.get("Content-Length") or 0)
+        if path == "/media-capture":
+            self._capture_media(length)
+            return
         raw = self.rfile.read(length) if length else b"{}"
 
         if path == "/ping":
@@ -244,10 +272,53 @@ class Handler(BaseHTTPRequestHandler):
                 "date": str(self.server.local_today()),
                 "stats": dict(self.server.stats),
                 "seen_total": self.server.store.seen_count(),
+                "capture_media_inline": self.server.capture_media_inline,
+                "capture_media_max_bytes": self.server.capture_media_max_bytes,
             })
         else:
             self._json(404, {"error": "not found"})
 
+    def _capture_media(self, length: int) -> None:
+        """Accept length-prefixed metadata plus browser-authorized media bytes."""
+        if not self.server.capture_media_inline:
+            self.close_connection = True
+            self._json(404, {"error": "media capture disabled"})
+            return
+        maximum = self.server.capture_media_max_bytes + 65_540
+        if length < 5 or length > maximum:
+            self.close_connection = True
+            with self.server.lock:
+                self.server.stats["media_rejected"] += 1
+            self._json(413, {"error": "media capture exceeds configured bound"})
+            return
+        raw = self.rfile.read(length)
+        metadata_length = struct.unpack(">I", raw[:4])[0]
+        if metadata_length < 2 or metadata_length > 65_536 or 4 + metadata_length >= len(raw):
+            self._json(400, {"error": "bad media envelope"})
+            return
+        try:
+            metadata = json.loads(raw[4:4 + metadata_length])
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            self._json(400, {"error": "bad media metadata"})
+            return
+        body = raw[4 + metadata_length:]
+        status_code = int(metadata.get("status_code") or 0)
+        content_range = str(metadata.get("content_range") or "")
+        if not _complete_media_response(status_code, content_range, len(body)):
+            self._json(422, {"error": "partial or unsuccessful media response"})
+            return
+        url = str(metadata.get("url") or "")
+        mime_type = str(metadata.get("mime_type") or "")
+        host = (urlparse(url).hostname or "").casefold()
+        tiktok_host = host == "tiktok.com" or host.endswith(".tiktok.com")
+        if not tiktok_host or not mime_type.casefold().startswith("video/"):
+            self._json(400, {"error": "unsupported media origin or type"})
+            return
+        with self.server.lock:
+            result = self.server.media_handoff.capture(url, body, mime_type)
+            self.server.stats["media_captures"] += 1
+            self.server.stats["media_linked"] += int(result["linked"])
+        self._json(200, {"ok": True, **result})
     def _process_capture(self, data: dict[str, Any]) -> int:
         platform = data.get("platform", "")
         api_url = data.get("api_url", "")
@@ -285,7 +356,12 @@ class Handler(BaseHTTPRequestHandler):
             new_records: list[dict] = []
             records = self._records_for(platform, payload, api_url, platform_url, meta, raw_ref)
             for record in records:
-                if self.server.store.upsert_post(record, raw_ref):
+                inserted = self.server.store.upsert_post(record, raw_ref)
+                if getattr(self.server, "capture_media_inline", False):
+                    self.server.stats["media_linked"] += (
+                        self.server.media_handoff.register_record(record)
+                    )
+                if inserted:
                     new_posts += 1
                     new_records.append(record)
             self.server.stats["posts"] += new_posts
@@ -391,12 +467,16 @@ def main(argv: list[str] | None = None) -> int:
                         help="persistent collection data root")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--capture-media-inline", action="store_true")
+    parser.add_argument("--capture-media-max-bytes", type=int, default=64 * 1024 * 1024)
     args = parser.parse_args(argv)
     server = CaptureServer(
         args.study_config,
         args.data_root,
         host=args.host,
         port=args.port,
+        capture_media_inline=args.capture_media_inline,
+        capture_media_max_bytes=args.capture_media_max_bytes,
     )
     try:
         server.serve_forever()

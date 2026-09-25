@@ -21,6 +21,7 @@ port = 8765
 [collector]
 mode = "localhost-remote"
 workers = 1
+download_media = true
 
 [distributed]
 config_backend = "redis"

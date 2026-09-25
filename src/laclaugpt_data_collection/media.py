@@ -16,11 +16,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable
 from urllib.error import HTTPError
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from .store import CollectionStore
 
 USER_AGENT = "Mozilla/5.0 (LaclauGPT collector; research)"
+TERMINAL_MEDIA_STATUSES = {"completed", "ok", "downloaded", "access_restricted"}
 
 
 class MediaBackend:
@@ -126,7 +128,7 @@ class MediaDownloader:
                 if media_key in queued:
                     continue
                 known = self.store.media_known(media_key)
-                if known and known.get("status") in {"completed", "ok", "downloaded", "access_restricted"}:
+                if known and known.get("status") in TERMINAL_MEDIA_STATUSES:
                     continue
                 queued.add(media_key)
                 jobs.append(MediaJob(
@@ -155,11 +157,14 @@ class MediaDownloader:
 
     def _download_one(self, job: MediaJob) -> dict:
         # A capture-time handoff may have completed while the cron worker was
-        # waiting to run. Never replace completed/restricted state with running.
+        # waiting to run. Never replace terminal state with running.
         known = self.store.media_known(job.media_key)
-        if known and known.get("status") in {"completed", "ok", "downloaded", "access_restricted"}:
-            return {"media_key": job.media_key, "collection_id": job.collection_id,
-                    "status": "skipped"}
+        if known and known.get("status") in TERMINAL_MEDIA_STATUSES:
+            return {
+                "media_key": job.media_key,
+                "collection_id": job.collection_id,
+                "status": "skipped",
+            }
         # Persist queued/running state before network I/O. The collection id is
         # part of media_key, so simultaneous AI26/Brazil26 jobs never collide.
         self.store.record_media(
@@ -170,21 +175,27 @@ class MediaDownloader:
             body, mime = self._fetch(job.url)
         except Exception as exc:  # noqa: BLE001
             status = exc.code if isinstance(exc, HTTPError) else None
-            # TikTok 403 may be bound to the researcher's browser session.
-            # Do not retry forever, replay cookies, or expose signed URLs in logs.
-            restricted = job.platform == "tiktok" and status in {401, 403}
-            state = "access_restricted" if restricted else "failed"
+            session_bound = (
+                job.platform == "tiktok"
+                and status in {401, 403}
+                and (
+                    (urlparse(job.url).hostname or "") == "tiktok.com"
+                    or (urlparse(job.url).hostname or "").endswith(".tiktok.com")
+                )
+            )
+            outcome_status = "access_restricted" if session_bound else "failed"
             reason = (
-                f"HTTP {status}: access restricted" if restricted
+                f"HTTP {status}: access restricted" if session_bound
                 else f"HTTP {status}" if status is not None
                 else type(exc).__name__
             )
             self.store.record_media(
                 job.media_key, job.platform, job.source_id, job.media_index, job.url,
-                None, None, None, "", state, reason, status,
+                None, None, None, "", outcome_status, reason, status,
             )
             return {"media_key": job.media_key, "collection_id": job.collection_id,
-                    "status": state, "error": reason, "http_status": status}
+                    "status": outcome_status, "error": reason,
+                    "http_status": status}
 
         mime = (mime or "application/octet-stream").split(";", 1)[0].strip()
         checksum = hashlib.sha256(body).hexdigest()
@@ -213,3 +224,93 @@ class MediaDownloader:
         request = Request(url, headers={"User-Agent": USER_AGENT})
         with urlopen(request, timeout=120) as response:
             return response.read(), response.headers.get("Content-Type", "application/octet-stream")
+
+
+class CaptureTimeMediaHandoff:
+    """Persist browser-authorized response bytes and reconcile canonical linkage."""
+
+    def __init__(self, store: CollectionStore, backend: MediaBackend | None = None) -> None:
+        self.store = store
+        self.backend = backend or FilesystemBackend(store.media_dir, store.root)
+
+    @staticmethod
+    def _jobs(record: dict) -> list[MediaJob]:
+        collection_id, platform, source_id, refs = MediaDownloader._record_fields(record)
+        source_hash = hashlib.sha256(source_id.encode()).hexdigest()[:16]
+        jobs: list[MediaJob] = []
+        for position, ref in enumerate(refs):
+            url = str(ref.get("url") or "")
+            if not url:
+                continue
+            media_index = int(ref.get("media_index", position))
+            jobs.append(MediaJob(
+                media_key=f"{collection_id}:{platform}:{source_hash}:{media_index}",
+                collection_id=collection_id,
+                platform=platform,
+                source_id=source_id,
+                media_index=media_index,
+                kind=str(ref.get("kind") or "unknown"),
+                url=url,
+            ))
+        return jobs
+
+    def register_record(self, record: dict) -> int:
+        """Register references and reconcile bytes captured before canonical JSON."""
+        reconciled = 0
+        for job in self._jobs(record):
+            self.store.register_media_reference(
+                job.url, job.media_key, job.platform, job.source_id, job.media_index
+            )
+            captured = self.store.captured_media(job.url)
+            if captured is not None:
+                self._complete(job, captured)
+                reconciled += 1
+        return reconciled
+
+    def capture(self, url: str, body: bytes, mime_type: str) -> dict:
+        """Store a bounded browser response once and link every known reference."""
+        mime = (mime_type or "application/octet-stream").split(";", 1)[0].strip()
+        checksum = hashlib.sha256(body).hexdigest()
+        extension = (mimetypes.guess_extension(mime) or ".bin").replace(".jpe", ".jpg")
+        path = self.backend.save(f"captured/{checksum}{extension}", body, mime)
+        self.store.record_captured_media(url, path, checksum, len(body), mime)
+        captured = self.store.captured_media(url)
+        assert captured is not None
+        references = self.store.media_references_for_url(url)
+        for ref in references:
+            self._complete(
+                MediaJob(
+                    media_key=ref["media_key"],
+                    collection_id=ref["media_key"].split(":", 1)[0],
+                    platform=ref["platform"],
+                    source_id=ref["document_id"],
+                    media_index=ref["media_index"],
+                    kind="unknown",
+                    url=url,
+                ),
+                captured,
+            )
+        return {
+            "status": "completed" if references else "pending_link",
+            "local_path": path,
+            "sha256": checksum,
+            "byte_size": len(body),
+            "mime_type": mime,
+            "linked": len(references),
+        }
+
+    def _complete(self, job: MediaJob, captured: dict) -> None:
+        self.store.record_media(
+            job.media_key,
+            job.platform,
+            job.source_id,
+            job.media_index,
+            job.url,
+            captured["local_path"],
+            captured["sha256"],
+            captured["byte_size"],
+            captured["mime_type"],
+            "completed",
+            None,
+            200,
+        )
