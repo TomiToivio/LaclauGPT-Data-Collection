@@ -404,8 +404,10 @@ def _check_firefox_command(command: list[str], *, env: dict[str, str]) -> None:
     if not (Path(executable).is_file() or shutil.which(executable)):
         raise RuntimeError("Firefox executable is not available; configure LACLAUGPT_FIREFOX_COMMAND")
     try:
+        # Probe the entire configured command, not just a launcher such as env
+        # or powershell, whose own --version says nothing about Firefox.
         probe = subprocess.run(
-            [executable, "--version"],
+            [*command, "--version"],
             env=env,
             capture_output=True,
             text=True,
