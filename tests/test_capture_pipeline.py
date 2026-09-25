@@ -91,6 +91,7 @@ class _ServerFixture(CaptureServer):
         self.store = CollectionStore(data_root)
         self.stats = {"captures": 0, "posts": 0, "errors": 0, "skipped": 0}
         self.run_id = "synthetic-run"
+        self.project_id = "synthetic-study"
         self.lock = threading.RLock()
         self._tz = None
         # attributes the handler touches indirectly
