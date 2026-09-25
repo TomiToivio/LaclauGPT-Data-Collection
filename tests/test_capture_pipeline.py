@@ -91,12 +91,11 @@ class _ServerFixture(CaptureServer):
         self.store = CollectionStore(data_root)
         self.stats = {"captures": 0, "posts": 0, "errors": 0, "skipped": 0}
         self.run_id = "synthetic-run"
+        # The handler reads the study identity from the server when building
+        # capture provenance, so the socket-free fixture must expose it too.
         self.project_id = "synthetic-study"
         self.lock = threading.RLock()
         self._tz = None
-        # The handler reads the study identity from the server when building
-        # capture provenance, so the socket-free fixture must expose it too.
-        self.project_id = "brazil26"
         # attributes the handler touches indirectly
         self.Handler = SimpleNamespace  # never used; placeholder
 
