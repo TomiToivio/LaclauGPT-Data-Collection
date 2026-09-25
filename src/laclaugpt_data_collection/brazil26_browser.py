@@ -286,7 +286,13 @@ def run_backend(
     if mirror is not None:
         mirror.scan_once()
     server = CaptureServer(
-        study_config, data_root, host=host, port=port, project_id=settings.project_id
+        study_config,
+        data_root,
+        host=host,
+        port=port,
+        project_id=settings.project_id,
+        capture_media_inline=getattr(settings, "capture_media_inline", False),
+        capture_media_max_bytes=getattr(settings, "capture_media_max_bytes", 64 * 1024 * 1024),
     )
     if mirror is not None:
         mirror.start()

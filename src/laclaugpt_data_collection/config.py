@@ -55,6 +55,8 @@ class Settings(BaseSettings):
 
     browser_host: str = "127.0.0.1"
     browser_port: int = 8765
+    capture_media_inline: bool = False
+    capture_media_max_bytes: int = 64 * 1024 * 1024
 
     # Empty by default so auto mode never sends data to an unconfigured service.
     mongodb_uri: str = ""
@@ -188,6 +190,8 @@ class Settings(BaseSettings):
             "s3_addressing_style": self.s3_addressing_style,
             "browser_host": self.browser_host,
             "browser_port": str(self.browser_port),
+            "capture_media_inline": str(self.capture_media_inline),
+            "capture_media_max_bytes": str(self.capture_media_max_bytes),
             "kg_enabled": str(self.kg_enabled),
             "kg_backend": self.kg_backend,
             "kg_export_root": str(self.kg_export_root),

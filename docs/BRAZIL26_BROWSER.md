@@ -89,6 +89,20 @@ The status must identify Brazil26 before collecting research material.
 ## TikTok and Instagram media
 
 Browser capture records media references without blocking interactive research.
+### TikTok session-bound video
+
+When `LACLAUGPT_CAPTURE_MEDIA_INLINE=true`, the Firefox extension may hand the
+localhost backend public TikTok video bytes that the researcher-controlled
+browser has already received. This does not export cookies, tokens, headers, or
+browser history and does not issue a second media request. The response stream
+is still forwarded to TikTok unchanged.
+
+The handoff is bounded by `LACLAUGPT_CAPTURE_MEDIA_MAX_BYTES` (64 MiB in the
+example profile), content-addressed, and reconciled durably to the canonical
+media reference whether the post JSON or video response arrives first. Detached
+TikTok CDN 401/403 responses are recorded as `access_restricted` and are not
+retried forever by the 15-minute worker. X and Instagram keep their existing
+download path.
 The Brazil26 media worker uses the existing persistent `MediaDownloader` and
 distributed media runner. TikTok and Instagram image/video references supported
 by the canonical media model are downloaded later to the configured storage.

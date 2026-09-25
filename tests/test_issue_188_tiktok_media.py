@@ -14,7 +14,9 @@ def _record(platform: str) -> dict:
         "source": {"platform": platform},
         "content": {"media_references": [
             {"kind": "video", "media_index": 0,
-             "url": f"https://cdn.example.invalid/{platform}.mp4?signature=SENSITIVE"}
+             "url": (f"https://v16-webapp-prime.tiktok.com/{platform}.mp4?signature=SENSITIVE"
+                     if platform == "tiktok" else
+                     f"https://cdn.example.invalid/{platform}.mp4?signature=SENSITIVE")}
         ]},
     }
 
