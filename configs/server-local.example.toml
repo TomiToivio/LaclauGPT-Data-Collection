@@ -15,7 +15,6 @@ sqlite_path = "./data/database/collection.sqlite3"
 [collector]
 mode = "local"
 workers = 1
-download_media = false
 
 [interoperability]
 schema_version = "1.0.0"
