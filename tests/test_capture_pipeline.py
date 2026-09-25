@@ -93,6 +93,9 @@ class _ServerFixture(CaptureServer):
         self.run_id = "synthetic-run"
         self.lock = threading.RLock()
         self._tz = None
+        # The handler reads the study identity from the server when building
+        # capture provenance, so the socket-free fixture must expose it too.
+        self.project_id = "brazil26"
         # attributes the handler touches indirectly
         self.Handler = SimpleNamespace  # never used; placeholder
 
