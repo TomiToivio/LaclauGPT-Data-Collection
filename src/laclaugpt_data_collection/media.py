@@ -126,7 +126,7 @@ class MediaDownloader:
                 if media_key in queued:
                     continue
                 known = self.store.media_known(media_key)
-                if known and known.get("status") in {"completed", "ok", "downloaded"}:
+                if known and known.get("status") in {"completed", "ok", "downloaded", "access_restricted"}:
                     continue
                 queued.add(media_key)
                 jobs.append(MediaJob(
@@ -154,6 +154,12 @@ class MediaDownloader:
         return results
 
     def _download_one(self, job: MediaJob) -> dict:
+        # A capture-time handoff may have completed while the cron worker was
+        # waiting to run. Never replace completed/restricted state with running.
+        known = self.store.media_known(job.media_key)
+        if known and known.get("status") in {"completed", "ok", "downloaded", "access_restricted"}:
+            return {"media_key": job.media_key, "collection_id": job.collection_id,
+                    "status": "skipped"}
         # Persist queued/running state before network I/O. The collection id is
         # part of media_key, so simultaneous AI26/Brazil26 jobs never collide.
         self.store.record_media(
@@ -164,12 +170,21 @@ class MediaDownloader:
             body, mime = self._fetch(job.url)
         except Exception as exc:  # noqa: BLE001
             status = exc.code if isinstance(exc, HTTPError) else None
+            # TikTok 403 may be bound to the researcher's browser session.
+            # Do not retry forever, replay cookies, or expose signed URLs in logs.
+            restricted = job.platform == "tiktok" and status in {401, 403}
+            state = "access_restricted" if restricted else "failed"
+            reason = (
+                f"HTTP {status}: access restricted" if restricted
+                else f"HTTP {status}" if status is not None
+                else type(exc).__name__
+            )
             self.store.record_media(
                 job.media_key, job.platform, job.source_id, job.media_index, job.url,
-                None, None, None, "", "failed", str(exc)[:300], status,
+                None, None, None, "", state, reason, status,
             )
             return {"media_key": job.media_key, "collection_id": job.collection_id,
-                    "status": "failed", "error": str(exc)[:300], "http_status": status}
+                    "status": state, "error": reason, "http_status": status}
 
         mime = (mime or "application/octet-stream").split(";", 1)[0].strip()
         checksum = hashlib.sha256(body).hexdigest()
