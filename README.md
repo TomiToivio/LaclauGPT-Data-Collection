@@ -22,7 +22,7 @@ The framework is developed around Ernesto Laclau and Chantal Mouffe's discourse 
 LaclauGPT grew out of research-software work at the **[Helsinki Hub on Emotions, Populism and Polarisation (HEPPsinki)](https://www.helsinki.fi/en/researchgroups/emotions-populism-and-polarisation), University of Helsinki**, and has been developed in connection with the **CO3**, **PLEDGE**, and **ENDURE** international research projects.
 
 <p align="center">
-  <a href="https://www.co3socialcontract.eu/"><img src="https://www.co3socialcontract.eu/favicon.ico" width="88" height="88" alt="CO3 project logo"></a>
+  <a href="https://www.co3socialcontract.eu/"><img src="https://raw.githubusercontent.com/TomiToivio/LaclauGPT/main/assets/co3-logo.svg" width="180" alt="CO3 project logo"></a>
   &nbsp;&nbsp;&nbsp;&nbsp;
   <a href="https://www.pledgeproject.eu/"><img src="https://www.pledgeproject.eu/wp-content/uploads/2024/04/Pledge-Logo.png" width="88" height="88" alt="PLEDGE project logo"></a>
   &nbsp;&nbsp;&nbsp;&nbsp;
