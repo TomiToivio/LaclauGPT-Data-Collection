@@ -23,6 +23,16 @@ from .store import CollectionStore
 
 USER_AGENT = "Mozilla/5.0 (LaclauGPT collector; research)"
 TERMINAL_MEDIA_STATUSES = {"completed", "ok", "downloaded", "access_restricted"}
+TIKTOK_MEDIA_HOST_SUFFIXES = ("tiktok.com", "tiktokcdn-eu.com")
+
+
+def is_tiktok_media_host(host: str) -> bool:
+    """Return whether *host* is an explicitly supported TikTok media family."""
+    normalized = host.rstrip(".").casefold()
+    return any(
+        normalized == suffix or normalized.endswith(f".{suffix}")
+        for suffix in TIKTOK_MEDIA_HOST_SUFFIXES
+    )
 
 
 class MediaBackend:
@@ -175,10 +185,7 @@ class MediaDownloader:
             session_bound = (
                 job.platform == "tiktok"
                 and status in {401, 403}
-                and (
-                    (urlparse(job.url).hostname or "") == "tiktok.com"
-                    or (urlparse(job.url).hostname or "").endswith(".tiktok.com")
-                )
+                and is_tiktok_media_host(urlparse(job.url).hostname or "")
             )
             outcome_status = "access_restricted" if session_bound else "failed"
             # urllib errors may embed signed URLs or query parameters. Persist
