@@ -18,7 +18,6 @@ sqlite_path = "./data/database/collection.sqlite3"
 [collector]
 mode = "laskin-remote"
 workers = 1
-download_media = true
 non_browser_enabled = true
 
 [distributed]

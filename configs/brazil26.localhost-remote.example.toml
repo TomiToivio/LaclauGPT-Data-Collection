@@ -23,7 +23,6 @@ interactive = true
 [collector]
 mode = "localhost-remote"
 workers = 1
-download_media = true
 non_browser_enabled = true
 source_manifest = "configs/studies/brazil26.sources.example.toml"
 

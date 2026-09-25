@@ -156,6 +156,12 @@ class MediaDownloader:
         return results
 
     def _download_one(self, job: MediaJob) -> dict:
+        # A browser capture may have completed after this job was queued.
+        # Avoid replacing durable completed or access-restricted state.
+        known = self.store.media_known(job.media_key)
+        if known and known.get("status") in TERMINAL_MEDIA_STATUSES:
+            return {"media_key": job.media_key, "collection_id": job.collection_id,
+                    "status": "skipped"}
         # Persist queued/running state before network I/O. The collection id is
         # part of media_key, so simultaneous AI26/Brazil26 jobs never collide.
         self.store.record_media(
@@ -175,12 +181,19 @@ class MediaDownloader:
                 )
             )
             outcome_status = "access_restricted" if session_bound else "failed"
+            # urllib errors may embed signed URLs or query parameters. Persist
+            # only an HTTP code or exception class, never exception detail.
+            reason = (
+                f"HTTP {status}: access restricted" if session_bound
+                else f"HTTP {status}" if status is not None
+                else type(exc).__name__
+            )
             self.store.record_media(
                 job.media_key, job.platform, job.source_id, job.media_index, job.url,
-                None, None, None, "", outcome_status, str(exc)[:300], status,
+                None, None, None, "", outcome_status, reason, status,
             )
             return {"media_key": job.media_key, "collection_id": job.collection_id,
-                    "status": outcome_status, "error": str(exc)[:300],
+                    "status": outcome_status, "error": reason,
                     "http_status": status}
 
         mime = (mime or "application/octet-stream").split(";", 1)[0].strip()
