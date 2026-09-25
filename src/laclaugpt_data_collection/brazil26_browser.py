@@ -377,7 +377,11 @@ def _wait_for_backend(host: str, port: int, process: subprocess.Popen[bytes]) ->
 def _firefox_command(env: dict[str, str]) -> list[str]:
     configured = env.get("LACLAUGPT_FIREFOX_COMMAND", "").strip()
     if configured:
-        command = shlex.split(configured)
+        # A complete executable path may contain spaces (notably Windows Firefox
+        # from WSL). A command with arguments still uses shell-style quoting.
+        command = [configured] if Path(configured).is_file() else shlex.split(configured)
+        if not command:
+            raise RuntimeError("LACLAUGPT_FIREFOX_COMMAND is empty")
     else:
         executable = shutil.which("firefox") or shutil.which("firefox.exe")
         if not executable:
@@ -394,6 +398,31 @@ def _firefox_command(env: dict[str, str]) -> list[str]:
     elif profile_name:
         command.extend(["-P", profile_name])
     return command
+
+
+def _check_firefox_command(command: list[str], *, env: dict[str, str]) -> None:
+    """Probe the executable, not just its presence on PATH (e.g. a broken snap shim)."""
+    executable = command[0]
+    if not (Path(executable).is_file() or shutil.which(executable)):
+        raise RuntimeError("Firefox executable is not available; configure LACLAUGPT_FIREFOX_COMMAND")
+    try:
+        # Probe the entire configured command, not just a launcher such as env
+        # or powershell, whose own --version says nothing about Firefox.
+        probe = subprocess.run(
+            [*command, "--version"],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=8,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise RuntimeError("Firefox executable failed its --version probe") from exc
+    if probe.returncode != 0:
+        raise RuntimeError(
+            "Firefox executable is unusable (version probe exited "
+            f"{probe.returncode}); set LACLAUGPT_FIREFOX_COMMAND to a working browser"
+        )
 
 
 def run_researcher_session(
@@ -591,6 +620,7 @@ def run_preflight(
         env.update(runtime)
         try:
             browser_command = _firefox_command(env)
+            _check_firefox_command(browser_command, env=env)
         except RuntimeError as exc:
             problems.append(str(exc))
 

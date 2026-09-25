@@ -168,6 +168,14 @@ Use public-safe material:
 
 If preflight cannot find Firefox, set `LACLAUGPT_FIREFOX_COMMAND`, `LACLAUGPT_FIREFOX_PROFILE`, or `LACLAUGPT_FIREFOX_PROFILE_PATH` in the ignored env file.
 
+For Windows Firefox launched from WSL, quote the complete command inside the shell-sourceable ignored env file, preserving the executable's spaces, for example:
+
+```bash
+LACLAUGPT_FIREFOX_COMMAND="'/mnt/c/Program Files/Mozilla Firefox/firefox.exe'"
+```
+
+Do not put an unquoted spaced path in an env file sourced by Bash. Preflight probes the executable with `--version` and reports a dead Linux snap launcher instead of treating its mere presence on PATH as browser readiness. This probe does not establish that the Firefox extension is installed or that platform capture has worked; verify those in a human-operated session.
+
 If status says `stopped`, start the researcher session and verify no other service is occupying the configured loopback port.
 
 If validation reports a cross-study `collection_id`, do not hand the dataset to analysis. Locate the originating capture/configuration first.
