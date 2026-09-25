@@ -18,6 +18,7 @@ def _apply_profile(path: Path) -> None:
     storage = data.get("storage", {})
     paths = data.get("paths", {})
     browser_capture = data.get("browser_capture", {})
+    collector = data.get("collector", {})
     mapping = {
         "LACLAUGPT_PROFILE": data.get("profile"),
         "LACLAUGPT_MACHINE": data.get("machine"),
@@ -30,6 +31,8 @@ def _apply_profile(path: Path) -> None:
         "LACLAUGPT_SQLITE_PATH": paths.get("sqlite_path"),
         "LACLAUGPT_BROWSER_HOST": browser_capture.get("host"),
         "LACLAUGPT_BROWSER_PORT": browser_capture.get("port"),
+        "LACLAUGPT_CAPTURE_MEDIA_INLINE": collector.get("download_media"),
+        "LACLAUGPT_CAPTURE_MEDIA_MAX_BYTES": collector.get("media_max_bytes"),
     }
     for key, value in mapping.items():
         if value is not None and key not in os.environ:

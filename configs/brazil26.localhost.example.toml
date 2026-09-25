@@ -23,6 +23,7 @@ interactive = true
 mode = "localhost"
 workers = 1
 download_media = true
+media_max_bytes = 67108864
 non_browser_enabled = true
 source_manifest = "configs/studies/brazil26.sources.example.toml"
 

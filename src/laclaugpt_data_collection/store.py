@@ -68,6 +68,30 @@ class CollectionStore:
             )
             """
         )
+        self._db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS media_references (
+                url TEXT NOT NULL,
+                media_key TEXT NOT NULL,
+                platform TEXT NOT NULL,
+                document_id TEXT NOT NULL,
+                media_index INTEGER NOT NULL,
+                PRIMARY KEY (url, media_key)
+            )
+            """
+        )
+        self._db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS captured_media (
+                url TEXT PRIMARY KEY,
+                local_path TEXT NOT NULL,
+                sha256 TEXT NOT NULL,
+                byte_size INTEGER NOT NULL,
+                mime_type TEXT NOT NULL,
+                captured_at TEXT NOT NULL
+            )
+            """
+        )
         self._db.commit()
 
     def append_raw(self, platform: str, payload: dict) -> str:
@@ -256,6 +280,90 @@ class CollectionStore:
                 ),
             )
             self._db.commit()
+
+    def register_media_reference(
+        self,
+        url: str,
+        media_key: str,
+        platform: str,
+        document_id: str,
+        media_index: int,
+    ) -> None:
+        """Persist canonical linkage before or after capture bytes arrive."""
+        with self._db_lock:
+            self._db.execute(
+                """
+                INSERT OR IGNORE INTO media_references
+                (url, media_key, platform, document_id, media_index)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (url, media_key, platform, document_id, media_index),
+            )
+            self._db.commit()
+
+    def media_references_for_url(self, url: str) -> list[dict]:
+        with self._db_lock:
+            rows = self._db.execute(
+                """
+                SELECT media_key, platform, document_id, media_index
+                FROM media_references WHERE url=? ORDER BY media_key
+                """,
+                (url,),
+            ).fetchall()
+        return [
+            {
+                "media_key": row[0],
+                "platform": row[1],
+                "document_id": row[2],
+                "media_index": row[3],
+            }
+            for row in rows
+        ]
+
+    def record_captured_media(
+        self,
+        url: str,
+        local_path: str,
+        sha256: str,
+        byte_size: int,
+        mime_type: str,
+    ) -> None:
+        with self._db_lock:
+            self._db.execute(
+                """
+                INSERT OR REPLACE INTO captured_media
+                (url, local_path, sha256, byte_size, mime_type, captured_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    url,
+                    local_path,
+                    sha256,
+                    byte_size,
+                    mime_type,
+                    datetime.now(UTC).isoformat(timespec="seconds"),
+                ),
+            )
+            self._db.commit()
+
+    def captured_media(self, url: str) -> dict | None:
+        with self._db_lock:
+            row = self._db.execute(
+                """
+                SELECT local_path, sha256, byte_size, mime_type, captured_at
+                FROM captured_media WHERE url=?
+                """,
+                (url,),
+            ).fetchone()
+        if not row:
+            return None
+        return {
+            "local_path": row[0],
+            "sha256": row[1],
+            "byte_size": row[2],
+            "mime_type": row[3],
+            "captured_at": row[4],
+        }
 
     def write_manifest(self, manifest: dict) -> Path:
         path = self.manifests_dir / f"run-{utc_stamp()}.json"
