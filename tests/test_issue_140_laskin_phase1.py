@@ -109,6 +109,7 @@ class FakeRSSCollector:
 
 class SettingsStub:
     project_id = "ai26"
+    distributed_requested = True
     distributed_namespace = ProjectNamespace("ai26")
     caller = "linux-server-cron"
     execution = "cron"
