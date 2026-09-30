@@ -22,6 +22,23 @@ export LACLAUGPT_PROJECT_ID=brazil26
 export LACLAUGPT_EXECUTION=cron
 export LACLAUGPT_CALLER=cron
 
+# This wrapper is the zero-infrastructure localhost path, matching
+# run_brazil26_localhost_collect.sh. A repo-root .env that points at a remote
+# MongoDB/Redis/S3 must not silently switch the media pass into the distributed
+# plane: that made every tick fail with "distributed collection requires
+# LACLAUGPT_RUN_ID" and stopped media capture entirely. Objects stay in the
+# local filesystem store and the existing SQLite media index tracks them.
+# Explicit remote mirroring belongs to run_brazil26_localhost_sync.sh.
+export LACLAUGPT_RECORD_BACKEND=csv
+export LACLAUGPT_OBJECT_BACKEND=filesystem
+export LACLAUGPT_CACHE_BACKEND=memory
+export LACLAUGPT_DISTRIBUTED_CONFIG_BACKEND=local
+export LACLAUGPT_MESSAGING_BACKEND=none
+export LACLAUGPT_TASK_QUEUE_BACKEND=direct
+export LACLAUGPT_MONGODB_URI=
+export LACLAUGPT_REDIS_URL=
+export LACLAUGPT_S3_BUCKET=
+
 mkdir -p "$(dirname "$LOCK_FILE")"
 exec 9>"$LOCK_FILE"
 flock -n 9 || { echo "Brazil26 media worker already running; exiting cleanly" >&2; exit 0; }
