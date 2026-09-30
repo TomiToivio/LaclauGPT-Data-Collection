@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from laclaugpt_data_collection import server_runner
 from laclaugpt_data_collection.config import Settings
 from laclaugpt_data_collection.models import CanonicalRecord, ContentSection, SourceSection
-from laclaugpt_data_collection import server_runner
 
 
 class _MemoryStore:
