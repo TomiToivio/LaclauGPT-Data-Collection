@@ -147,7 +147,15 @@ def test_write_canonical_csv_serializes_nested_fields(tmp_path) -> None:
 
 
 def test_parquet_error_is_actionable_without_optional_dependency(tmp_path, monkeypatch) -> None:
-    record = import_4cat_record({"id": "p-3", "text": "hello"})
+    record = import_4cat_record(
+        {
+            "id": "p-3",
+            "text": "hello",
+            # Keep nested metadata non-empty so current PyArrow can materialize the
+            # canonical struct while this test exercises Parquet dependency handling.
+            "sampling": {"mode": "fixture"},
+        }
+    )
 
     # The environment may or may not have pyarrow. This test only verifies successful
     # export when present; absence is covered by the explicit RuntimeError branch.
