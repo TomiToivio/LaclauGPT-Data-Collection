@@ -73,7 +73,6 @@ def test_sync_wrapper_skips_cleanly_without_run_id(tmp_path: Path) -> None:
     assert not Path(env["CALL_LOG"]).exists()
 
 
-
 @pytest.mark.parametrize("worker", ["collect", "sync"])
 def test_wrappers_preserve_pinned_study(tmp_path: Path, worker: str) -> None:
     root, env = setup_checkout(tmp_path)
