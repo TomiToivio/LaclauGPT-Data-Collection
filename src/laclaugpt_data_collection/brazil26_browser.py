@@ -79,8 +79,9 @@ def _ensure_brazil26_study(study_config: str | Path) -> str:
 
 def _brazil26_settings(*, env_file: str | Path | None = None) -> Settings:
     """Load Brazil26 settings without reading an ambient dotenv by default."""
+    project_id_explicit = env_file is not None or "LACLAUGPT_PROJECT_ID" in os.environ
     settings = Settings(_env_file=env_file)
-    if settings.project_id in {"", "default"}:
+    if not project_id_explicit or settings.project_id in {"", "default"}:
         settings.project_id = PROJECT_ID
     if settings.project_id != PROJECT_ID:
         raise ValueError(
