@@ -72,6 +72,23 @@ def test_noopunk_runbook_reuses_the_existing_localhost_wrappers() -> None:
     assert "adds no script" in text or "reuses" in text.lower()
 
 
+def test_handoff_status_field_is_real_and_used_correctly() -> None:
+    """Guard against an invented field name in verification steps.
+
+    `handoff.status = ready` is the real gate Analysis reads
+    (Data-Analysis `docs/AI26_DISTRIBUTED_WORKER.md`, and
+    `distributed_worker.py` writes it), so a runbook that told an operator to look
+    for some other field would send them hunting for something that does not exist.
+    This asserts the runbook uses the name the pipeline actually writes.
+
+    Recorded because I got it wrong: an earlier draft of the NooPunk runbook
+    "corrected" this to no field at all, on the mistaken belief that `handoff` was
+    only a versioned envelope. It is both -- an envelope that carries `status`.
+    """
+    text = _text(NOOPUNK_DOC)
+    assert "handoff.status = ready" in text
+
+
 def test_noopunk_does_not_define_a_local_namespace() -> None:
     """Machine identity is provenance; it must never become study identity."""
     text = _text(NOOPUNK_DOC)

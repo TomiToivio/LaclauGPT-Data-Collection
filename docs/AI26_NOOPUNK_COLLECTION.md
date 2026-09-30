@@ -127,7 +127,7 @@ namespace that was just refreshed.
 Confirm on the **shared** store, not locally:
 
 1. new canonical records exist in `<project>__records` carrying the versioned
-   `handoff` delivery envelope (`docs/CANONICAL_RECORD_CONTRACT.md`);
+   `handoff.status = ready` (`docs/CANONICAL_RECORD_CONTRACT.md`);
 2. their provenance records this node's machine class and execution profile, and
    that provenance is separable from scientific source identity;
 3. a browser-captured item that has pending media is picked up by the media worker
