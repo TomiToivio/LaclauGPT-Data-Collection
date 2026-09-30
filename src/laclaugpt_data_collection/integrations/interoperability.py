@@ -402,6 +402,36 @@ def read_external_records(path: str | Path, *, tool: ExternalTool) -> list[Canon
     return [import_external_record(tool, _mapping(row)) for row in rows]
 
 
+def _parquet_safe(value: Any) -> Any:
+    """Replace structures PyArrow/Parquet cannot represent with an equivalent null.
+
+    PyArrow maps a JSON ``{}`` to a struct with no child fields, and Parquet
+    refuses to write such a struct::
+
+        ArrowNotImplementedError: Cannot write struct type 'analysis' with no
+        child field to Parquet. Consider adding a dummy child field.
+
+    A freshly collected record always has several empty sections (``analysis``,
+    ``review``, ``legacy``, and often ``raw_metadata``/``stage_outputs``), so this
+    is the normal case, not an edge case: every Parquet export of a real record hit
+    it.
+
+    An empty mapping becomes ``None`` (a Parquet null), recursively. That is the
+    honest representation in this format: "no value recorded", which is exactly
+    what the empty section means. Empty *lists* are left alone because Parquet
+    represents those natively, and no field is dropped, so a reader still gets the
+    complete canonical schema. JSON/JSONL/CSV are unaffected and keep the original
+    ``{}``.
+    """
+    if isinstance(value, dict):
+        if not value:
+            return None
+        return {key: _parquet_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_parquet_safe(item) for item in value]
+    return value
+
+
 def write_records(
     records: Iterable[CanonicalRecord],
     path: str | Path,
@@ -455,6 +485,6 @@ def write_records(
                 "Parquet export requires the optional 'interop' dependency: "
                 "pip install -e '.[interop]'"
             ) from exc
-        pq.write_table(pa.Table.from_pylist(rows), destination)
+        pq.write_table(pa.Table.from_pylist(_parquet_safe(rows)), destination)
         return
     raise ValueError(f"unsupported export file type: {suffix}")

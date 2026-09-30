@@ -43,7 +43,7 @@ phase1-non-browser = [
   "atproto>=0.0.55,<1",
 ]
 x-apify = ["apify-client>=1.8,<3"]
-interop = ["pyarrow>=17"]
+interop = ["pyarrow>=17,<26"]
 web-mining = [
   "beautifulsoup4>=4.12,<5",
   "Scrapy>=2.11,<3",
