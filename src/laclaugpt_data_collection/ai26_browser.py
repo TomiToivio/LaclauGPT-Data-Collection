@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from .capture_server import CaptureServer
-from .config import Settings
+from .config import Settings, project_id_was_explicitly_configured
 from .distributed_capture import DistributedCaptureSink
 from .distributed_media_runner import MediaRunLockedError, run_distributed_media
 from .store import utc_stamp
@@ -38,7 +38,9 @@ def _ensure_ai26_study(study_config: str | Path) -> str:
 def _ai26_settings(*, env_file: str | Path | None = None) -> Settings:
     """Load AI26 settings without reading an ambient dotenv by default."""
     settings = Settings(_env_file=env_file)
-    if settings.project_id in {"", "default"}:
+    # Same stale-sentinel pattern as the Brazil26 helper; see issue #197. An
+    # explicitly configured non-AI26 project must still fail the check below.
+    if not project_id_was_explicitly_configured(settings):
         settings.project_id = PROJECT_ID
     if settings.project_id != PROJECT_ID:
         raise ValueError(

@@ -20,6 +20,24 @@ DATA_SUBDIRS = (
 )
 
 
+def project_id_was_explicitly_configured(settings: "Settings") -> bool:
+    """True when ``project_id`` came from the environment/dotenv, not the default.
+
+    ``project_id`` has a non-empty default, so comparing it against that default
+    cannot tell "the operator configured this study" apart from "nobody said
+    anything and the built-in default applied". Code that compared against the
+    literal sentinel ``"default"`` (which *was* the default until 07c309b moved
+    it to ``"ai26"``) now silently sees a concrete study id instead of the unset
+    state, so those comparisons mis-fire (issue #197).
+
+    ``model_fields_set`` is pydantic-settings' own record of the fields that were
+    explicitly provided, which is exactly the distinction needed. Nothing is
+    hard-coded to a particular default, so this stays correct if the default
+    changes again.
+    """
+    return "project_id" in settings.model_fields_set
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="LACLAUGPT_", env_file=".env", env_file_encoding="utf-8", extra="ignore"

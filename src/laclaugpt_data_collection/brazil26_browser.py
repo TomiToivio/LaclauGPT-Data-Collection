@@ -23,7 +23,7 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 from .capture_server import CaptureServer
-from .config import Settings
+from .config import Settings, project_id_was_explicitly_configured
 from .distributed_capture import DistributedCaptureSink
 from .distributed_media_runner import MediaRunLockedError, run_distributed_media
 from .models import CanonicalRecord
@@ -80,7 +80,12 @@ def _ensure_brazil26_study(study_config: str | Path) -> str:
 def _brazil26_settings(*, env_file: str | Path | None = None) -> Settings:
     """Load Brazil26 settings without reading an ambient dotenv by default."""
     settings = Settings(_env_file=env_file)
-    if settings.project_id in {"", "default"}:
+    # The guard's intent is "a Brazil26 run must not inherit some other study's
+    # id". Detect the genuinely unset state rather than comparing against the
+    # old "default" sentinel; since 07c309b the built-in default is "ai26", which
+    # is not a Brazil26 id at all, so the sentinel comparison mis-fired on the
+    # most likely host configuration (issue #197).
+    if not project_id_was_explicitly_configured(settings):
         settings.project_id = PROJECT_ID
     if settings.project_id != PROJECT_ID:
         raise ValueError(

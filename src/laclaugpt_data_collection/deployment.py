@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from .config import Settings
+from .config import Settings, project_id_was_explicitly_configured
 
 
 @dataclass(frozen=True)
@@ -74,7 +74,10 @@ def validate_profile(settings: Settings) -> list[str]:
     if settings.distributed_requested:
         if not settings.run_id:
             problems.append("distributed collection requires LACLAUGPT_RUN_ID")
-        if settings.project_id == "default":
+        if not project_id_was_explicitly_configured(settings):
+            # Was ``settings.project_id == "default"``, which stopped
+            # detecting anything once the built-in default moved to "ai26":
+            # a distributed run with no explicit study id passed (issue #197).
             problems.append("distributed collection requires an explicit LACLAUGPT_PROJECT_ID")
         if settings.private_config_dir is None:
             problems.append("distributed collection requires LACLAUGPT_PRIVATE_CONFIG_DIR")
