@@ -97,7 +97,23 @@ data/config/                  ignored runtime configuration
 
 ## Non-browser collection
 
-The public Brazil26 source manifest includes bounded institutional sources. Run the current localhost RSS worker with:
+The public `configs/studies/brazil26.sources.example.toml` is a starting example
+with bounded institutional sources, not an installed operational manifest. The
+worker does not silently substitute it when the private manifest is missing.
+Review the source selection, then create an ignored operational copy if these
+sources match the study (the command preserves an existing file):
+
+```bash
+mkdir -p data/config
+cp -n configs/studies/brazil26.sources.example.toml data/config/brazil26.sources.toml
+```
+
+Set `LACLAUGPT_SOURCE_MANIFEST` in the ignored runtime env file to that copy, or
+to an existing approved manifest. Verify its active feed URLs before relying on
+scheduled collection. An example URL is not evidence of a successful live feed
+fetch. Until an operational manifest exists, RSS remains unconfigured.
+
+Run the current localhost RSS worker with:
 
 ```bash
 bash scripts/run_brazil26_localhost_collect.sh
@@ -186,14 +202,45 @@ If validation reports a cross-study `collection_id`, do not hand the dataset to 
 
 If a worker reports an existing lock, inspect the running process before deleting anything. Lock files themselves are harmless.
 
-If an older workstation cron block points at `.worktrees/brazil26-runtime`, reinstall the marker-managed block from the canonical checkout:
+If an older workstation cron block points at `.worktrees/brazil26-runtime`,
+repair the runtime prerequisites before reinstalling it. From the canonical
+checkout, create a checkout-local environment so the wrappers do not fall back
+to an executable whose editable install still points at the stale worktree:
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -e '.[feeds,browser,youtube,distributed]'
+.venv/bin/python -c 'import laclaugpt_data_collection; print(laclaugpt_data_collection.__file__)'
+```
+
+The printed package path must be under this checkout's `src/`. This prepares
+future scheduled workers; it does not migrate or restart an already-running
+browser backend. Other environments that still import from the stale directory
+must also be repointed before that directory can be retired.
+
+Ensure the ignored runtime env file exists, `BRAZIL26_CONFIG` names the real
+private study, and `LACLAUGPT_SOURCE_MANIFEST` names an existing operational
+manifest as described above. Collect and sync resolve these values after loading
+the env file. Explicit study and data paths passed by the installer take
+precedence over values in the env file. Use absolute runtime paths when possible;
+relative worker paths are based on the canonical checkout.
+
+Run the collection and media wrappers manually first. Run sync as well when
+remote mirroring is configured. A missing source manifest cannot be repaired by
+repointing cron alone. Then install and inspect the marker-managed block:
 
 ```bash
 bash scripts/install_cron_brazil26.sh
 crontab -l | sed -n '/BEGIN LACLAUGPT BRAZIL26/,/END LACLAUGPT BRAZIL26/p'
 ```
 
-The installer derives `ROOT` from the checkout containing the script, so the regenerated entries point at that canonical checkout rather than a stale worktree. Verify one scheduled tick before removing any old runtime directory. The repository cannot mutate an already-installed workstation crontab remotely.
+The installer derives `ROOT` from its checkout and passes the selected runtime
+env, study and data paths to all three workers. Media remains every 15 minutes.
+Verify an actual scheduled tick and its output in `data/logs/` before retiring
+anything. Do not remove the stale directory while any editable install, running
+process or scheduled command still depends on it; preserve its local edits and
+the canonical research data. The repository cannot change or verify an installed
+workstation crontab remotely.
 
 Shell scripts are committed with LF line endings via `.gitattributes` (`*.sh text eol=lf`). If a Windows/WSL checkout has CRLF-corrupted working files despite a clean Git status, restore the affected tracked scripts from Git or renormalize the checkout before repointing cron.
 
