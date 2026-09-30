@@ -25,7 +25,7 @@ class Settings(BaseSettings):
         env_prefix="LACLAUGPT_", env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
 
-    project_id: str = "default"
+    project_id: str = "ai26"
     run_id: str = ""
     profile: str = "local"
     machine: Literal["laptop", "linux-server", "custom"] = "laptop"
