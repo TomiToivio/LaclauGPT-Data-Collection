@@ -103,7 +103,11 @@ The public Brazil26 source manifest includes bounded institutional sources. Run 
 bash scripts/run_brazil26_localhost_collect.sh
 ```
 
-The wrapper is lock-protected and project-scoped. To debug one source family, edit an ignored copy of `data/config/brazil26.sources.toml` so only the intended public-safe source is active, then run the same bounded worker. Do not create a second schema or scheduler.
+The wrapper is lock-protected and project-scoped. It deliberately pins the RSS pass to local canonical storage (CSV/filesystem) and clears distributed backend selectors so a repo-root `.env` cannot silently turn this localhost job into a MongoDB/Redis/S3 run. Remote mirroring is a separate sync step.
+
+To debug one source family, edit an ignored copy of `data/config/brazil26.sources.toml` so only the intended public-safe source is active, then run the same bounded worker. Do not create a second schema or scheduler.
+
+Brazil26 does not inherit the AI26 realtime publication-date floor. Study-specific scheduling rules must be selected by project rather than reusing `RealtimePolicy.ai26()` globally.
 
 ## Media/download processing
 
@@ -181,5 +185,16 @@ If status says `stopped`, start the researcher session and verify no other servi
 If validation reports a cross-study `collection_id`, do not hand the dataset to analysis. Locate the originating capture/configuration first.
 
 If a worker reports an existing lock, inspect the running process before deleting anything. Lock files themselves are harmless.
+
+If an older workstation cron block points at `.worktrees/brazil26-runtime`, reinstall the marker-managed block from the canonical checkout:
+
+```bash
+bash scripts/install_cron_brazil26.sh
+crontab -l | sed -n '/BEGIN LACLAUGPT BRAZIL26/,/END LACLAUGPT BRAZIL26/p'
+```
+
+The installer derives `ROOT` from the checkout containing the script, so the regenerated entries point at that canonical checkout rather than a stale worktree. Verify one scheduled tick before removing any old runtime directory. The repository cannot mutate an already-installed workstation crontab remotely.
+
+Shell scripts are committed with LF line endings via `.gitattributes` (`*.sh text eol=lf`). If a Windows/WSL checkout has CRLF-corrupted working files despite a clean Git status, restore the affected tracked scripts from Git or renormalize the checkout before repointing cron.
 
 Never commit live Brazil26 targets, credentials, cookies, browser profiles, private endpoints, collected research data, or downloaded media.
