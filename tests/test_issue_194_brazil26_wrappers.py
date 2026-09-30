@@ -39,7 +39,11 @@ def setup_checkout(tmp_path: Path) -> tuple[Path, dict[str, str]]:
         'LACLAUGPT_DATA_ROOT="data/selected"\n'
     )
     env = {k: v for k, v in os.environ.items() if not k.startswith("LACLAUGPT_")}
-    env.update(LACLAUGPT_ENV_FILE=str(env_file), CALL_LOG=str(tmp_path / "calls"))
+    env.update(
+        LACLAUGPT_ENV_FILE=str(env_file),
+        LACLAUGPT_RUN_ID="synthetic-run",
+        CALL_LOG=str(tmp_path / "calls"),
+    )
     return root, env
 
 
@@ -56,6 +60,18 @@ def test_wrappers_load_env_paths_before_validating(tmp_path: Path, worker: str) 
         assert "data/config/approved.toml" in calls
     else:
         assert "data/selected" in calls
+
+
+def test_sync_wrapper_skips_cleanly_without_run_id(tmp_path: Path) -> None:
+    root, env = setup_checkout(tmp_path)
+    env.pop("LACLAUGPT_RUN_ID", None)
+    result = subprocess.run(
+        ["bash", str(root / "scripts/run_brazil26_localhost_sync.sh")],
+        cwd=tmp_path, env=env, check=True, capture_output=True, text=True,
+    )
+    assert "remote sync disabled" in result.stdout.lower()
+    assert not Path(env["CALL_LOG"]).exists()
+
 
 
 @pytest.mark.parametrize("worker", ["collect", "sync"])
