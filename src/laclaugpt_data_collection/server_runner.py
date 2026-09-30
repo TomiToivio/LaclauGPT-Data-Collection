@@ -329,8 +329,8 @@ def run_phase1_rss(
     limit: int = 50,
     rotation: int | None = None,
 ) -> dict[str, Any]:
-    """Run one bounded Phase 1 RSS batch through the canonical distributed sink."""
-    from .distributed_capture import DistributedCaptureSink
+    """Run one bounded Phase 1 RSS batch through canonical local or distributed storage."""
+    from .factory import build_record_store
     from .realtime import RealtimePolicy, parse_source_time
 
     if max_feeds < 1 or per_feed_limit < 1 or limit < 1:
@@ -339,7 +339,7 @@ def run_phase1_rss(
     routed_collection = collection_id or settings.project_id
     if routed_collection != settings.project_id:
         raise ValueError(
-            "Phase 1 Laskin worker must use the configured project_id as collection_id"
+            "Phase 1 worker must use the configured project_id as collection_id"
         )
     if rotation is None:
         rotation = int(time.time() // 3600) * max_feeds
@@ -356,16 +356,38 @@ def run_phase1_rss(
         per_feed_limit=per_feed_limit,
     )
 
-    sink = DistributedCaptureSink(settings)
-    sink.assert_private_config(study_config)
-    policy = RealtimePolicy.ai26()
+    # AI26 has a study-specific realtime publication floor. Brazil26 and other
+    # projects must not inherit that policy accidentally.
+    policy = RealtimePolicy.ai26() if routed_collection == "ai26" else None
     synced = 0
     skipped_before_floor = 0
     errors: list[str] = []
+    notification_errors: list[str] = []
+
+    sink = None
+    store = None
+    if settings.distributed_requested:
+        from .distributed_capture import DistributedCaptureSink
+
+        sink = DistributedCaptureSink(settings)
+        sink.assert_private_config(study_config)
+        storage_mode = "distributed"
+        storage_target = settings.distributed_namespace.mongo_collection("records")
+    else:
+        # Zero-infrastructure mode is first-class: CSV/SQLite/auto-local writes
+        # the same canonical record without MongoDB, Redis, or S3.
+        store = build_record_store(settings)
+        storage_mode = "local"
+        storage_target = type(store).__name__
 
     for record in records:
         published = parse_source_time(record.source.created_at)
-        if policy.publication_date_floor and published and published < policy.publication_date_floor:
+        if (
+            policy is not None
+            and policy.publication_date_floor
+            and published
+            and published < policy.publication_date_floor
+        ):
             skipped_before_floor += 1
             continue
         if synced >= limit:
@@ -376,16 +398,23 @@ def run_phase1_rss(
             provenance.metadata["execution"] = settings.execution
             if settings.run_id and not provenance.run_id:
                 provenance.run_id = settings.run_id
-        payload = record.model_dump(mode="json")
-        payload["collection_id"] = routed_collection
-        arena = str(record.source.raw_metadata.get("arena") or "")
-        if arena:
-            payload["arena"] = arena
         try:
-            sink.ingest(payload)
+            if sink is not None:
+                payload = record.model_dump(mode="json")
+                payload["collection_id"] = routed_collection
+                arena = str(record.source.raw_metadata.get("arena") or "")
+                if arena:
+                    payload["arena"] = arena
+                sink.ingest(payload)
+            else:
+                assert store is not None
+                store.upsert(record)
             synced += 1
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{record.source_url}: {str(exc)[:180]}")
+
+    if sink is not None:
+        notification_errors = list(sink.notification_errors)
 
     return {
         "status": "ok" if not errors else "partial",
@@ -397,12 +426,17 @@ def run_phase1_rss(
         "records_collected": len(records),
         "records_synced": synced,
         "skipped_before_publication_floor": skipped_before_floor,
-        "mongodb_collection": settings.distributed_namespace.mongo_collection("records"),
+        "storage_mode": storage_mode,
+        "storage_target": storage_target,
+        "mongodb_collection": (
+            settings.distributed_namespace.mongo_collection("records")
+            if storage_mode == "distributed"
+            else ""
+        ),
         "warnings": warnings,
         "errors": errors,
-        "notification_errors": list(sink.notification_errors),
+        "notification_errors": notification_errors,
     }
-
 
 def main(argv: list[str] | None = None) -> int:
     """Phase 1 canonical RSS entry point used by `laclaugpt-server-rss`.
