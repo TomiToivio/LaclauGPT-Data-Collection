@@ -1,5 +1,7 @@
 # CODEX.md
 
+**Active branch policy:** Phase 2 is current. Phase 2 work targets `main` directly; `phase-2` is a passive mirror, while `phase-1` and `phase-0` are preserved historical baselines.
+
 Codex and other coding agents must follow `AGENTS.md` as the canonical repository contract.
 
 Before changing runtime paths or data handling, also read `docs/RUNTIME_DATA.md` and `docs/PRIVACY.md`.
