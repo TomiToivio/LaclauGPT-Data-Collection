@@ -20,6 +20,19 @@ export LACLAUGPT_PROJECT_ID=brazil26
 export LACLAUGPT_EXECUTION=cron
 export LACLAUGPT_CALLER=cron
 
+# This wrapper is the zero-infrastructure localhost path. Keep a repo-root .env
+# or stale remote profile from silently switching it into the distributed plane.
+# Explicit remote mirroring belongs to run_brazil26_localhost_sync.sh.
+export LACLAUGPT_RECORD_BACKEND=csv
+export LACLAUGPT_OBJECT_BACKEND=filesystem
+export LACLAUGPT_CACHE_BACKEND=memory
+export LACLAUGPT_DISTRIBUTED_CONFIG_BACKEND=local
+export LACLAUGPT_MESSAGING_BACKEND=none
+export LACLAUGPT_TASK_QUEUE_BACKEND=direct
+export LACLAUGPT_MONGODB_URI=
+export LACLAUGPT_REDIS_URL=
+export LACLAUGPT_S3_BUCKET=
+
 # laclaugpt-server-rss made --study-config a required argument; the RSS worker
 # refuses to run without the private study identity. Resolve it after the
 # runtime env is sourced so BRAZIL26_CONFIG from the ignored env file wins.
