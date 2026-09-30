@@ -45,6 +45,7 @@ cd "$ROOT"
 # 2) Phase 1 plugins that can be executed safely from the same manifest.
 # Both use collection_id=ai26 and the configured canonical record backend.
 laclaugpt-server-rss \
+  --study-config "$STUDY_CONFIG" \
   --source-manifest "$SOURCE_MANIFEST" \
   --collection-id ai26 \
   --worker-id localhost-rss \

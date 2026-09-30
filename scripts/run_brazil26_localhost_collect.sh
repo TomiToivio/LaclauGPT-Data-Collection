@@ -4,6 +4,7 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 ENV_FILE=${LACLAUGPT_ENV_FILE:-"$ROOT/data/config/brazil26-localhost.env"}
 SOURCE_MANIFEST=${LACLAUGPT_SOURCE_MANIFEST:-"$ROOT/data/config/brazil26.sources.toml"}
 LOCK_FILE=${LACLAUGPT_COLLECT_LOCK:-"$ROOT/data/tmp/brazil26-localhost-collect.lock"}
+STUDY_OVERRIDE=${LACLAUGPT_STUDY_CONFIG:-}
 
 export PATH="$ROOT/.venv/bin:${HOME:-/root}/.local/bin:$PATH"
 mkdir -p "$ROOT/data/logs" "$ROOT/data/tmp"
@@ -19,6 +20,12 @@ export LACLAUGPT_PROJECT_ID=brazil26
 export LACLAUGPT_EXECUTION=cron
 export LACLAUGPT_CALLER=cron
 
+# laclaugpt-server-rss made --study-config a required argument; the RSS worker
+# refuses to run without the private study identity. Resolve it after the
+# runtime env is sourced so BRAZIL26_CONFIG from the ignored env file wins.
+STUDY_CONFIG=${STUDY_OVERRIDE:-${LACLAUGPT_STUDY_CONFIG:-${BRAZIL26_CONFIG:-"$ROOT/data/config/brazil26.yaml"}}}
+[[ -f "$STUDY_CONFIG" ]] || { echo "missing Brazil26 study config: $STUDY_CONFIG" >&2; exit 2; }
+
 command -v flock >/dev/null
 command -v laclaugpt-server-rss >/dev/null || { echo "laclaugpt-server-rss missing" >&2; exit 2; }
 command -v python >/dev/null || { echo "python missing" >&2; exit 2; }
@@ -32,6 +39,7 @@ cd "$ROOT"
 # The plugin pass consumes only directly executable rows. It never expands a
 # YouTube channel homepage into guessed video targets.
 laclaugpt-server-rss \
+  --study-config "$STUDY_CONFIG" \
   --source-manifest "$SOURCE_MANIFEST" \
   --collection-id brazil26 \
   --worker-id localhost-rss \
