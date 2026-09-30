@@ -2,16 +2,20 @@
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 ENV_FILE=${LACLAUGPT_ENV_FILE:-"$ROOT/data/config/brazil26-localhost.env"}
-SOURCE_MANIFEST=${LACLAUGPT_SOURCE_MANIFEST:-"$ROOT/data/config/brazil26.sources.toml"}
+MANIFEST_OVERRIDE=${LACLAUGPT_SOURCE_MANIFEST:-}
+DATA_OVERRIDE=${LACLAUGPT_DATA_ROOT:-}
 LOCK_FILE=${LACLAUGPT_COLLECT_LOCK:-"$ROOT/data/tmp/brazil26-localhost-collect.lock"}
 STUDY_OVERRIDE=${LACLAUGPT_STUDY_CONFIG:-}
 
 export PATH="$ROOT/.venv/bin:${HOME:-/root}/.local/bin:$PATH"
 mkdir -p "$ROOT/data/logs" "$ROOT/data/tmp"
 [[ -f "$ENV_FILE" ]] || { echo "missing runtime env: $ENV_FILE" >&2; exit 2; }
-[[ -f "$SOURCE_MANIFEST" ]] || { echo "missing Brazil26 source manifest: $SOURCE_MANIFEST" >&2; exit 2; }
 
+cd "$ROOT"
 set -a; source "$ENV_FILE"; set +a
+SOURCE_MANIFEST=${MANIFEST_OVERRIDE:-${LACLAUGPT_SOURCE_MANIFEST:-"$ROOT/data/config/brazil26.sources.toml"}}
+export LACLAUGPT_DATA_ROOT=${DATA_OVERRIDE:-${LACLAUGPT_DATA_ROOT:-"$ROOT/data"}}
+[[ -f "$SOURCE_MANIFEST" ]] || { echo "missing Brazil26 source manifest: $SOURCE_MANIFEST" >&2; exit 2; }
 if [[ "${LACLAUGPT_PROJECT_ID:-brazil26}" != "brazil26" ]]; then
   echo "Brazil26 worker refuses LACLAUGPT_PROJECT_ID=${LACLAUGPT_PROJECT_ID}" >&2
   exit 2
