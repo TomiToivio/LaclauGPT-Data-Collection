@@ -42,9 +42,9 @@ Keep this repository limited to data collection: source/browser/network capture,
 - Do not spend issue scope on making outputs friendlier to humans unless Tomi explicitly requests it. Human-in-the-loop scientific validation remains required; this rule is about software/output presentation, not removing human research responsibility.
 - Phase 2 work goes directly to `main` under the repository's current branch policy. Phase 0/1 branches remain historical baselines and are not defaults for new work.
 
-## Phase 0 foundation and Phase 1 restoration
+## Historical Phase 0/1 foundation
 
-The hand-coded implementation under `laclaugpt/` is the Phase 0 foundation for this module.
+The hand-coded implementation under `laclaugpt/` is retained as the historical Phase 0 foundation. The guidance below is archaeology/maintenance context only; it does not define new work on `main`, which is AI26 Phase 2.
 
 Agents MUST inspect `laclaugpt/` first before proposing or implementing Phase 1 work. Existing Phase 1 code outside `laclaugpt/` is a reference implementation and source of isolated functionality, tests, schemas, and interfaces. It is not automatically the canonical architecture.
 
@@ -69,9 +69,9 @@ This includes direct and indirect changes. Do not change dependent code, schemas
 
 Before editing `laclaugpt/` or anything that depends on it, search for `TOMI-LOCKED` markers and treat them as strict invariants.
 
-## AI26 public reference study
+## AI26 active study
 
-AI26 (`Ideological contestation over AI`) is the preferred realistic public example for this module because the current LaclauGPT architecture is being developed alongside the public AI26 paper. Use `configs/studies/ai26.example.yaml` when documenting or testing study-aware collection behavior.
+AI26 (`Ideological contestation over AI`) is the active and default study for this module. The current `main` architecture is developed for AI26 Phase 2. Use `configs/studies/ai26.example.yaml` when documenting or testing study-aware collection behavior.
 
 AI26 example configuration is allowed to contain public methodology: the three paper arenas (AI elites, grassroots mobilisation, parliamentary/electoral politics), public source-family examples, discovery terms, project metadata and secret-free collection/storage policies. These settings are sampling provenance only. Collection MUST NOT infer or assign ideological formations, discourse roles or actor ideology from the source list.
 
