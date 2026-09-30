@@ -1,5 +1,7 @@
 # HERMES.md
 
+**Active branch policy:** Phase 2 is current. Phase 2 work targets `main` directly; `phase-2` is a passive mirror, while `phase-1` and `phase-0` are preserved historical baselines.
+
 Hermes-style agents must follow `AGENTS.md` as the canonical repository contract and `skills/laclaugpt-data-collection/SKILL.md` for the operational skill.
 
 Before changing runtime paths or data handling, also read `docs/RUNTIME_DATA.md`, `docs/PRIVACY.md`, and `docs/DEPLOYMENT_AND_HERMES.md`.
@@ -38,7 +40,7 @@ When you make a substantive observation, such as a change in a source, an emergi
 
 ## Branches
 
-Never commit directly to `main`. Create a branch when working on an issue, following the existing convention `issue-<n>-<short-slug>`, and open a pull request for human review.
+Phase 2 work may be committed directly to `main` when Tomi explicitly authorizes it. Otherwise, for tracked issue work, prefer the existing `issue-<n>-<short-slug>` branch convention and a pull request for review.
 
 ```bash
 git switch -c issue-<n>-<short-slug>
