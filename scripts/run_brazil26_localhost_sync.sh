@@ -23,6 +23,15 @@ export LACLAUGPT_PROJECT_ID=${LACLAUGPT_PROJECT_ID:-brazil26}
 export LACLAUGPT_EXECUTION=cron
 export LACLAUGPT_CALLER=cron
 
+# Remote mirroring is optional for the localhost workflow. A distributed sync
+# needs a real run id for its Redis idempotency namespace; without one, treat
+# the scheduled job as intentionally dormant instead of emitting an hourly
+# configuration failure.
+if [[ -z "${LACLAUGPT_RUN_ID:-}" ]]; then
+  echo "Brazil26 remote sync disabled: set LACLAUGPT_RUN_ID to enable mirroring."
+  exit 0
+fi
+
 exec 9>"$LOCK_FILE"
 flock -n 9 || { echo "Brazil26 sync already running; exiting cleanly" >&2; exit 0; }
 
