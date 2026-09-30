@@ -2,7 +2,7 @@
 
 This module implements the shared LaclauGPT multi-project namespace defined by `schemas/distributed-project.schema.json` and the parent repository's `docs/DISTRIBUTED_PROJECT_STORAGE.md`.
 
-Set `LACLAUGPT_PROJECT_ID` to a stable lower-case project identifier such as `ai26`, `ep24`, `brazil26` or `hungary26`. `Settings.distributed_namespace` then derives the same names used by Analysis and Visualization.
+For this repository, `LACLAUGPT_PROJECT_ID` defaults to and should remain `ai26`. EP24, Hungary26 and Brazil26 belong in separate project repositories and are not active deployment targets here. `Settings.distributed_namespace` then derives the same names used by Analysis and Visualization.
 
 ## Redis control plane
 
