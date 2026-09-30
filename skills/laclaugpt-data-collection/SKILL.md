@@ -1,5 +1,7 @@
 # LaclauGPT Data Collection agent skill
 
+> **Branch policy:** Phase 2 is current. Work against `main`; `phase-2` is the passive mirror. `phase-1` and `phase-0` are preserved historical baselines.
+
 Operate Collection through the same canonical APIs used by the CLI. Never create a separate agent-only collector path.
 
 ## Scope
