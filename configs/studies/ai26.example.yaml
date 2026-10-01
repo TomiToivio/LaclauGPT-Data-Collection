@@ -256,6 +256,23 @@ groups:
     accounts:
       x: [PauseAI]
 
+  - id: grassroots_datacentre_energy_conflict
+    name: Data-centre, energy and environmental conflict mobilisation
+    arena: grassroots
+    notes: >-
+      mobilisation around AI infrastructure siting - data centres, energy and
+      water use, ratepayer and property-tax politics, land use and local
+      consent. Included as a sampling decision because this is the material
+      anchor through which otherwise abstract AI contestation currently
+      becomes concrete; it is NOT an ideological classification, and the
+      group is heterogeneous (local, environmental and ratepayer campaigns
+      that are not necessarily anti-AI in general). Handles verified live on
+      Bluesky 2026-10-02.
+    accounts:
+      bluesky:
+        - foxglovelegal.bsky.social
+        - nodesertdatacenter.com
+
   - id: governance_institutions_x
     name: Public governance institutions
     arena: parliamentary
