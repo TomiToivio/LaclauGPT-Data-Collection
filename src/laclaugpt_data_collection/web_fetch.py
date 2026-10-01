@@ -125,7 +125,14 @@ def fetch_web_child(
         ) as client:
             response = None
             original = current
+            seen: set[str] = set()
             for _ in range(5):
+                if current in seen:
+                    # Canonicalization (which strips a trailing slash) can make a
+                    # redirect point back at the URL we already requested. Stop
+                    # instead of spending hops on an unbreakable loop.
+                    return WebFetchOutcome(current, None, "redirect_loop")
+                seen.add(current)
                 if not host_validator(current):
                     return WebFetchOutcome(current, None, "unsafe_or_unresolvable_host")
                 response = client.get(current)
