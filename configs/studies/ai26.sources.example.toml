@@ -210,6 +210,17 @@ priority = "P2"
 active = true
 last_verified = "2026-09-17"
 
+[[feed]]
+name = "foxglove"
+feed_url = "https://www.foxglove.org.uk/feed/"
+homepage = "https://www.foxglove.org.uk/"
+arena = "grassroots"
+source_family = "data-centre opposition / tech accountability / environmental and local conflict"
+sampling_rationale = "UK tech-accountability nonprofit documenting legal and community challenges to AI/data-centre expansion (clean-energy obligations, local planning conflicts, migration/immigration enforcement technology). Grounds the grassroots arena's infrastructure, energy and local-consent demands in dateable campaign artefacts. Verified live 2026-10-02 with 10 items. NOT all items are AI-related; lightweight relevance filtering at analysis stage only."
+priority = "P1"
+active = true
+last_verified = "2026-10-02"
+
 # ---------------------------------------------------------------------------
 # Public web endpoints
 # ---------------------------------------------------------------------------
@@ -523,6 +534,22 @@ acct = "@emilymbender@dair-community.social"
 arena = "elites"
 source_family = "Critical AI / language-model critique"
 priority = "P1"
+
+[[bluesky_account]]
+name = "Foxglove Legal"
+handle = "foxglovelegal.bsky.social"
+profile_url = "https://bsky.app/profile/foxglovelegal.bsky.social"
+arena = "grassroots"
+source_family = "data-centre opposition / tech accountability"
+priority = "P1"
+
+[[bluesky_account]]
+name = "No Desert Data Center Coalition"
+handle = "nodesertdatacenter.com"
+profile_url = "https://bsky.app/profile/nodesertdatacenter.com"
+arena = "grassroots"
+source_family = "data-centre opposition / local and environmental mobilisation"
+priority = "P2"
 
 # ---------------------------------------------------------------------------
 # Long-form and scholarly discovery
