@@ -111,3 +111,29 @@ def test_failed_fetch_returns_error_without_mutating_parent() -> None:
     assert outcome.record is None
     assert outcome.error
     assert parent.source_url == "https://x.com/example/status/1"
+
+
+def test_redirect_to_own_canonical_url_is_a_loop_not_an_error() -> None:
+    """Canonicalization strips the trailing slash, so a site that redirects
+    "/blog" back to "/blog/" would bounce forever. That must be detected as a
+    redirect loop instead of surfacing a raw 301 HTTPStatusError (#199)."""
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(str(request.url))
+        if request.url.path == "/blog":
+            return httpx.Response(301, headers={"location": "/blog/"})
+        return httpx.Response(200, headers={"content-type": "text/html"}, text="<html>ok</html>")
+
+    outcome = fetch_web_child(
+        "https://example.org/blog/",
+        _parent(),
+        transport=httpx.MockTransport(handler),
+        host_validator=lambda _url: True,
+    )
+    assert outcome.record is None
+    assert outcome.error == "redirect_loop"
+    # The seed is canonicalized to /blog and its redirect resolves back to the
+    # same URL, so the loop is caught before a second request is issued.
+    assert calls == ["https://example.org/blog"]
+
