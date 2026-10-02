@@ -9,9 +9,19 @@ from .base import CollectionResult
 
 
 class RSSCollector:
-    def __init__(self, feed_urls: list[str], *, max_items_per_feed: int = 100) -> None:
+    def __init__(
+        self,
+        feed_urls: list[str],
+        *,
+        max_items_per_feed: int = 100,
+        source_name: str = "",
+    ) -> None:
         self.feed_urls = feed_urls
         self.max_items_per_feed = max_items_per_feed
+        # Optional human label for the configured source. Warnings from the
+        # collection runner are aggregated anonymously, so without this a
+        # zero-item feed is indistinguishable from any other source.
+        self.source_name = source_name
 
     def collect(self) -> CollectionResult:
         try:
@@ -31,7 +41,13 @@ class RSSCollector:
                 if record:
                     result.records.append(record)
         if not result.records:
-            result.warnings.append(result.zero_result_warning or "No feed items collected")
+            if result.bodies_seen and not result.raw_items_seen:
+                # Parsed cleanly and carried nothing: a publisher-side empty
+                # feed, not payload drift. Report it by name so the source is
+                # identifiable in the aggregated cycle warnings.
+                result.warnings.append(result.empty_feed_warning(self.source_name))
+            else:
+                result.warnings.append(result.zero_result_warning or "No feed items collected")
         return result
 
 
