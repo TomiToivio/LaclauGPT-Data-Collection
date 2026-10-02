@@ -31,9 +31,10 @@ class FakeStore:
 
 
 class FakeRSSCollector:
-    def __init__(self, feed_urls, *, max_items_per_feed=100):
+    def __init__(self, feed_urls, *, max_items_per_feed=100, source_name=""):
         self.feed_url = feed_urls[0]
         self.max_items_per_feed = max_items_per_feed
+        self.source_name = source_name
 
     def collect(self):
         records = [

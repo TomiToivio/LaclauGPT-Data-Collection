@@ -26,6 +26,22 @@ class CollectionResult:
             return "Response bodies were captured but parsers emitted no items. Check endpoint/payload drift."
         return "No collection activity was observed. Check source configuration and connectivity."
 
+    def empty_feed_warning(self, source: str = "") -> str:
+        """Warning for a feed that was fetched, parsed, and simply carried no items.
+
+        This is deliberately distinct from :attr:`zero_result_warning`. A valid
+        but empty feed is a *publisher-side* condition: the document parsed
+        (``bozo=False``) and there is no payload shape to adapt to, so the
+        generic "check endpoint/payload drift" hint sends the reader after a
+        bug that does not exist. Naming the source is what makes the cycle
+        actionable, because the collected warnings are aggregated anonymously.
+        """
+        label = f"{source}: " if source else ""
+        return (
+            f"{label}response body captured but the feed contained no items; "
+            "check the publisher's feed (not parser drift)"
+        )
+
 
 class Collector(Protocol):
     def collect(self) -> CollectionResult: ...
