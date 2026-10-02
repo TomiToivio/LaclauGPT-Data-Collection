@@ -221,6 +221,39 @@ priority = "P1"
 active = true
 last_verified = "2026-10-02"
 
+[[feed]]
+name = "edri"
+feed_url = "https://edri.org/feed/"
+homepage = "https://edri.org/"
+arena = "grassroots"
+source_family = "digital rights / surveillance / data protection / EU AI governance"
+sampling_rationale = "European Digital Rights network: the first-party European civil-society voice on surveillance, biometrics, migration technology, data protection and the rights side of AI regulation. Fills the grassroots arena's surveillance/data-extraction stratum with dateable policy-campaign artefacts in the EU region the paper names. Verified live 2026-10-02 with 20 items, newest 2026-09-30. NOT all items are AI-related; lightweight relevance filtering at analysis stage only."
+priority = "P1"
+active = true
+last_verified = "2026-10-02"
+
+[[feed]]
+name = "eff_updates"
+feed_url = "https://www.eff.org/rss/updates.xml"
+homepage = "https://www.eff.org/"
+arena = "grassroots"
+source_family = "digital civil liberties / surveillance / platform power / AI deployment resistance"
+sampling_rationale = "Electronic Frontier Foundation's updates feed: first-party civil-liberties campaigns and litigation over automated policing, ALPR, biometrics, platform power and AI deployment. Supplies the US-region counterpart to the EU digital-rights stratum and grounds grassroots demands in dateable litigation and campaign documents. Verified live 2026-10-02 with 50 items, newest 2026-10-01. NOT all items are AI-related; lightweight relevance filtering at analysis stage only."
+priority = "P1"
+active = true
+last_verified = "2026-10-02"
+
+[[feed]]
+name = "teollisuusliitto"
+feed_url = "https://www.teollisuusliitto.fi/feed/"
+homepage = "https://www.teollisuusliitto.fi/"
+arena = "grassroots"
+source_family = "Finnish trade union / labour / automation"
+sampling_rationale = "Finnish industrial trade union (SAK affiliate): first-party Finnish-language labour material on technology, working life and restructuring. The grassroots arena declares languages [en, fi] but had only one Finnish expert blog plus web pages, i.e. no Finnish labour organisation. Verified live 2026-10-02 with 6 items, newest 2026-10-02. NOT all items are AI-related; lightweight relevance filtering at analysis stage only."
+priority = "P1"
+active = true
+last_verified = "2026-10-02"
+
 # ---------------------------------------------------------------------------
 # Public web endpoints
 # ---------------------------------------------------------------------------
@@ -550,6 +583,22 @@ profile_url = "https://bsky.app/profile/nodesertdatacenter.com"
 arena = "grassroots"
 source_family = "data-centre opposition / local and environmental mobilisation"
 priority = "P2"
+
+[[bluesky_account]]
+name = "Electronic Frontier Foundation"
+handle = "eff.org"
+profile_url = "https://bsky.app/profile/eff.org"
+arena = "grassroots"
+source_family = "digital civil liberties / surveillance / platform power"
+priority = "P1"
+
+[[bluesky_account]]
+name = "Finnish Government (Valtioneuvosto)"
+handle = "valtioneuvosto.fi"
+profile_url = "https://bsky.app/profile/valtioneuvosto.fi"
+arena = "parliamentary"
+source_family = "Finland government / national policy"
+priority = "P1"
 
 # ---------------------------------------------------------------------------
 # Long-form and scholarly discovery

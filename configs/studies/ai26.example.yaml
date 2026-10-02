@@ -256,6 +256,25 @@ groups:
     accounts:
       x: [PauseAI]
 
+  - id: grassroots_rights_digital_civil_liberties
+    name: Digital-rights and civil-liberties mobilisation
+    arena: grassroots
+    notes: >-
+      rights-based mobilisation on surveillance, data extraction, platform power
+      and the civil-liberties side of AI deployment (automated policing, ALPR,
+      border and migration technology, content and privacy regulation). Added as
+      a SAMPLING decision because the grassroots arena's sampling_focus names
+      surveillance and data extraction, and that stratum had first-party
+      campaign sources only for labour/creator and data-centre demands. It is NOT
+      an ideological classification, and the group is heterogeneous (some
+      campaigns contest a specific deployment rather than AI in general). Handles
+      verified live 2026-10-02 via the public Bluesky API: EFF 5559 posts /
+      165651 followers, newest 2026-10-01; EDRi feed 20 items, newest
+      2026-09-30.
+    accounts:
+      bluesky:
+        - eff.org
+
   - id: grassroots_datacentre_energy_conflict
     name: Data-centre, energy and environmental conflict mobilisation
     arena: grassroots
@@ -276,9 +295,10 @@ groups:
   - id: governance_institutions_x
     name: Public governance institutions
     arena: parliamentary
-    notes: regulation, standards, oversight, competitiveness and public policy; institutional accounts reduce party-political sampling bias in the public demo
+    notes: regulation, standards, oversight, competitiveness and public policy; institutional accounts reduce party-political sampling bias in the public demo. The Finnish Government handle is listed because the paper's Finland component needs a first-party Finnish-language parliamentary source; handle verified live 2026-10-02 (4104 posts, newest 2026-10-02). Inclusion is a SAMPLING decision and never an ideological classification.
     accounts:
       x: [EU_Commission, Europarl_EN, OECD_AI, NIST]
+      bluesky: [valtioneuvosto.fi]
     discovery_entities:
       - European Commission AI Office
       - European Parliament
