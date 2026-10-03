@@ -248,6 +248,31 @@ groups:
     notes: employment, automation, copyright, consent and bargaining around generative AI
     accounts:
       x: [sagaftra, WGAWest, uniglobalunion]
+      bluesky: [wgawest.bsky.social]
+
+  - id: grassroots_creator_rights_licensing
+    name: Creator-rights and copyright/licensing mobilisation
+    arena: grassroots
+    notes: >-
+      the rights-and-licensing articulation of creative labour: AI training on
+      copyrighted work, licensing and compensation, transparency obligations,
+      and the litigation that carries these demands (Bartz v. Anthropic,
+      Thomson Reuters v. ROSS). Added 2026-10-03 as a SAMPLING decision because
+      the grassroots arena's sampling_focus names creative work and copyright,
+      but the US part of that stratum held union-labour actors only
+      (SAG-AFTRA, WGA West) and no rights organisation. This is NOT an
+      ideological classification; the group mixes rights bodies with different
+      positions on AI training. Feeds verified live 2026-10-03:
+      authorsalliance.org/feed/ 10 items, newest 2026-10-02;
+      etui.org/rss.xml (EU labour-research layer) 10 items, newest 2026-10-02;
+      sitra.fi/feed/ (Finnish public-interest foresight, Finnish-language) 12
+      items, newest 2026-10-02. The Authors Guild feed was checked and NOT
+      added: it is a members' newsletter with no AI-policy content. Bluesky
+      handles verified live 2026-10-03: WGA West 417 posts / 67 942 followers,
+      newest 2026-10-02; Creative Commons 482 posts / 8 029 followers, newest
+      2026-10-02.
+    accounts:
+      bluesky: [wgawest.bsky.social, creativecommons.bsky.social]
 
   - id: grassroots_pause_resistance_x
     name: Pause and deployment-resistance mobilisation
