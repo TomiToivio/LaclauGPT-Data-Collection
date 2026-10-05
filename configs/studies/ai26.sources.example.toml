@@ -249,6 +249,22 @@ active = true
 last_verified = "2026-10-04"
 
 # ---------------------------------------------------------------------------
+# EU corporate-power and deregulation-contestation stratum
+# (added 2026-10-05 from the daily coverage audit; see the 2026-10-05 report)
+# ---------------------------------------------------------------------------
+
+[[feed]]
+name = "corporateeurope"
+feed_url = "https://www.corporateeurope.org/en/rss.xml"
+homepage = "https://www.corporateeurope.org/en"
+arena = "elites"
+source_family = "EU corporate capture / lobbying / deregulation contestation around AI and tech"
+sampling_rationale = "Corporate Europe Observatory: the EU-level civil-society analysis of corporate capture of decision-making, with a live 2026 strand naming AI and tech politics directly - 'No place for Palantir in a democratic Europe!' (28 Sep 2026), 'The EU's new AI Envoy is a tech CEO with extraordinary conflicts of interest' (19 Jun 2026), 'A deadly alliance of Big Tech and Big Oil' (31 Aug 2026), 'SOTEU: von der Leyen doubles down on deregulation' (16 Sep 2026) and the annual EU corporate-lobby league table. The elites arena names Critical AI and political-economy critique and regions [GLOBAL, US, EU, FI], but its EU-level material was held only by governance institutions (European Commission, Parliament) and think-tank feeds; this supplies the ownership/concentration/corporate-power articulation from a non-governmental actor, and it directly covers the deregulation-versus-regulation frontier that the Phase 1 paper treats as a contested nodal articulation (RQ1, RQ3). Inclusion is a SAMPLING decision, never an ideological classification; this is an advocacy organisation with an explicit position and its claims are not treated as discourse ground truth. Verified live 2026-10-05 with 20 items, newest 2026-09-28. NOT all items are AI-related; lightweight relevance filtering at analysis stage only."
+priority = "P2"
+active = true
+last_verified = "2026-10-05"
+
+# ---------------------------------------------------------------------------
 # Public web endpoints
 # ---------------------------------------------------------------------------
 
