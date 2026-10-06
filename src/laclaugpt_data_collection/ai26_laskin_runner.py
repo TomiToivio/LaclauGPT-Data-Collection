@@ -11,8 +11,11 @@ import importlib.util
 import json
 import time
 import tomllib
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 from .collectors.arxiv import ArxivCollector
 from .collectors.bluesky import BlueskyCollector
@@ -21,6 +24,7 @@ from .collectors.youtube import YouTubeCollector
 from .config import Settings
 from .distributed_capture import DistributedCaptureSink
 from .models import CollectionProvenance, NormalizedRecord
+from .plugins import RetryPolicy
 from .realtime import RealtimePolicy, parse_source_time
 from .server_runner import run_phase1_rss
 from .web_fetch import fetch_web_child
@@ -65,6 +69,83 @@ def preflight_optional_dependencies(jobs: list[dict[str, Any]]) -> list[str]:
                 f"(configured jobs: {', '.join(names)}; missing modules: {', '.join(missing)})"
             )
     return errors
+
+
+def load_collector_retry_policy(study_config: str | Path) -> RetryPolicy:
+    """Read ``collector_defaults.retry`` from the study config (#212).
+
+    The AI26 Laskin runner drives collectors directly rather than through
+    ``PluginRunner``, so it must honour the same declared retry budget itself.
+    Missing or malformed values fall back to the conservative defaults rather
+    than failing a whole tick.
+    """
+    defaults = RetryPolicy()
+    try:
+        data = yaml.safe_load(Path(study_config).read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return defaults
+    if not isinstance(data, dict):
+        return defaults
+    retry = (data.get("collector_defaults") or {}).get("retry") or {}
+    if not isinstance(retry, dict):
+        return defaults
+
+    def _positive(value: Any, fallback: int) -> int:
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            return fallback
+        return parsed if parsed >= 1 else fallback
+
+    def _non_negative(value: Any, fallback: float) -> float:
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            return fallback
+        return parsed if parsed >= 0 else fallback
+
+    return RetryPolicy(
+        max_attempts=_positive(retry.get("max_attempts"), defaults.max_attempts),
+        base_delay_seconds=_non_negative(
+            retry.get("initial_backoff_seconds"), defaults.base_delay_seconds
+        ),
+        max_delay_seconds=_non_negative(
+            retry.get("max_backoff_seconds"), defaults.max_delay_seconds
+        ),
+    )
+
+
+def _retryable_http_status(exc: BaseException) -> int | None:
+    """Return the HTTP status of a retryable arxiv/requests error, else None."""
+    import requests
+
+    if isinstance(exc, requests.exceptions.HTTPError):
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+        return int(status) if status else None
+    status = getattr(exc, "status", None)
+    if isinstance(status, int) and 400 <= status < 600:
+        return status
+    return None
+
+
+def _call_with_retry(
+    func: Callable[[], Any], *, policy: RetryPolicy, is_retryable: Callable[[BaseException], bool]
+) -> Any:
+    """Call ``func`` with a bounded backoff, re-raising the last error when exhausted.
+
+    Owned here at the orchestration boundary, exactly like ``PluginRunner`` does
+    for plugin-driven collectors, so the AI26 Laskin path honours the study
+    config's declared retry budget instead of silently costing a tick (#212).
+    """
+    attempts = max(1, policy.max_attempts)
+    for attempt in range(1, attempts + 1):
+        try:
+            return func()
+        except Exception as exc:  # noqa: BLE001 - re-raised unless retryable and budget remains
+            if attempt >= attempts or not is_retryable(exc):
+                raise
+            time.sleep(policy.delay_for(attempt))
+    raise AssertionError("unreachable")  # pragma: no cover
 
 
 def load_non_browser_jobs(path: str | Path) -> list[dict[str, Any]]:
@@ -117,7 +198,12 @@ def _stamp(record: NormalizedRecord, row: dict[str, Any], *, collection_id: str,
 
 
 def _records_for_job(
-    row: dict[str, Any], *, collection_id: str, worker_id: str, per_source_limit: int
+    row: dict[str, Any],
+    *,
+    collection_id: str,
+    worker_id: str,
+    per_source_limit: int,
+    retry_policy: RetryPolicy | None = None,
 ) -> tuple[list[NormalizedRecord], list[str]]:
     kind = str(row["kind"])
     if kind == "bluesky_account":
@@ -134,7 +220,15 @@ def _records_for_job(
         query = str(row.get("query") or "").strip()
         if not query:
             return [], ["scholarly_query missing query"]
-        result = ArxivCollector(query, max_results=per_source_limit).collect()
+        # The arXiv endpoint rate-limits (HTTP 429) and occasionally 5xx's. The
+        # library retries quickly and then gives up; without a bounded, backed-off
+        # retry at this boundary a single transient status silently costs a tick's
+        # scholarly records (#212).
+        result = _call_with_retry(
+            lambda: ArxivCollector(query, max_results=per_source_limit).collect(),
+            policy=retry_policy or RetryPolicy(),
+            is_retryable=lambda exc: _retryable_http_status(exc) in (429, 500, 502, 503, 504),
+        )
         return [_stamp(r, row, collection_id=collection_id, worker_id=worker_id) for r in result.records], list(result.warnings)
 
     if kind == "youtube_source":
@@ -238,6 +332,7 @@ def run_phase1_laskin(
     remaining = max(limit - int(rss.get("records_synced", 0)), 0)
     sink = DistributedCaptureSink(settings)
     sink.assert_private_config(study_config)
+    retry_policy = load_collector_retry_policy(study_config)
     policy = RealtimePolicy.ai26()
     jobs = select_job_window(all_jobs, max_jobs=max_jobs, rotation=rotation * max_jobs)
     synced = 0
@@ -255,6 +350,7 @@ def run_phase1_laskin(
                 collection_id=routed,
                 worker_id=worker_id,
                 per_source_limit=per_source_limit,
+                retry_policy=retry_policy,
             )
             warnings.extend(source_warnings)
             collected += len(records)
