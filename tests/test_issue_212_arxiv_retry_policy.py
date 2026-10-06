@@ -116,6 +116,16 @@ def test_call_with_retry_reraises_when_the_budget_is_exhausted_or_not_retryable(
     assert terminal["n"] == 1  # not retryable -> fail fast, no extra attempts
 
 
+def test_retryable_http_status_works_without_requests_installed(monkeypatch) -> None:
+    """CI installs only '.[dev]'; arxiv.requests must not be a hard import (#212)."""
+    import sys
+
+    monkeypatch.setitem(sys.modules, "requests", None)
+    assert runner._retryable_http_status(FakeHTTPStatusError(429)) == 429
+    assert runner._retryable_http_status(FakeHTTPStatusError(404)) == 404
+    assert runner._retryable_http_status(ValueError("nope")) is None
+
+
 def test_scholarly_job_retries_a_transient_429_then_collects(monkeypatch) -> None:
     monkeypatch.setattr(runner.time, "sleep", lambda _seconds: None)
     record = NormalizedRecord(

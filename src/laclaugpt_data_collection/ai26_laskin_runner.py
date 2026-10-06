@@ -116,10 +116,17 @@ def load_collector_retry_policy(study_config: str | Path) -> RetryPolicy:
 
 
 def _retryable_http_status(exc: BaseException) -> int | None:
-    """Return the HTTP status of a retryable arxiv/requests error, else None."""
-    import requests
+    """Return the HTTP status of a retryable arxiv/requests error, else None.
 
-    if isinstance(exc, requests.exceptions.HTTPError):
+    ``requests`` is an optional dependency here, so its presence is not assumed:
+    the arxiv ``HTTPError`` carries a plain ``status`` attribute and is handled
+    without it.
+    """
+    try:
+        import requests
+    except ImportError:  # requests ships with the optional 'documents' extra
+        requests = None
+    if requests is not None and isinstance(exc, requests.exceptions.HTTPError):
         status = getattr(getattr(exc, "response", None), "status_code", None)
         return int(status) if status else None
     status = getattr(exc, "status", None)
