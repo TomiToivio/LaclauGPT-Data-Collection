@@ -192,6 +192,45 @@ sampling_rationale = "Petteri Järvinen's blog: high-signal Finnish-language AI 
 priority = "P1"
 active = true
 last_verified = "2026-09-13"
+
+# ---------------------------------------------------------------------------
+# Finnish-language evidence stratum
+# (added 2026-10-07 from the daily coverage audit; see the 2026-10-07 report)
+#
+# The declared studies/ai26.yaml arenas all list `fi` in their language scope,
+# and the Phase 1 paper names Finland as one of three weighted initial regions,
+# but the only Finnish-language feedable source before this edit was
+# `petterijarvinen` - the corpus held four Finnish records in total. These two
+# add Finland-scoped AI articulations to the elites arena (a domain the
+# parliamentary/government web_sources do not reach). Inclusion is a SAMPLING
+# decision, never an ideological classification: both are knowledge institutions
+# with their own perspectives, and downstream analysis infers positions from
+# documents, not from source identity. Neither is AI-only; relevance filtering
+# stays at the analysis stage.
+# ---------------------------------------------------------------------------
+
+[[feed]]
+name = "sitra"
+feed_url = "https://www.sitra.fi/feed/"
+homepage = "https://www.sitra.fi/"
+arena = "elites"
+source_family = "Finland AI governance / public-interest innovation"
+sampling_rationale = "Sitra (the Finnish Innovation Fund): a state-linked foresight and public-interest innovation actor carrying Finnish-language AI articulations, including responsible-adoption and risk framings (e.g. its 'Voiko tekoäly tappaa meidät kaikki?' piece and its sote AI-deployment programme with STM and DigiFinland). Supplies the Finnish-language, non-market, institutional-foresight voice that the elites arena's fi language scope declares but the corpus does not yet hold. Inclusion is a SAMPLING decision, never an ideological classification. Verified live 2026-10-07 with 12 items, newest 2026-10-07. NOT all items are AI-related; lightweight relevance filtering at analysis stage only."
+priority = "P2"
+active = true
+last_verified = "2026-10-07"
+
+[[feed]]
+name = "etla"
+feed_url = "https://www.etla.fi/feed/"
+homepage = "https://www.etla.fi/"
+arena = "elites"
+source_family = "Finland AI political economy / labour and productivity"
+sampling_rationale = "ETLA (the Research Institute of the Finnish Economy): an economic-research institute publishing Finnish-language AI political-economy material - labour displacement and productivity ('Tekoäly ei tuhoa työtä, vaan muuttaa sitä', 'Tekoälymurros pikemminkin lisää kuin vähentää ihmistyötä') and data-centre investment ('Googlen datakeskusinvestoinnit'). Grounds the elites arena's fi scope in a national political-economy register, complementing Sitra's governance register. Inclusion is a SAMPLING decision, never an ideological classification. Verified live 2026-10-07 with 30 items, newest 2026-10-06. NOT all items are AI-related; lightweight relevance filtering at analysis stage only."
+priority = "P2"
+active = true
+last_verified = "2026-10-07"
+
 [[feed]]
 name = "kaifulee_medium"
 feed_url = "https://kaifulee.medium.com/feed"
