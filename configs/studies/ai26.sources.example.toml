@@ -222,6 +222,41 @@ active = true
 last_verified = "2026-10-02"
 
 # ---------------------------------------------------------------------------
+# Mainstream news and non-US/EU/FI perspectives
+#
+# Both rows below respond to the same declared gap. Section 4.1 of the Phase 1
+# paper states that analyses "should remain attentive to whose labour,
+# environments, and political agency appear within the sampled discourse,
+# including references to communities outside these regions", while the initial
+# scope is weighted to the US, the EU and Finland. Neither row is an ideological
+# classification of an actor or an outlet: inclusion is a SAMPLING decision, and
+# downstream analysis infers positions from documents rather than from source
+# identity. Neither is AI-only; relevance filtering stays at the analysis stage.
+# ---------------------------------------------------------------------------
+
+[[feed]]
+name = "rest_of_world"
+feed_url = "https://restofworld.org/feed/latest/"
+homepage = "https://restofworld.org/"
+arena = "grassroots"
+source_family = "non-Western AI political economy / labour and digital-rights mobilisation"
+sampling_rationale = "Rest of World reports on technology outside the US/EU/China core: AI labour and data work, platform and cloud infrastructure, and the governance claims of countries that the current corpus does not represent. Verified live 2026-10-08 with 12 items, newest 2026-10-07, of which 9 carried AI/technology content (e.g. 'Who gets to decide if AI is safe? Africa wants a say', 'AI companies want to embed safety evaluators, but countries need their own'). This is the only configured source that gives the paper's 'communities outside these regions' clause any documentary basis, and the corpus currently holds no material of this kind. NOT all items are AI-related; lightweight relevance filtering at analysis stage only."
+priority = "P2"
+active = true
+last_verified = "2026-10-08"
+
+[[feed]]
+name = "guardian_ai"
+feed_url = "https://www.theguardian.com/technology/artificialintelligenceai/rss"
+homepage = "https://www.theguardian.com/technology/artificialintelligenceai"
+arena = "grassroots"
+source_family = "mainstream AI coverage / labour, surveillance and public-interest framing"
+sampling_rationale = "The Guardian's AI section is a dateable mainstream register for the grassroots strands the corpus is thinnest on: workers placed under AI monitoring, creator and copyright conflict, outsourced data labour, and public-interest contestation of the AI build-out. Verified live 2026-10-08 with 20 items, newest 2026-10-08, all AI-related (e.g. 'Co-op becomes latest firm to put staff under AI surveillance'; 'Refugees in Kenya are powering tech for dwindling pay'; 'Tell us: have you been monitored or assessed by AI at work?'). Complements the institutional feeds, which rarely carry workplace-level articulations. Inclusion is a SAMPLING decision, never an ideological classification; the section also carries frontier-lab news, so arena assignment here reflects its dominant contribution to the labour/rights strand, not a claim about the outlet."
+priority = "P2"
+active = true
+last_verified = "2026-10-08"
+
+# ---------------------------------------------------------------------------
 # Public web endpoints
 # ---------------------------------------------------------------------------
 
