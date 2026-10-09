@@ -86,7 +86,7 @@ def test_clean_tick_emits_end_marker_and_succeeds(tmp_path: Path) -> None:
 
     assert "AI26 Laskin collection start" in result.stdout
     assert "AI26 Laskin collection end" in result.stdout
-    assert "runner_status=0" in result.stdout
+    assert "runner_status" not in result.stdout
     assert result.returncode == 0
 
 

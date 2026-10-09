@@ -58,7 +58,12 @@ else
 fi
 
 echo "[$(date -Is)] AI26 Laskin collection start"
-# Preserve exit status without suppressing the terminal marker on partial ticks.
+# The runner returns 1 whenever any source recorded an error (status: partial),
+# so a single transient upstream failure (e.g. arXiv HTTP 429) would abort this
+# wrapper under `set -e` *before* the end marker below, leaving a tick that reads
+# as a silently stopped stage even though its records were collected. Capture the
+# runner status, always emit the end marker, and propagate the status so cron/CI
+# still sees a non-zero exit for a partial tick.
 set +e
 "${RUN[@]}" \
   --study-config "$STUDY_CONFIG" \
@@ -71,5 +76,9 @@ set +e
   --limit "${LACLAUGPT_AI26_BATCH_LIMIT:-40}"
 runner_status=$?
 set -e
-echo "[$(date -Is)] AI26 Laskin collection end runner_status=$runner_status"
+if [[ "$runner_status" -ne 0 ]]; then
+  echo "[$(date -Is)] AI26 Laskin collection end runner_status=${runner_status} (tick partial; see status/errors above)"
+else
+  echo "[$(date -Is)] AI26 Laskin collection end"
+fi
 exit "$runner_status"
