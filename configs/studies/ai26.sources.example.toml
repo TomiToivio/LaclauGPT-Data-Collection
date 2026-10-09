@@ -336,6 +336,33 @@ active = true
 last_verified = "2026-10-05"
 
 # ---------------------------------------------------------------------------
+# Surveillance / data-extraction rights-accountability stratum
+# (added 2026-10-06 from the daily coverage audit; see the 2026-10-06 report)
+# ---------------------------------------------------------------------------
+
+[[feed]]
+name = "bigbrotherwatch"
+feed_url = "https://www.bigbrotherwatch.org.uk/feed/"
+homepage = "https://www.bigbrotherwatch.org.uk/"
+arena = "grassroots"
+source_family = "surveillance / data extraction / digital-rights accountability"
+sampling_rationale = "Big Brother Watch: a UK civil-society organisation documenting state surveillance, biometric and policing technology, welfare-data and digital-ID schemes, and public-interest challenges to them. The grassroots arena names 'surveillance and data extraction' as a sampling_focus but the tracked plan had no feedable source dedicated to it - the existing rights feeds (algorithmwatch, edri, eff, foxglove, pending in PRs #204/#209) cover accountability and infrastructure rather than state-surveillance and biometrics specifically. This supplies that otherwise-empty strand with an independent, English-language civil-society actor. Inclusion is a SAMPLING decision, never an ideological classification; the organisation has explicit positions of its own and those positions are not treated as discourse ground truth. Verified live 2026-10-06 with 60 items, newest 2026-10-05. NOT all items are AI-related; lightweight relevance filtering at analysis stage only."
+priority = "P1"
+active = true
+last_verified = "2026-10-06"
+
+[[feed]]
+name = "accessnow"
+feed_url = "https://www.accessnow.org/feed/"
+homepage = "https://www.accessnow.org/"
+arena = "grassroots"
+source_family = "digital rights / surveillance / AI-governance accountability"
+sampling_rationale = "Access Now: a global digital-rights organisation with an explicit 2026 AI strand ('From surveillance to governance: recentering human rights in the AI ...', Sep 2026) alongside its internet-governance and business-and-human-rights work. Adds a non-UK, non-EU-institution civil-society voice to the grassroots 'surveillance and data extraction' strand and links it to the AI-governance articulation the parliamentary arena records only from institutions. Inclusion is a SAMPLING decision, never an ideological classification; the organisation has explicit positions of its own and those positions are not treated as discourse ground truth. Verified live 2026-10-06 with 15 items, newest 2026-10-01. NOT all items are AI-related; lightweight relevance filtering at analysis stage only."
+priority = "P2"
+active = true
+last_verified = "2026-10-06"
+
+# ---------------------------------------------------------------------------
 # Public web endpoints
 # ---------------------------------------------------------------------------
 
