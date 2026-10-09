@@ -125,7 +125,9 @@ def test_brazil26_cron_is_marker_managed_private_and_locked() -> None:
     assert "# BEGIN LACLAUGPT BRAZIL26" in cron
     assert "# END LACLAUGPT BRAZIL26" in cron
     assert "brazil-election-2026.yaml" in cron
-    assert "*/15 * * * *" in cron
+    # Issue #233 supersedes the 15-minute media cadence with 30 minutes.
+    assert "*/30 * * * *" in cron
+    assert "*/15 * * * *" not in cron
     assert "LACLAUGPT_STUDY_CONFIG=" in cron
     assert "run_brazil26_localhost_media.sh" in cron
     assert "--lock" in media

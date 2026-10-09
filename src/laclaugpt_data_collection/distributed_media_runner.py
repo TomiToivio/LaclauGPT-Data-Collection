@@ -186,6 +186,35 @@ def apply_media_results(
     return list(touched.values())
 
 
+def _allowed_platforms(study_config: str | Path, data_root: str | Path) -> frozenset[str] | None:
+    """Return the platform allowlist for a study, or None when unconstrained.
+
+    Issue #233: Brazil26 media may only be downloaded for X/Instagram/TikTok. The
+    policy lives in the study's source manifest. Resolution mirrors the shell
+    wrappers: ``LACLAUGPT_SOURCE_MANIFEST`` wins, else
+    ``<data_root>/config/brazil26.sources.toml``. A missing manifest is not an
+    error here (the local-first path may not have one); an unreadable or
+    policy-violating one is.
+    """
+    from .source_allowlist import (
+        BRAZIL26_PLATFORMS,
+        assert_brazil26_only,
+        enabled_platforms,
+        load_manifest,
+    )
+
+    manifest_path = os.environ.get("LACLAUGPT_SOURCE_MANIFEST", "")
+    candidates = [Path(manifest_path)] if manifest_path else []
+    candidates.append(Path(data_root) / "config" / "brazil26.sources.toml")
+    for path in candidates:
+        if not path.is_file():
+            continue
+        manifest = load_manifest(path)
+        assert_brazil26_only(manifest)
+        return frozenset(enabled_platforms(manifest) & set(BRAZIL26_PLATFORMS))
+    return None
+
+
 def _run_local_media_unlocked(
     settings: Settings,
     *,
@@ -209,6 +238,7 @@ def _run_local_media_unlocked(
             store,
             backend=FilesystemBackend(store.media_dir, store.root),
             workers=workers,
+            allowed_platforms=_allowed_platforms(study_config, data_root),
         )
         jobs = downloader.enqueue_from_records(records)
         results = downloader.run_queue(jobs)
@@ -283,6 +313,7 @@ def _run_distributed_media_unlocked(
             store,
             backend=S3MediaBackend(object_store),
             workers=workers,
+            allowed_platforms=_allowed_platforms(study_config, data_root),
         )
         # Issue #210: repair refs whose durable media already exists but whose
         # document lost the back-reference to a later re-ingest. This runs FIRST,

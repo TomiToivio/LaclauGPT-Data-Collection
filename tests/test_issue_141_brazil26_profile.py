@@ -43,10 +43,13 @@ priority = "P2"
     assert result["project_id"] == "brazil26"
     assert result["collection_id"] == "brazil26"
     assert result["runs"] == []
+    # Issue #233 supersedes the channel-guess reason: for the Brazil26 policy
+    # YouTube is not an enabled source family at all, so the row is skipped
+    # before channel expansion is even considered.
     assert result["skipped"] == [
         {
             "source": "official_channel",
-            "reason": "no explicit video_urls; channel expansion is never guessed",
+            "reason": "youtube is not an enabled platform for this deployment (#233)",
         }
     ]
 

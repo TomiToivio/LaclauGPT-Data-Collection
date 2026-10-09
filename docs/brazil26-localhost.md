@@ -141,9 +141,9 @@ or use the existing lock-protected wrapper:
 bash scripts/run_brazil26_localhost_media.sh
 ```
 
-With the local-first profile, objects remain local and the existing SQLite media index tracks completed files and retries. The 15-minute cron entry invokes this same worker; it does not require MongoDB/S3 for the default filesystem profile. Downstream local handoff should read the media index via `CollectionStore.media_states(source_url, collection_id="brazil26")`, rather than assuming the original append-only browser JSONL rows are rewritten in place. Configure distributed MongoDB/S3 only when the private runtime explicitly enables it.
+With the local-first profile, objects remain local and the existing SQLite media index tracks completed files and retries. The **30-minute** cron entry invokes this same worker; it does not require MongoDB/S3 for the default filesystem profile. (Issue #233 supersedes the earlier 15-minute cadence: the installer now writes `*/30` and strips any stale `*/15` media entry.) Downstream local handoff should read the media index via `CollectionStore.media_states(source_url, collection_id="brazil26")`, rather than assuming the original append-only browser JSONL rows are rewritten in place. Configure distributed MongoDB/S3 only when the private runtime explicitly enables it.
 
-The media cron entry is `*/15 * * * *` inside the marker-managed Brazil26 block. An existing `data/config/brazil26-localhost.env` can provide `BRAZIL26_CONFIG` for direct installation and manual media runs; the launcher-pinned study config and data root take precedence. Verify the actual host installation and one scheduled tick on the research workstation. CI exercises only synthetic media, not authenticated platform downloads.
+The media cron entry is `*/30 * * * *` inside the marker-managed Brazil26 block (issue #233; it supersedes the earlier 15-minute cadence). An existing `data/config/brazil26-localhost.env` can provide `BRAZIL26_CONFIG` for direct installation and manual media runs; the launcher-pinned study config and data root take precedence. Verify the actual host installation and one scheduled tick on the research workstation. CI exercises only synthetic media, not authenticated platform downloads.
 
 For each of Instagram, X and TikTok, capture a permitted public record containing a video reference, run the media worker, and inspect a completed or explicit failed/unsupported media-index entry. URL expiry, access restrictions and platform-specific signed URLs may prevent an individual video from downloading; do not interpret a synthetic test as proof of live platform coverage.
 
@@ -156,6 +156,44 @@ laclaugpt-brazil26 check --study-config "$BRAZIL26_CONFIG"
 ```
 
 The browser backend will mirror only when the effective settings request distributed infrastructure. Local capture remains the durable first hop.
+
+### Distributed media to CSC Allas
+
+The default `run_brazil26_localhost_media.sh` is deliberately local-first: it pins
+`LACLAUGPT_OBJECT_BACKEND=filesystem` and clears the remote selectors so a repo-root
+`.env` cannot switch it into the distributed plane. For the #233 deployment, where
+queued videos must land in CSC Allas with their object key and state recorded in the
+project-scoped MongoDB, use the distributed wrapper instead:
+
+```bash
+bash scripts/run_brazil26_localhost_media_distributed.sh
+```
+
+It sets (does not clear) `LACLAUGPT_RECORD_BACKEND=mongodb` and
+`LACLAUGPT_OBJECT_BACKEND=s3`, refuses to run without `LACLAUGPT_S3_BUCKET` /
+`LACLAUGPT_MONGODB_URI` (fail closed, never a silent filesystem fallback), and
+enforces the source policy before touching the network. Allas credentials come
+from `allas-conf` / `~/.aws`, never from the env file.
+
+Install **one** media cron entry per host. The installer writes the local-first
+wrapper; to schedule the distributed one, point the marker-managed block at the
+`..._media_distributed.sh` wrapper and verify a single scheduled tick.
+
+### Source policy (X, Instagram and TikTok only)
+
+The Brazil26 deployment collects X, Instagram and TikTok and nothing else. The
+policy lives in the source manifest's `enabled_platforms`, and preflight asserts
+it:
+
+```bash
+laclaugpt-brazil26 preflight --distributed   # also asserts Allas/Mongo config
+```
+
+A manifest that enables RSS, YouTube, Telegram, Reddit, Bluesky, Mastodon or
+arXiv is refused by preflight and by the collect worker; the RSS pass is skipped
+for a manifest that does not enable it. `configs/studies/brazil26.sources.example.toml`
+declares `enabled_platforms = ["x", "instagram", "tiktok"]`; its institutional
+RSS/YouTube rows are kept as provenance with `enabled = false`.
 
 ## Validate before Phase 1 analysis
 

@@ -1,6 +1,15 @@
 # Public-safe Brazil26 Phase 1 source manifest.
 # These are institutional context sources, not candidate/party classifications.
 # Live operational targets may extend this manifest privately.
+#
+# Issue #233: the Brazil26 localhost deployment collects X, Instagram and TikTok
+# ONLY. `enabled_platforms` is that allowlist and every collector consults it
+# (src/laclaugpt_data_collection/source_allowlist.py). RSS, YouTube, Telegram,
+# Reddit, Bluesky and Mastodon are declared off. The `[[feed]]` rows below are
+# retained as documented institutional context with `enabled = false`; they are
+# never collected under the Brazil26 policy, and a manifest that enables a
+# non-browser family is refused by preflight and by the collect worker.
+enabled_platforms = ["x", "instagram", "tiktok"]
 
 [[feed]]
 name = "camara_eleicoes"
@@ -8,27 +17,28 @@ feed_url = "https://www.camara.leg.br/noticias/rss/dinamico/ELEICOES"
 homepage = "https://www.camara.leg.br/noticias/rss"
 arena = "institutional"
 source_family = "official legislative election news"
-sampling_rationale = "Official Câmara election coverage provides bounded institutional context without duplicating browser candidate targets."
+sampling_rationale = "Official Câmara election coverage, kept for provenance. Disabled for Brazil26: RSS is not a permitted source family (#233)."
 priority = "P1"
-active = true
+active = false
+enabled = false
 last_verified = "2026-09-20"
 
 # TSE publishes an official RSS entry point, but the exact machine-consumable
-# feed URL can change. Keep it as a web source until verified in the private
-# operational overlay rather than guessing an RSS endpoint.
+# feed URL can change. Kept as a web source for provenance only; not collected.
 [[web_source]]
 name = "tse_election_news"
 homepage = "https://www.tse.jus.br/comunicacao/noticias"
 arena = "institutional"
 source_family = "official electoral administration"
-sampling_rationale = "Official election-administration news and guidance."
-priority = "P1"
+sampling_rationale = "Official election-administration news, kept for provenance. Not a permitted Brazil26 source family (#233)."
 
+# YouTube is explicitly disabled for Brazil26 (#233).
 [[youtube_source]]
 name = "justica_eleitoral"
 homepage = "https://www.youtube.com/@justicaeleitoral"
 arena = "institutional"
 source_family = "official electoral administration video"
-sampling_rationale = "Use transcripts when a canonical YouTube transcript collector is enabled; do not download media by default."
+sampling_rationale = "Kept for provenance only. Disabled for Brazil26: YouTube is not a permitted source family (#233)."
 priority = "P2"
 transcripts_only = true
+enabled = false

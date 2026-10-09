@@ -20,6 +20,7 @@ from .config import Settings
 from .factory import build_record_store
 from .models import CollectionProvenance
 from .plugins import CollectionContext, CollectionRunner, PluginRegistry, default_registry
+from .source_allowlist import SourceAllowlistError, assert_brazil26_only, enabled_plugin_ids
 from .storage.base import RecordStore
 
 
@@ -131,12 +132,34 @@ def collect_manifest(
         raise ValueError("Brazil26 collector requires project_id=collection_id=brazil26")
 
     manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
+    # Issue #233: the manifest is the source policy. Refuse a manifest that would
+    # collect anything outside X/Instagram/TikTok, and gate the plugin pass on the
+    # plugin ids the enabled platforms actually resolve to -- a manifest that
+    # enables only the three browser platforms enables no plugin at all, so an
+    # old [[youtube_source]] row can never sneak YouTube back in.
+    try:
+        assert_brazil26_only(manifest)
+    except SourceAllowlistError as exc:
+        raise ValueError(str(exc)) from exc
+    allowed_plugins = enabled_plugin_ids(manifest)
     store = build_record_store(Settings())
     plugins = default_registry()
     runs: list[dict[str, Any]] = []
     skipped: list[dict[str, str]] = []
 
-    for row in manifest.get("youtube_source", []):
+    if "youtube" not in allowed_plugins:
+        for row in manifest.get("youtube_source", []) or []:
+            skipped.append(
+                {
+                    "source": str(row.get("name") or ""),
+                    "reason": "youtube is not an enabled platform for this deployment (#233)",
+                }
+            )
+        youtube_rows: list[dict[str, Any]] = []
+    else:
+        youtube_rows = list(manifest.get("youtube_source", []))
+
+    for row in youtube_rows:
         urls = row.get("video_urls") or []
         if urls:
             runs.append(
@@ -165,6 +188,7 @@ def collect_manifest(
         "runs": runs,
         "skipped": skipped,
         "notes": [
+            "Source families are restricted to the manifest's enabled_platforms (#233).",
             "RSS is executed by the same shell wrapper before this plugin pass.",
             "Browser/X/Instagram/TikTok capture remains manual and loopback-only.",
             "YouTube channel homepages are not expanded into invented video targets.",
