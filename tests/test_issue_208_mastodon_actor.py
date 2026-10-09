@@ -73,3 +73,25 @@ def test_invalid_acct_is_a_configuration_failure(acct):
             {"kind": "mastodon_account", "acct": acct},
             collection_id="ai26", worker_id="test", per_source_limit=5,
         )
+
+
+@pytest.mark.parametrize(
+    ("http_status", "retryable"),
+    [(429, True), (500, True), (503, True), (404, False), (401, False)],
+)
+def test_mastodon_api_error_tuple_status_controls_retry(http_status, retryable):
+    class MastodonAPIError(Exception):
+        pass
+
+    class FailingClient(Client):
+        def account_lookup(self, acct):
+            raise MastodonAPIError("API request failed", http_status, "synthetic")
+
+    with pytest.raises(MastodonCollectionError) as caught:
+        MastodonCollector(
+            "https://example.invalid",
+            acct="researcher@example.invalid",
+            client=FailingClient(),
+        ).collect()
+    assert caught.value.status_code == http_status
+    assert caught.value.retryable is retryable
