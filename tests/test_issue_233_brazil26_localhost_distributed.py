@@ -194,16 +194,51 @@ def test_media_runner_rejects_a_policy_violating_manifest(tmp_path: Path, monkey
 # --------------------------------------------------------------------------- #
 
 def test_installer_uses_a_thirty_minute_media_cadence() -> None:
+    """The cadence is the fact; the wrapper NAME is now selectable (#233 AC3).
+
+    The line is emitted through `$MEDIA_WRAPPER`, so asserting the literal wrapper
+    name would pin an implementation detail that must vary between local-first and
+    Allas modes. Assert the cadence and that exactly one media entry is emitted.
+    """
     text = (ROOT / "scripts/install_cron_brazil26.sh").read_text(encoding="utf-8")
     assert "*/30 * * * *" in text
-    media_lines = [line for line in text.splitlines() if "run_brazil26_localhost_media.sh" in line]
+    # exactly one media cron line, and it must be the 30-minute one
+    media_lines = [
+        line for line in text.splitlines()
+        if "scripts/$MEDIA_WRAPPER" in line or "run_brazil26_localhost_media" in line
+        if line.strip().startswith(("*/30", "*/15", "*"))
+    ]
     assert media_lines, "the media cron entry is missing"
     assert all("*/30" in line for line in media_lines), media_lines
+    assert not any("*/15" in line for line in media_lines), "a 15-minute entry survives"
+
+
+def test_installer_can_schedule_the_allas_media_worker() -> None:
+    """#233 AC3 needs a *scheduled* Allas upload, so the mode must be selectable.
+
+    Without this the distributed wrapper exists but can never be installed, and the
+    acceptance criterion cannot be met on any host.
+    """
+    text = (ROOT / "scripts/install_cron_brazil26.sh").read_text(encoding="utf-8")
+    assert "LACLAUGPT_BRAZIL26_MEDIA_MODE" in text
+    assert "run_brazil26_localhost_media_distributed.sh" in text
+    # local-first stays the default
+    assert "LACLAUGPT_BRAZIL26_MEDIA_MODE:-local" in text
+    # and a bad mode fails closed rather than silently installing the wrong worker
+    assert "must be 'local' or 'allas'" in text
+
+
+def test_switching_mode_removes_the_other_wrappers_entry() -> None:
+    """Two media entries would fight for the same lock, so the other mode is stripped."""
+    text = (ROOT / "scripts/install_cron_brazil26.sh").read_text(encoding="utf-8")
+    assert "OTHER_WRAPPER" in text
+    assert "other mode" in text
 
 
 def test_installer_strips_a_stale_fifteen_minute_entry() -> None:
     text = (ROOT / "scripts/install_cron_brazil26.sh").read_text(encoding="utf-8")
-    assert "run_brazil26_localhost_media\\.sh" in text
+    # both wrappers must be matched, so switching mode cannot leave a 15-minute entry
+    assert "run_brazil26_localhost_media(_distributed)?\\.sh" in text
     assert "stale 15-minute" in text
 
 
