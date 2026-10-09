@@ -192,15 +192,30 @@ class TestRunnerWiring:
     so it must not happen by default.
     """
 
-    def test_budgets_are_off_by_default(self) -> None:
+    def test_the_budget_parameter_is_a_three_state_override(self) -> None:
+        """#239.2: the STUDY decides, not a wrapper flag nobody passes.
+
+        `None` (default) follows the audited config's `source_budgets.enforce`;
+        True forces the declared caps on; False forces them off for a deliberate
+        unbounded run. Pinning `is False` here is what kept the caps unreachable.
+        """
         import inspect
 
         from laclaugpt_data_collection.ai26_laskin_runner import run_phase1_laskin
 
         sig = inspect.signature(run_phase1_laskin)
-        assert sig.parameters["enforce_source_budgets"].default is False, (
-            "a cap that changes corpus contents must be opt-in"
+        default = sig.parameters["enforce_source_budgets"].default
+        assert default is None, (
+            "the default must defer to the study config; True/False remain explicit overrides"
         )
+
+    def test_a_study_that_declares_nothing_enables_nothing(self, tmp_path) -> None:
+        """The stronger property the old default was protecting: no silent capping."""
+        from laclaugpt_data_collection.ai26_laskin_runner import _declared_budgets_bind
+
+        undecided = tmp_path / "undecided.yaml"
+        undecided.write_text("study: ai26\n", encoding="utf-8")
+        assert _declared_budgets_bind(undecided) is False
 
     def test_the_cli_exposes_the_flag(self) -> None:
         # argparse would SystemExit on an unknown flag; parsing must succeed.
