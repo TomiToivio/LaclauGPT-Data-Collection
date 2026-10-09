@@ -52,8 +52,12 @@ def map_paper(paper: Any) -> NormalizedRecord | None:
         else []
     )
     text = "\n\n".join(part for part in [snapshot["title"], snapshot["summary"]] if part)
+    from ..language import resolve_language
+
+    language, method = resolve_language(text)
     record = NormalizedRecord(
         document_id=paper_id,
+        language=language,
         platform="arxiv",
         author=authors[0] if authors else "",
         author_fullname=", ".join(authors),
@@ -74,6 +78,7 @@ def map_paper(paper: Any) -> NormalizedRecord | None:
                 "primary_category": snapshot["primary_category"],
                 "updated": snapshot["updated"],
                 "pdf_url": pdf_url,
+                "language_method": method,
             },
         ),
     )

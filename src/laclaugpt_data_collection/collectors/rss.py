@@ -37,7 +37,7 @@ class RSSCollector:
             entries = list(parsed.entries[: self.max_items_per_feed])
             result.raw_items_seen += len(entries)
             for entry in entries:
-                record = _entry_to_record(feed_url, entry)
+                record = _entry_to_record(feed_url, entry, feed_language=_feed_language(parsed))
                 if record:
                     result.records.append(record)
         if not result.records:
@@ -51,7 +51,28 @@ class RSSCollector:
         return result
 
 
-def _entry_to_record(feed_url: str, entry: Any) -> NormalizedRecord | None:
+def _feed_language(parsed: Any) -> str:
+    """The feed-level declared language, or "" when the parser does not report one.
+
+    `feedparser` returns a dict-like `parsed.feed`, but a parser stub (and an Atom
+    document with no feed-level language) may carry no `feed` at all, or carry it as
+    a plain object rather than a mapping. Reading the attribute unconditionally made
+    every such parse raise AttributeError, which the plugin layer surfaced as a
+    whole-source collection failure -- so a missing *optional* language field took
+    down feeds that had parsed perfectly well.
+
+    A declared language is a hint; its absence is not an error. The per-entry
+    language is resolved later by `resolve_language`, which falls back to content
+    detection, so nothing is lost by returning "" here.
+    """
+    feed = getattr(parsed, "feed", None)
+    if isinstance(feed, dict):
+        return str(feed.get("language", "") or "")
+    language = getattr(feed, "language", "")
+    return str(language or "")
+
+
+def _entry_to_record(feed_url: str, entry: Any, *, feed_language: str = "") -> NormalizedRecord | None:
     link = str(getattr(entry, "link", "") or "")
     title = str(getattr(entry, "title", "") or "")
     summary = str(getattr(entry, "summary", "") or "")
@@ -64,10 +85,17 @@ def _entry_to_record(feed_url: str, entry: Any) -> NormalizedRecord | None:
         return None
     author = str(getattr(entry, "author", "") or "")
     raw_entry = dict(entry) if hasattr(entry, "items") else {"value": str(entry)}
+    from ..language import resolve_language
+
+    language, language_method = resolve_language(
+        "\n\n".join(part for part in (title, summary) if part),
+        declared=str(getattr(entry, "language", "") or feed_language),
+    )
     return NormalizedRecord(
         document_id=document_id,
         platform="rss",
         author=author,
+        language=language,
         timestamp=published,
         source_url=link,
         text="\n\n".join(part for part in (title, summary) if part),
@@ -78,6 +106,6 @@ def _entry_to_record(feed_url: str, entry: Any) -> NormalizedRecord | None:
             visited_url=feed_url,
             api_url=link,
             transformations=["rss-atom-parse", "map-entry"],
-            metadata={"source_publication_time_present": bool(published)},
+            metadata={"source_publication_time_present": bool(published), "language_method": language_method},
         ),
     )

@@ -95,7 +95,7 @@ def normalise(
         unix_timestamp=int(mapped.get("unix_timestamp") or 0),
         source_url=source_url,
         text=str(mapped.get("body") or ""),
-        language=str(mapped.get("language_guess") or "") if platform == "x" else "",
+        language=str(mapped.get("language") or mapped.get("language_guess") or ""),
         parent_document_id=parent,
         hashtags=_split_list(mapped.get("hashtags")),
         mentions=_split_list(mapped.get("mentions")),
