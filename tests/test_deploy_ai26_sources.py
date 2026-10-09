@@ -1,8 +1,7 @@
 """Synthetic tests for the explicit AI26 manifest deployment gate."""
-from pathlib import Path
 import subprocess
 import sys
-
+from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "deploy_ai26_sources.py"
 
