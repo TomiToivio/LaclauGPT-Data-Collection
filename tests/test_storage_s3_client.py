@@ -1,18 +1,26 @@
 """CSC Allas / S3-compatible object store client configuration.
 
 CSC Allas is the documented distributed object-storage target. It is *not*
-fully S3-compatible in two ways that silently break uploads with boto3
+fully S3-compatible in three ways that silently break uploads with boto3
 defaults:
 
 1. Signature version 4 uploads are rejected with HTTP 411
    (``MissingContentLength``) even when ``Content-Length`` is sent.
 2. Path-style addressing uploads are rejected with a misleading
-   ``QuotaExceeded`` (HTTP 403) even when the bucket has free space. Reads
-   (list/head/get) succeed with either addressing style, so the defect only
-   shows up the first time an object is written.
+   ``QuotaExceeded`` (HTTP 403) even when the bucket has free space.
+3. The streaming checksums modern botocore attaches by default
+   (``request_checksum_calculation`` / ``x-amz-checksum-*``) are rejected
+   outright: PUTs return a bare HTTP 400 ``InvalidArgument`` with no detail.
+
+Reads (list/head/get) succeed with the defaults in all three cases, so a
+misconfigured client looks healthy until the first object is written. That is
+why (3) went unnoticed here: ``tools/upload_media_to_allas.py`` pinned
+``request_checksum_calculation="when_required"`` for its own client, but the
+shared ``S3ObjectStore`` used by the collection/media pipeline did not, so a
+video download could never be uploaded to Allas even with valid credentials.
 
 These tests pin the constructed client to the working configuration so a later
-refactor cannot silently reintroduce v4 + forced-path addressing.
+refactor cannot silently reintroduce any of the three.
 
 They are deliberately hermetic: ``boto3`` and ``botocore.config`` are stubbed,
 so the suite still runs under CI's ``pip install -e '.[dev]'`` (which does not
@@ -38,6 +46,7 @@ class _RecordingConfig:
         self.kwargs = kwargs
         self.signature_version = kwargs.get("signature_version")
         self.s3 = kwargs.get("s3") or {}
+        self.request_checksum_calculation = kwargs.get("request_checksum_calculation")
 
 
 class _RecordingBoto3:
@@ -87,6 +96,34 @@ def test_allas_defaults_do_not_force_path_addressing(fake_boto3: _RecordingBoto3
 
     assert store.addressing_style == "auto"
     assert fake_boto3.last_config.s3["addressing_style"] == "auto"
+
+
+def test_allas_put_client_disables_streaming_checksums(fake_boto3: _RecordingBoto3) -> None:
+    """Allas rejects botocore's default streaming checksums with a bare 400.
+
+    Without this, every PUT fails while list/head/get succeed, so the store
+    looks healthy and the first upload is the first symptom (issue #233: the
+    Allas media path could never have worked).
+    """
+    S3ObjectStore(bucket="project_2009497", endpoint_url="https://a3s.fi")
+
+    assert fake_boto3.last_config.request_checksum_calculation == "when_required"
+
+
+def test_factory_object_store_disables_streaming_checksums(
+    fake_boto3: _RecordingBoto3,
+) -> None:
+    """The factory path (used by the media worker) must pin it too."""
+    settings = Settings(
+        _env_file=None,
+        object_backend="s3",
+        s3_bucket="project_2009497",
+        s3_endpoint_url="https://a3s.fi",
+    )
+
+    build_object_store(settings)
+
+    assert fake_boto3.last_config.request_checksum_calculation == "when_required"
 
 
 def test_explicit_signature_and_addressing_are_forwarded(fake_boto3: _RecordingBoto3) -> None:
