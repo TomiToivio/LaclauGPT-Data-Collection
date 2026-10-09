@@ -207,7 +207,11 @@ def collect_rss_records(
     warnings: list[str] = []
     for feed in feeds:
         feed_url = str(feed["feed_url"])
-        result = RSSCollector([feed_url], max_items_per_feed=per_feed_limit).collect()
+        result = RSSCollector(
+            [feed_url],
+            max_items_per_feed=per_feed_limit,
+            source_name=str(feed.get("name") or ""),
+        ).collect()
         warnings.extend(result.warnings)
         for record in result.records:
             records.append(
