@@ -48,6 +48,7 @@ class WebFetchOutcome:
     url: str
     record: CanonicalRecord | None
     error: str = ""
+    status_code: int | None = None
 
 
 def external_urls_for_record(record: CanonicalRecord) -> list[str]:
@@ -159,6 +160,8 @@ def fetch_web_child(
             body = response.content[: max_bytes + 1]
             if len(body) > max_bytes:
                 return WebFetchOutcome(current, None, "response_too_large")
+    except httpx.HTTPStatusError as exc:
+        return WebFetchOutcome(current, None, "http_error", exc.response.status_code)
     except Exception as exc:  # noqa: BLE001
         return WebFetchOutcome(current, None, str(exc)[:300])
 

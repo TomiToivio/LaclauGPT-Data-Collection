@@ -51,6 +51,15 @@ _OPTIONAL_DEPENDENCY_CONTRACT: dict[str, tuple[str, tuple[str, ...]]] = {
 }
 
 
+class SourceJobError(RuntimeError):
+    """Machine-readable failure of a configured source, not an empty result."""
+
+    def __init__(self, reason: str, *, status_code: int | None = None) -> None:
+        super().__init__(reason)
+        self.reason = reason
+        self.status_code = status_code
+
+
 def preflight_optional_dependencies(jobs: list[dict[str, Any]]) -> list[str]:
     """Return loud setup errors for configured job kinds missing optional packages."""
     configured: dict[str, list[str]] = {}
@@ -216,17 +225,17 @@ def _records_for_job(
     if kind == "bluesky_account":
         handle = str(row.get("handle") or "").strip()
         if not handle:
-            return [], ["bluesky_account missing handle"]
+            raise SourceJobError("missing_handle")
         result = BlueskyCollector(actor=handle, max_results=per_source_limit).collect()
         return [_stamp(r, row, collection_id=collection_id, worker_id=worker_id) for r in result.records], list(result.warnings)
 
     if kind == "scholarly_query":
         services = {str(v).lower() for v in row.get("services") or []}
         if "arxiv" not in services:
-            return [], [f"{row.get('name','scholarly_query')}: no supported scholarly backend in this tick"]
+            raise SourceJobError("unsupported_scholarly_backend")
         query = str(row.get("query") or "").strip()
         if not query:
-            return [], ["scholarly_query missing query"]
+            raise SourceJobError("missing_query")
         # The arXiv endpoint rate-limits (HTTP 429) and occasionally 5xx's. The
         # library retries quickly and then gives up; without a bounded, backed-off
         # retry at this boundary a single transient status silently costs a tick's
@@ -241,14 +250,14 @@ def _records_for_job(
     if kind == "youtube_source":
         urls = row.get("video_urls") or ([] if not row.get("video_url") else [row["video_url"]])
         if not urls:
-            return [], [f"{row.get('name','youtube_source')}: no video_urls configured; channel discovery remains disabled"]
+            raise SourceJobError("missing_video_urls")
         result = YouTubeCollector([str(v) for v in urls], page_size=per_source_limit).collect()
         return [_stamp(r, row, collection_id=collection_id, worker_id=worker_id) for r in result.records], list(result.warnings)
 
     if kind == "web_source":
         url = str(row.get("homepage") or row.get("url") or "").strip()
         if not url:
-            return [], ["web_source missing homepage/url"]
+            raise SourceJobError("missing_web_url")
         fallback_feed = _WEB_SOURCE_FEED_FALLBACKS.get(url.rstrip("/"))
         if fallback_feed:
             result = RSSCollector(
@@ -273,16 +282,16 @@ def _records_for_job(
             arena=str(row.get("arena") or ""),
         )
         if outcome.record is None:
-            return [], [f"{row.get('name','web_source')}: {outcome.error}"]
+            raise SourceJobError("web_fetch_failed", status_code=outcome.status_code)
         return [_stamp(outcome.record, row, collection_id=collection_id, worker_id=worker_id)], []
 
     if kind == "mastodon_account":
         # The checked-in manifest stores actor acct values, while the current
         # generic Mastodon collector is timeline/hashtag based. Do not silently
         # substitute a public timeline for the named actor.
-        return [], [f"{row.get('name','mastodon_account')}: actor collection not supported by current adapter"]
+        raise SourceJobError("unsupported_mastodon_actor")
 
-    return [], [f"unsupported non-browser source kind: {kind}"]
+    raise SourceJobError("unsupported_source_kind")
 
 
 def run_phase1_laskin(
@@ -323,6 +332,7 @@ def run_phase1_laskin(
             "errors": setup_errors,
             "setup_errors": setup_errors,
             "notification_errors": [],
+            "source_outcomes": [],
         }
 
     rss = run_phase1_rss(
@@ -347,10 +357,22 @@ def run_phase1_laskin(
     skipped_before_floor = 0
     warnings = list(rss.get("warnings") or [])
     errors = list(rss.get("errors") or [])
+    source_outcomes: list[dict[str, Any]] = []
 
     for row in jobs:
+        outcome: dict[str, Any] = {
+            "kind": str(row.get("kind") or ""),
+            "name": str(row.get("name") or "unnamed"),
+            "priority": str(row.get("priority") or "P2"),
+            "status": "deferred",
+            "reason": "tick_record_limit",
+            "records_collected": 0,
+            "records_synced": 0,
+            "skipped_before_publication_floor": 0,
+        }
+        source_outcomes.append(outcome)
         if synced >= remaining:
-            break
+            continue
         try:
             records, source_warnings = _records_for_job(
                 row,
@@ -361,10 +383,16 @@ def run_phase1_laskin(
             )
             warnings.extend(source_warnings)
             collected += len(records)
+            outcome.update(
+                status="warning" if source_warnings else "ok",
+                reason="collector_warnings" if source_warnings else "",
+                records_collected=len(records),
+            )
             for record in records:
                 published = parse_source_time(record.source.created_at)
                 if policy.publication_date_floor and published and published < policy.publication_date_floor:
                     skipped_before_floor += 1
+                    outcome["skipped_before_publication_floor"] += 1
                     continue
                 if synced >= remaining:
                     break
@@ -381,7 +409,16 @@ def run_phase1_laskin(
                     payload["arena"] = arena
                 sink.ingest(payload)
                 synced += 1
+                outcome["records_synced"] += 1
+        except SourceJobError as exc:
+            outcome.update(
+                status="blocked" if exc.status_code in (401, 403) else "error",
+                reason=exc.reason,
+                http_status=exc.status_code,
+            )
+            errors.append(f"{row.get('kind')}:{row.get('name','unnamed')}: {exc.reason}")
         except Exception as exc:  # noqa: BLE001
+            outcome.update(status="error", reason="collection_or_ingest_failed")
             errors.append(f"{row.get('kind')}:{row.get('name','unnamed')}: {str(exc)[:180]}")
 
     return {
@@ -398,6 +435,7 @@ def run_phase1_laskin(
         "skipped_before_publication_floor": int(rss.get("skipped_before_publication_floor", 0)) + skipped_before_floor,
         "warnings": warnings,
         "errors": errors,
+        "source_outcomes": source_outcomes,
         "notification_errors": list(rss.get("notification_errors") or []) + list(sink.notification_errors),
     }
 
