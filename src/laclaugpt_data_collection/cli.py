@@ -72,6 +72,50 @@ def _manifest_drift(args: argparse.Namespace) -> int:
     return 0
 
 
+def _corpus_audit(args: argparse.Namespace) -> int:
+    """Read-only coverage/concentration report over a record source."""
+    import json as _json
+    from pathlib import Path as _Path
+
+    from .corpus_audit import audit_records, audit_summary
+
+    records: list[dict] = []
+    if args.records:
+        path = _Path(args.records)
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line:
+                records.append(_json.loads(line))
+    elif args.mongodb_uri:
+        # Import inside the branch so the base install needs no pymongo.
+        from pymongo import MongoClient
+
+        client = MongoClient(args.mongodb_uri, serverSelectionTimeoutMS=5000)
+        collection = client[args.mongodb_database][args.mongodb_collection]
+        query = {"project_id": args.project} if args.project else {}
+        records = list(collection.find(query, {"_id": 0}).limit(args.limit))
+    else:
+        print(json.dumps({"status": "error", "error": "pass --records or --mongodb-uri"}))
+        return 2
+
+    configured: list[str] = []
+    if args.configured_sources:
+        configured = [
+            line.strip()
+            for line in _Path(args.configured_sources).read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+    report = audit_records(
+        records,
+        top_n=args.top_n,
+        publication_floor=args.publication_floor or "",
+        configured_sources=configured,
+    )
+    print(json.dumps(report, indent=2, sort_keys=True))
+    print(audit_summary(report), file=sys.stderr)
+    return 0
+
+
 def _distributed_check(args: argparse.Namespace) -> int:
     from .distributed_capture import DistributedCaptureSink
 
@@ -137,6 +181,24 @@ def _build_parser() -> argparse.ArgumentParser:
         help="exit 1 when the manifests differ (for a CI or cron gate)",
     )
     drift.set_defaults(func=_manifest_drift)
+
+    audit = sub.add_parser(
+        "corpus-audit",
+        help="read-only coverage and concentration report for the store",
+    )
+    audit.add_argument("--records", help="JSONL of canonical records (offline)")
+    audit.add_argument("--mongodb-uri", help="Mongo URI to read from (read-only)")
+    audit.add_argument("--mongodb-database", default="spectacleScraper")
+    audit.add_argument("--mongodb-collection", default="ai26__records")
+    audit.add_argument("--project", default="", help="project_id filter")
+    audit.add_argument("--limit", type=int, default=5000)
+    audit.add_argument("--top-n", type=int, default=3, help="dominance window")
+    audit.add_argument("--publication-floor", default="", help="ISO date, e.g. 2026-09-01")
+    audit.add_argument(
+        "--configured-sources",
+        help="file of source names/handles the manifest declares (one per line)",
+    )
+    audit.set_defaults(func=_corpus_audit)
 
     plugins = sub.add_parser("plugins", help="inspect the versioned collection-plugin registry")
     plugin_sub = plugins.add_subparsers(dest="plugins_command", required=True)
