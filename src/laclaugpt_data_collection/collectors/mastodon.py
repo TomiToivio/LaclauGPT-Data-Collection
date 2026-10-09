@@ -8,6 +8,7 @@ import re
 from html import unescape
 from typing import Any
 from urllib.error import URLError
+from urllib.parse import urlsplit
 
 from ..models import CollectionProvenance, MediaReference, NormalizedRecord
 from .base import CollectionResult
@@ -91,6 +92,7 @@ class MastodonCollector:
         instance_url: str,
         *,
         hashtag: str | None = None,
+        acct: str | None = None,
         limit: int = 20,
         access_token: str | None = None,
         cursor: str | None = None,
@@ -98,6 +100,9 @@ class MastodonCollector:
     ) -> None:
         self.instance_url = instance_url.rstrip("/")
         self.hashtag = hashtag.lstrip("#") if hashtag else None
+        self.acct = acct.lstrip("@") if acct else None
+        if self.acct and self.hashtag:
+            raise ValueError("Choose an account or a hashtag, not both")
         self.limit = limit
         self.access_token = access_token
         self.cursor = cursor
@@ -139,11 +144,22 @@ class MastodonCollector:
         if self.cursor:
             kwargs["max_id"] = self.cursor
         try:
-            rows = (
-                client.timeline_hashtag(self.hashtag, **kwargs)
-                if self.hashtag
-                else client.timeline_public(**kwargs)
-            )
+            if self.acct:
+                account = client.account_lookup(self.acct)
+                resolved = str(account.get("acct") or "").lstrip("@")
+                host = urlsplit(self.instance_url).hostname or ""
+                expected = self.acct if "@" in self.acct else f"{self.acct}@{host}"
+                actual = resolved if "@" in resolved else f"{resolved}@{host}"
+                if actual.casefold() != expected.casefold() or not account.get("id"):
+                    raise ValueError("Mastodon account lookup did not match the configured acct")
+                result.requests_seen += 1
+                rows = client.account_statuses(account["id"], **kwargs)
+            else:
+                rows = (
+                    client.timeline_hashtag(self.hashtag, **kwargs)
+                    if self.hashtag
+                    else client.timeline_public(**kwargs)
+                )
         except Exception as exc:  # source library exposes several HTTP exception classes
             retryable, retry_after, status_code = self._failure_state(exc)
             raise MastodonCollectionError(
@@ -157,6 +173,9 @@ class MastodonCollector:
         for row in rows:
             record = map_status(dict(row), instance_url=self.instance_url)
             if record:
+                if self.acct:
+                    record.source.raw_metadata["configured_acct"] = self.acct
+                    record.provenance[-1].metadata["configured_acct"] = self.acct
                 result.records.append(record)
         if rows:
             last = rows[-1]

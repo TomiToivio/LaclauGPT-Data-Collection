@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import re
 import time
 import tomllib
 from collections.abc import Callable
@@ -19,6 +20,7 @@ import yaml
 
 from .collectors.arxiv import ArxivCollector
 from .collectors.bluesky import BlueskyCollector
+from .collectors.mastodon import MastodonCollectionError, MastodonCollector
 from .collectors.rss import RSSCollector
 from .collectors.youtube import YouTubeCollector
 from .config import Settings
@@ -286,10 +288,21 @@ def _records_for_job(
         return [_stamp(outcome.record, row, collection_id=collection_id, worker_id=worker_id)], []
 
     if kind == "mastodon_account":
-        # The checked-in manifest stores actor acct values, while the current
-        # generic Mastodon collector is timeline/hashtag based. Do not silently
-        # substitute a public timeline for the named actor.
-        raise SourceJobError("unsupported_mastodon_actor")
+        acct = str(row.get("acct") or "").strip().removeprefix("@")
+        if not re.fullmatch(r"[A-Za-z0-9_.-]+@[A-Za-z0-9.-]+(?::[0-9]+)?", acct):
+            raise SourceJobError("invalid_mastodon_acct")
+        _, host = acct.split("@", 1)
+        result = _call_with_retry(
+            lambda: MastodonCollector(
+                f"https://{host}", acct=acct, limit=min(per_source_limit, 40)
+            ).collect(),
+            policy=retry_policy or RetryPolicy(),
+            is_retryable=lambda exc: isinstance(exc, MastodonCollectionError) and exc.retryable,
+        )
+        return [
+            _stamp(r, row, collection_id=collection_id, worker_id=worker_id)
+            for r in result.records
+        ], list(result.warnings)
 
     raise SourceJobError("unsupported_source_kind")
 
