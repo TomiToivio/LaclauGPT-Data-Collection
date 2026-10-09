@@ -22,6 +22,26 @@ MODULE_VERSIONS = {
 }
 
 
+def _record_language(
+    platform: str, mapped: dict[str, Any], metadata: dict[str, Any] | None
+) -> str:
+    """Resolve a record's language from declared metadata, then content (#238).
+
+    Previously this returned the collector's ``language_guess`` for ``x`` and an
+    **empty string for every other platform**, so RSS, arXiv and web records were
+    guaranteed unlabelled. Explicit metadata (a feed's ``<language>``, an API's
+    ``lang``, a collector's ``language``) still wins; a content-based fallback now
+    covers the platforms that supply none.
+    """
+    from .language import resolve_language
+
+    body = str(mapped.get("body") or "")
+    # The collector may already have attached a language to the mapped item or to
+    # the capture metadata; both are declarations, not guesses.
+    tag, _source = resolve_language(body, mapped, metadata or {})
+    return tag
+
+
 def normalise(
     platform: str,
     mapped: dict[str, Any],
@@ -95,7 +115,7 @@ def normalise(
         unix_timestamp=int(mapped.get("unix_timestamp") or 0),
         source_url=source_url,
         text=str(mapped.get("body") or ""),
-        language=str(mapped.get("language_guess") or "") if platform == "x" else "",
+        language=_record_language(platform, mapped, metadata),
         parent_document_id=parent,
         hashtags=_split_list(mapped.get("hashtags")),
         mentions=_split_list(mapped.get("mentions")),

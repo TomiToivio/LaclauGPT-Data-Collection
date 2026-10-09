@@ -52,6 +52,11 @@ def map_paper(paper: Any) -> NormalizedRecord | None:
         else []
     )
     text = "\n\n".join(part for part in [snapshot["title"], snapshot["summary"]] if part)
+    # Issue #238: arXiv metadata declares no language, so this record used to be
+    # guaranteed unlabelled. Resolve it from the abstract text.
+    from ..language import language_metadata, resolve_language
+
+    tag, tag_source = resolve_language(text, snapshot)
     record = NormalizedRecord(
         document_id=paper_id,
         platform="arxiv",
@@ -60,6 +65,7 @@ def map_paper(paper: Any) -> NormalizedRecord | None:
         timestamp=snapshot["published"],
         source_url=source_url,
         text=text,
+        language=tag,
         media_references=media,
         raw_payload=snapshot,
         raw_content_type="application/vnd.arxiv.metadata+json",
@@ -74,6 +80,7 @@ def map_paper(paper: Any) -> NormalizedRecord | None:
                 "primary_category": snapshot["primary_category"],
                 "updated": snapshot["updated"],
                 "pdf_url": pdf_url,
+                **language_metadata(tag, tag_source),
             },
         ),
     )

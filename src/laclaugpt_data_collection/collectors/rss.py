@@ -34,10 +34,14 @@ class RSSCollector:
             result.requests_seen += 1
             parsed = feedparser.parse(feed_url)
             result.bodies_seen += 1
+            # A feed's own <language> element is the publisher's declaration
+            # (#238); it is passed down so an entry never has to guess what the
+            # feed already states.
+            feed_language = str(getattr(parsed, "feed", {}).get("language", "") or "")
             entries = list(parsed.entries[: self.max_items_per_feed])
             result.raw_items_seen += len(entries)
             for entry in entries:
-                record = _entry_to_record(feed_url, entry)
+                record = _entry_to_record(feed_url, entry, feed_language=feed_language)
                 if record:
                     result.records.append(record)
         if not result.records:
@@ -51,7 +55,9 @@ class RSSCollector:
         return result
 
 
-def _entry_to_record(feed_url: str, entry: Any) -> NormalizedRecord | None:
+def _entry_to_record(
+    feed_url: str, entry: Any, *, feed_language: str = ""
+) -> NormalizedRecord | None:
     link = str(getattr(entry, "link", "") or "")
     title = str(getattr(entry, "title", "") or "")
     summary = str(getattr(entry, "summary", "") or "")
@@ -64,13 +70,20 @@ def _entry_to_record(feed_url: str, entry: Any) -> NormalizedRecord | None:
         return None
     author = str(getattr(entry, "author", "") or "")
     raw_entry = dict(entry) if hasattr(entry, "items") else {"value": str(entry)}
+    # Issue #238: an RSS/Atom record used to carry no language at all. Prefer
+    # the feed's declared <language>, then the entry's own, then detect from
+    # the text; the record says which of the three it was.
+    from ..language import language_metadata, resolve_language
+
+    body = "\n\n".join(part for part in (title, summary) if part)
+    tag, tag_source = resolve_language(body, {"language": feed_language}, raw_entry)
     return NormalizedRecord(
         document_id=document_id,
         platform="rss",
         author=author,
         timestamp=published,
         source_url=link,
-        text="\n\n".join(part for part in (title, summary) if part),
+        text=body,
         raw_payload=raw_entry,
         raw_content_type="application/feed+json",
         collection_provenance=CollectionProvenance(
@@ -78,6 +91,9 @@ def _entry_to_record(feed_url: str, entry: Any) -> NormalizedRecord | None:
             visited_url=feed_url,
             api_url=link,
             transformations=["rss-atom-parse", "map-entry"],
-            metadata={"source_publication_time_present": bool(published)},
+            metadata={
+                "source_publication_time_present": bool(published),
+                **language_metadata(tag, tag_source),
+            },
         ),
     )

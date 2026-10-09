@@ -76,12 +76,18 @@ def extract_document(path: str | Path) -> NormalizedRecord:
     title = str(metadata.get("title") or metadata.get("/Title") or file_path.name)
     author = str(metadata.get("author") or metadata.get("/Author") or "")
     media_type = "application/pdf" if suffix == ".pdf" else "text/plain"
+    # Issue #238: a local document carries whatever the PDF/text declares, or a
+    # detected tag; this platform previously set none.
+    from ..language import language_metadata, resolve_language
+
+    tag, tag_source = resolve_language(text, metadata)
     record = NormalizedRecord(
         document_id=checksum,
         platform="document",
         author=author,
         source_url=f"file+sha256:{checksum}",
         text=text,
+        language=tag,
         raw_ref=f"file+sha256:{checksum}",
         raw_checksum=checksum,
         raw_content_type=media_type,
@@ -93,6 +99,7 @@ def extract_document(path: str | Path) -> NormalizedRecord:
                 "title": title,
                 "sha256": checksum,
                 "raw_reference_policy": "content-addressed-local-reference; absolute paths are not persisted",
+                **language_metadata(tag, tag_source),
                 **metadata,
             },
         ),
