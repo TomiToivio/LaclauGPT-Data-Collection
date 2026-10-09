@@ -67,10 +67,10 @@ def _entry_to_record(feed_url: str, entry: Any, *, feed_language: str = "") -> N
     from ..language import resolve_language
 
     language, language_method = resolve_language(
-        "\\n\\n".join(part for part in (title, summary) if part),
+        "\n\n".join(part for part in (title, summary) if part),
         declared=str(getattr(entry, "language", "") or feed_language),
     )
-    record = NormalizedRecord(
+    return NormalizedRecord(
         document_id=document_id,
         platform="rss",
         author=author,
@@ -88,4 +88,3 @@ def _entry_to_record(feed_url: str, entry: Any, *, feed_language: str = "") -> N
             metadata={"source_publication_time_present": bool(published), "language_method": language_method},
         ),
     )
-    return record
