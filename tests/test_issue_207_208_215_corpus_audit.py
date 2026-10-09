@@ -180,12 +180,14 @@ class TestDeclaredPlatformsAndFloor:
         unchecked = audit_records([_rec(source_name="X")])
         assert unchecked["configured_sources"]["checked"] is False
         summary = audit_summary(unchecked)
-        assert "not run" in summary
+        assert "configured-source check not run" in summary
         assert "0 configured source(s) unrepresented" not in summary
 
         checked = audit_records([_rec(source_name="X")], configured_sources=["X"])
         assert checked["configured_sources"]["checked"] is True
-        assert "not run" not in audit_summary(checked)
+        # Pin the CLAUSE, not the substring "not run": since #207 the summary also
+        # carries a stage-reachability clause that can legitimately say "not run".
+        assert "configured-source check not run" not in audit_summary(checked)
 
 
 class TestNoInventedVerdict:
@@ -224,3 +226,95 @@ class TestSummaryAndCLI:
         assert args.func.__name__ == "_corpus_audit"
         assert args.top_n == 3
         assert args.publication_floor == "2026-09-01"
+
+
+class TestStageReachability:
+    """#207: a stage-deferred platform must not read as a coverage failure.
+
+    The X stratum is nominal on Laskin because the stage is browser-free by
+    design. Counting `x` as "declared but empty" alongside a real gap makes the
+    nominal stratum look like a problem to fix here, and hides the one platform
+    that genuinely lacks a collector.
+    """
+
+    def test_deferred_and_empty_platforms_are_separated_from_expected_gaps(self) -> None:
+        records = [_rec(platform="rss"), _rec(platform="x")]
+        report = audit_records(
+            records, deferred_platforms=["x", "youtube", "tiktok", "instagram"]
+        )
+        bp = report["by_platform"]
+        assert set(bp["empty_and_deferred"]) == {"youtube", "tiktok", "instagram"}
+        assert "mastodon" in bp["empty_and_expected"], "a reachable platform still counts as a gap"
+        assert bp["deferred_check_ran"] is True
+
+    def test_a_deferred_platform_that_has_records_is_flagged(self) -> None:
+        """The #207 contradiction: `x` is declared deferred AND has 55 records.
+
+        Either the declaration is stale or the records are a historical artefact;
+        the tool must name it rather than silently pick one.
+        """
+        report = audit_records([_rec(platform="x")], deferred_platforms=["x"])
+        assert report["by_platform"]["deferred_but_has_records"] == ["x"]
+
+    def test_without_the_deferral_list_the_old_behaviour_is_preserved(self) -> None:
+        """Omitting the list must not silently invent an all-clear."""
+        report = audit_records([_rec(platform="rss")])
+        bp = report["by_platform"]
+        assert bp["deferred_check_ran"] is False
+        for platform in ("youtube", "mastodon", "tiktok", "instagram"):
+            assert platform in bp["declared_but_empty"]
+
+    def test_summary_distinguishes_the_three_states(self) -> None:
+        records = [_rec(platform="rss"), _rec(platform="x")]
+        with_deferral = audit_summary(
+            audit_records(records, deferred_platforms=["x", "youtube", "tiktok", "instagram"])
+        )
+        without = audit_summary(audit_records(records))
+        assert "deferred by stage" in with_deferral
+        assert "stage-reachability check not run" in without, (
+            "an unrun check must say so, not read as zero gaps"
+        )
+
+
+class TestStudyConfigDeclaresReachability:
+    """The declaration must live in the tracked public study config (#207)."""
+
+    def test_the_ai26_study_declares_stage_reachability(self) -> None:
+        from pathlib import Path
+
+        import yaml
+
+        path = (
+            Path(__file__).resolve().parents[1] / "configs" / "studies" / "ai26.example.yaml"
+        )
+        study = yaml.safe_load(path.read_text(encoding="utf-8"))
+        stages = study.get("stage_reachability")
+        assert stages, "the study config must declare per-stage reachability"
+        laskin = stages.get("laskin_non_browser")
+        assert laskin, "the browser-free server stage must declare what it can reach"
+        assert "x" in laskin["deferred"], "X is browser-only by design on Laskin"
+        assert "rss" in laskin["reachable"]
+        assert laskin.get("rationale"), "a deferral must say why"
+
+    def test_the_declaration_covers_every_declared_platform(self) -> None:
+        """An platform in neither list is an unstated assumption."""
+        from pathlib import Path
+
+        import yaml
+
+        path = (
+            Path(__file__).resolve().parents[1] / "configs" / "studies" / "ai26.example.yaml"
+        )
+        study = yaml.safe_load(path.read_text(encoding="utf-8"))
+        enabled = {
+            name for name, cfg in (study.get("platforms") or {}).items()
+            if isinstance(cfg, dict) and cfg.get("enabled")
+        }
+        declared = set()
+        for stage in (study.get("stage_reachability") or {}).values():
+            if isinstance(stage, dict):
+                declared |= set(stage.get("reachable") or [])
+                declared |= set(stage.get("deferred") or [])
+        # `scholarly` is the study-level name for the arxiv collector.
+        missing = enabled - declared - {"scholarly"}
+        assert not missing, f"platforms with no reachability statement: {sorted(missing)}"

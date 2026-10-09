@@ -105,11 +105,22 @@ def _corpus_audit(args: argparse.Namespace) -> int:
             for line in _Path(args.configured_sources).read_text(encoding="utf-8").splitlines()
             if line.strip()
         ]
+    deferred: list[str] = []
+    if args.study_config:
+        import yaml as _yaml
+
+        study = _yaml.safe_load(_Path(args.study_config).read_text(encoding="utf-8")) or {}
+        for stage in (study.get("stage_reachability") or {}).values():
+            if isinstance(stage, dict):
+                deferred.extend(
+                    str(p) for p in (stage.get("deferred") or []) if isinstance(p, str)
+                )
     report = audit_records(
         records,
         top_n=args.top_n,
         publication_floor=args.publication_floor or "",
         configured_sources=configured,
+        deferred_platforms=deferred,
     )
     print(json.dumps(report, indent=2, sort_keys=True))
     print(audit_summary(report), file=sys.stderr)
@@ -197,6 +208,11 @@ def _build_parser() -> argparse.ArgumentParser:
     audit.add_argument(
         "--configured-sources",
         help="file of source names/handles the manifest declares (one per line)",
+    )
+    audit.add_argument(
+        "--study-config",
+        help="study YAML; reads its stage_reachability block so stage-deferred "
+             "platforms are not reported as unexplained coverage gaps (#207)",
     )
     audit.set_defaults(func=_corpus_audit)
 

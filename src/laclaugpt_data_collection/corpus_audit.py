@@ -138,6 +138,7 @@ def audit_records(
     top_n: int = 3,
     publication_floor: str = "",
     configured_sources: Iterable[str] | None = None,
+    deferred_platforms: Iterable[str] | None = None,
 ) -> dict[str, Any]:
     """Summarise coverage and concentration over canonical records.
 
@@ -153,6 +154,14 @@ def audit_records(
     configured_sources:
         Source names/handles the manifest declares, for the
         "configured but unrepresented" check (#207's core finding).
+    deferred_platforms:
+        Platforms the current collection STAGE cannot reach (issue #207). A
+        declared platform that is deferred and empty is reported as `deferred`,
+        never as an unexplained coverage failure: on a browser-free stage the X
+        stratum cannot be collected, so counting it as "should have data" would
+        be a false alarm. Omitting the parameter keeps the previous behaviour and
+        is reported as `checked: False`, so an unrun distinction cannot read as
+        an all-clear.
 
     Returns a JSON-serialisable report. Every share names its denominator.
     """
@@ -196,7 +205,12 @@ def audit_records(
     # be able to fake its own all-clear. `checked` makes the state explicit.
     configured_checked = bool(configured)
 
-    declared_empty = [p for p in DECLARED_PLATFORMS if platform_counts.get(p, 0) == 0]
+    deferred = sorted({p.strip() for p in (deferred_platforms or []) if isinstance(p, str) and p.strip()})
+    declared_empty_all = [p for p in DECLARED_PLATFORMS if platform_counts.get(p, 0) == 0]
+    empty_deferred = [p for p in declared_empty_all if p in deferred]
+    # A platform that is deferred AND has records is a contradiction worth naming:
+    # the stage reachability declaration is then stale, not the data.
+    deferred_with_records = [p for p in deferred if platform_counts.get(p, 0) > 0]
 
     arena_shares = {
         arena: (arena_counts.get(arena, 0) / total if total else 0.0)
@@ -217,7 +231,15 @@ def audit_records(
         "by_platform": {
             "counts": {k: v for k, v in platform_counts.items()},
             "declared": list(DECLARED_PLATFORMS),
-            "declared_but_empty": declared_empty,
+            "declared_but_empty": declared_empty_all,
+            # Issue #207: an empty platform the current stage cannot reach is
+            # DEFERRED, not a failed collection. Reporting them together made the
+            # nominal X stratum look like a coverage problem to fix on Laskin.
+            "deferred": deferred,
+            "empty_and_deferred": empty_deferred,
+            "empty_and_expected": [p for p in declared_empty_all if p not in deferred],
+            "deferred_check_ran": bool(deferred),
+            "deferred_but_has_records": deferred_with_records,
         },
         "by_language": {
             "counts": {k: v for k, v in language_counts.items()},
@@ -270,5 +292,11 @@ def audit_summary(report: dict[str, Any]) -> str:
         f"{report['concentration']['top_n_share']:.1%} | "
         f"{report['by_language']['unlabelled']} without language | "
         f"{configured_clause} | "
-        f"{len(report['by_platform']['declared_but_empty'])} declared platform(s) empty"
+        + (
+            f"{len(report['by_platform']['empty_and_expected'])} declared platform(s) empty "
+            f"({len(report['by_platform']['empty_and_deferred'])} deferred by stage)"
+            if report["by_platform"].get("deferred_check_ran")
+            else f"{len(report['by_platform']['declared_but_empty'])} declared platform(s) empty "
+            "(stage-reachability check not run)"
+        )
     )

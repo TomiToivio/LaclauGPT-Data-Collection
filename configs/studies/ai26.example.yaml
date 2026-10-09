@@ -207,6 +207,29 @@ platforms:
   tiktok: {enabled: false, note: "optional later grassroots extension"}
   instagram: {enabled: false, note: "optional later grassroots extension"}
 
+# Stage reachability (issue #207). `platforms.<p>.enabled` says a platform is in
+# the study's DESIGN; it does not say the current collection stage can REACH it.
+# Laskin is browser-free by design (LACLAUGPT_BROWSER=none, and the runner
+# deliberately skips the browser-only source tables), so the browser platforms
+# are declared-but-deferred here, not absent. Without this block the X stratum
+# reads as collected when none of its configured handles appear: 55 records from
+# one 2026-09-16 laptop capture, blank arena, 12 below the publication floor.
+#
+# This is a DECLARATION, not a gate: it changes no collection behaviour. It makes
+# a stage's reachability explicit so a coverage report can say "nominal" rather
+# than "present", and so the deferred half is not mistaken for a failed half.
+stage_reachability:
+  # The browser-free server stage (Laskin). Everything it can collect is a
+  # network/API source; anything browser-only is deferred to the NooPunk node.
+  laskin_non_browser:
+    reachable: [rss, web, scholarly, mastodon, bluesky]
+    deferred: [x, youtube, tiktok, instagram]
+    rationale: >-
+      X, TikTok and Instagram require a browser session by design, and the
+      configured YouTube rows carry no channel URL so there is nothing to fetch.
+      Deferred to the always-on browser node (NooPunk), not dropped from the
+      study: the arenas still declare them and the handles stay configured.
+
 # Public browser targets. Inclusion is a sampling decision, NEVER an
 # ideological classification of an actor. Groups describe why material is
 # useful for collection coverage. Downstream analysis must infer positions
