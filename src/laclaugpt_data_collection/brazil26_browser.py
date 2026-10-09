@@ -581,14 +581,20 @@ def _backend_status(host: str, port: int) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
-def run_preflight(
+def _preflight_report(
     *,
     study_config: str | Path | None = None,
     data_root: str | Path | None = None,
     require_browser: bool = True,
     repo_root: Path | None = None,
     distributed: bool = False,
-) -> int:
+) -> dict[str, Any]:
+    """Build the preflight findings as a dict without printing anything.
+
+    ``run_preflight`` prints this; ``run_dry_run`` embeds it in the startup plan
+    (#233). Both share one implementation so the dry-run can never disagree with
+    the real preflight.
+    """
     root = (repo_root or _repo_root()).resolve()
     problems: list[str] = []
     warnings: list[str] = []
@@ -705,6 +711,124 @@ def run_preflight(
         "problems": problems,
         "warnings": warnings,
     }
+    return result
+
+
+def run_preflight(
+    *,
+    study_config: str | Path | None = None,
+    data_root: str | Path | None = None,
+    require_browser: bool = True,
+    repo_root: Path | None = None,
+    distributed: bool = False,
+) -> int:
+    """Print the preflight report and return 0 (ok) or 2 (problems)."""
+    result = _preflight_report(
+        study_config=study_config,
+        data_root=data_root,
+        require_browser=require_browser,
+        repo_root=repo_root,
+        distributed=distributed,
+    )
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return 0 if not result["problems"] else 2
+
+
+def run_dry_run(
+    *,
+    study_config: str | Path | None = None,
+    data_root: str | Path | None = None,
+    host: str = "127.0.0.1",
+    port: int = 8765,
+    install_cron: bool = True,
+    launch_browser: bool = True,
+    distributed: bool = False,
+    repo_root: Path | None = None,
+) -> int:
+    """Print exactly what a real start would do, without doing any of it (#233).
+
+    Resolves the study config, data root, runtime env, Firefox command, cron
+    action and source policy, then prints one JSON plan and exits. It starts no
+    backend, launches no browser and never touches the workstation crontab. The
+    findings come from the same ``_preflight_report`` the real preflight prints,
+    so this can never disagree with it. Exit code is 0 (ready) or 2 (the real
+    start would fail), which makes it usable as a pre-collection gate.
+    """
+    root = (repo_root or _repo_root()).resolve()
+    problems: list[str] = []
+    warnings: list[str] = []
+
+    if host not in _LOOPBACK:
+        problems.append("Brazil26 researcher session must bind to localhost/loopback")
+
+    env_file = Path(
+        os.environ.get("LACLAUGPT_ENV_FILE", root / "data/config/brazil26-localhost.env")
+    )
+
+    study = ""
+    config: Path | None = None
+    try:
+        config = _resolve_study_config(study_config, repo_root=root)
+        study = _ensure_brazil26_study(config)
+    except (FileNotFoundError, ValueError) as exc:
+        problems.append(str(exc))
+
+    chosen_data_root = Path(
+        data_root or os.environ.get("LACLAUGPT_DATA_ROOT", root / "data")
+    ).expanduser().resolve()
+
+    # Reuse the real preflight: environment, source policy, Firefox and (when
+    # requested) the Allas/Mongo checks live there; duplicating them here would
+    # let the plan drift from what a start actually enforces.
+    preflight = _preflight_report(
+        study_config=study_config,
+        data_root=data_root,
+        require_browser=launch_browser,
+        repo_root=root,
+        distributed=distributed,
+    )
+    for item in preflight["problems"]:
+        if item not in problems:
+            problems.append(item)
+    for item in preflight["warnings"]:
+        if item not in warnings:
+            warnings.append(item)
+
+    backend_argv = [
+        sys.executable,
+        "-m",
+        "laclaugpt_data_collection.brazil26_browser",
+        "backend",
+        "--study-config",
+        str(config) if config else "",
+        "--data-root",
+        str(chosen_data_root),
+        "--host",
+        host,
+        "--port",
+        str(port),
+    ]
+    result = {
+        "status": "ready" if not problems else "would-fail",
+        "dry_run": True,
+        "project_id": PROJECT_ID,
+        "study": study,
+        "study_config": str(config) if config else "",
+        "data_root": str(chosen_data_root),
+        "env_file": str(env_file),
+        "backend_bind": f"http://{host}:{port}",
+        "backend_argv": backend_argv,
+        "launch_browser": launch_browser,
+        "firefox_argv": preflight.get("browser_command", []),
+        "cron": {
+            "action": "install" if install_cron else "skip",
+            "installer": str(root / "scripts/install_cron_brazil26.sh"),
+        },
+        "distributed_preflight": bool(distributed),
+        "source_policy": preflight.get("source_policy", {}),
+        "problems": problems,
+        "warnings": warnings,
+    }
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0 if not problems else 2
 
@@ -813,6 +937,18 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--sync-interval", type=float, default=1.0)
     parser.add_argument("--no-cron", action="store_true", help="do not ensure the Brazil26 cron block")
     parser.add_argument("--no-browser", action="store_true", help="start backend without launching Firefox")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="print what a start would do (study, data root, Firefox, cron, source policy) "
+             "and exit without starting anything (#233)",
+    )
+    parser.add_argument(
+        "--distributed",
+        action="store_true",
+        help="run the distributed preflight (Allas/Mongo + 3-platform source policy) before "
+             "starting, or include it in --dry-run output (#233)",
+    )
 
     sub = parser.add_subparsers(dest="command")
     backend = sub.add_parser("backend", help="run localhost Firefox capture with remote mirroring")
@@ -857,6 +993,30 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if args.command is None:
+        dry_run = getattr(args, "dry_run", False)
+        distributed = getattr(args, "distributed", False)
+        if dry_run:
+            return run_dry_run(
+                study_config=args.study_config,
+                data_root=args.data_root,
+                host=args.host,
+                port=args.port,
+                install_cron=not args.no_cron,
+                launch_browser=not args.no_browser,
+                distributed=distributed,
+            )
+        if distributed:
+            # #233: a distributed start must pass the Allas/Mongo + source-policy
+            # preflight before the backend or cron is touched, so a misconfigured
+            # workstation fails before it writes anything.
+            gate = run_preflight(
+                study_config=args.study_config,
+                data_root=args.data_root,
+                require_browser=not args.no_browser,
+                distributed=True,
+            )
+            if gate != 0:
+                return gate
         try:
             return run_researcher_session(
                 study_config=args.study_config,
