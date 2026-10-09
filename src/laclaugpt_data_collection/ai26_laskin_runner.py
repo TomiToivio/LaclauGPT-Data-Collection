@@ -562,10 +562,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-jobs", type=int, default=6)
     parser.add_argument("--per-source-limit", type=int, default=5)
     parser.add_argument("--limit", type=int, default=40)
+    # Three-state deliberately: `store_true` would make an ABSENT flag pass
+    # False and thereby force the caps OFF, silently overriding a study that
+    # declares `source_budgets.enforce: true` (#239.2). Default None = follow the
+    # study config; the explicit flag forces on, --no-... forces off.
     parser.add_argument(
         "--enforce-source-budgets",
+        dest="enforce_source_budgets",
         action="store_true",
-        help="apply the study's declared per-source daily caps (#215)",
+        default=None,
+        help="force the study's declared per-source daily caps ON (#215); default follows the study config",
+    )
+    parser.add_argument(
+        "--no-enforce-source-budgets",
+        dest="enforce_source_budgets",
+        action="store_false",
+        help="force the declared caps OFF for a deliberate unbounded run",
     )
     parser.add_argument(
         "--tracked-plan",

@@ -98,6 +98,31 @@ class TestItem2DeclaredCapsBind:
         default = inspect.signature(run_phase1_laskin).parameters["enforce_source_budgets"].default
         assert default is None, "None means 'follow the study config'; False must force caps off"
 
+    def test_an_absent_flag_does_not_override_a_binding_study(self) -> None:
+        """The CLI default must be None, or a wrapper passing no flag would force
+        the caps OFF and quietly undo `source_budgets.enforce: true`.
+
+        A `store_true` flag defaults to False, which under the three-state contract
+        is not "unspecified" but "force off" -- an inversion of intent.
+        """
+        import re
+        from pathlib import Path as _Path
+
+        source = (
+            _Path(__file__).resolve().parents[1]
+            / "src"
+            / "laclaugpt_data_collection"
+            / "ai26_laskin_runner.py"
+        ).read_text(encoding="utf-8")
+        block = source.split('"--enforce-source-budgets"')[1].split("parser.add_argument")[0]
+        assert "default=None" in block, (
+            "an absent flag must mean 'follow the study config', not 'force the caps off'"
+        )
+        assert "--no-enforce-source-budgets" in source, (
+            "an explicit way to force the caps off is needed for a deliberate unbounded run"
+        )
+        assert re.search(r"enforce_source_budgets=args\.enforce_source_budgets", source)
+
     def test_an_absent_cap_is_still_never_invented(self) -> None:
         from laclaugpt_data_collection.source_budget import load_source_caps
 
