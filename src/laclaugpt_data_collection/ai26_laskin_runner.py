@@ -307,6 +307,30 @@ def _records_for_job(
     raise SourceJobError("unsupported_source_kind")
 
 
+def _declared_budgets_bind(study_config: str | Path) -> bool:
+    """Whether the study config declares its source caps as binding (#239.2).
+
+    A `source_budgets` block whose caps exist but bind nothing is the least
+    desirable state the issue names. The study declares the binding explicitly:
+
+        source_budgets:
+          enforce: true
+
+    Absent or false keeps the previous opt-in behaviour, so an existing config is
+    never silently changed into a capped run.
+    """
+    try:
+        import yaml
+
+        data = yaml.safe_load(Path(study_config).read_text(encoding="utf-8")) or {}
+    except Exception:  # noqa: BLE001 - a missing config must not enable a cap
+        return False
+    budgets = data.get("source_budgets")
+    if not isinstance(budgets, dict):
+        return False
+    return budgets.get("enforce") is True
+
+
 def run_phase1_laskin(
     settings: Settings,
     *,
@@ -320,7 +344,7 @@ def run_phase1_laskin(
     limit: int = 40,
     rotation: int | None = None,
     tracked_plan: str | Path | None = None,
-    enforce_source_budgets: bool = False,
+    enforce_source_budgets: bool | None = None,
 ) -> dict[str, Any]:
     routed = collection_id or settings.project_id
     if routed != settings.project_id:
@@ -378,6 +402,13 @@ def run_phase1_laskin(
     # Opt-in, because enabling a cap changes what the corpus contains -- a sampling
     # decision. The day's count comes from the store, since one hourly cycle is one
     # process and a memory counter would reset every tick.
+    # Issue #239.2: the study DECLARES the caps; a declaration in the audited
+    # config should bind the pipeline it governs, rather than depending on a
+    # wrapper flag nobody passes. `enforce_source_budgets` stays as an explicit
+    # override: True forces the declared caps on, False forces them off (for a
+    # deliberate unbounded run), None -- the default -- follows the study config.
+    if enforce_source_budgets is None:
+        enforce_source_budgets = _declared_budgets_bind(study_config)
     budget = None
     if enforce_source_budgets:
         from .source_budget import SourceDailyBudget, load_source_caps, utc_day

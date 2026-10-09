@@ -159,6 +159,13 @@ collector_defaults:
 # Conservative public-demo budgets. RSS/web/scholarly material remains the
 # backbone; browser collection is a bounded discourse sample, not a firehose.
 source_budgets:
+  # Bind the declared caps (issue #239.2). Without this the numbers below were
+  # declaration only: #215 built the enforcement mechanism, but it was opt-in via
+  # a CLI flag no production wrapper passed, so every cycle logged
+  # `source_budget: null` and concentration stayed flat (top-3 = 47.9%).
+  # `enforce: true` makes the audited config bind the pipeline it governs.
+  # Set to false only for a deliberate unbounded run.
+  enforce: true
   rss_web:
     target_endpoints: 40
     daily_relevant_items_soft_cap: 240
