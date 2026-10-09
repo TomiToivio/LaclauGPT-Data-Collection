@@ -60,6 +60,24 @@ else
   RUN=(python3 -m laclaugpt_data_collection.ai26_laskin_runner)
 fi
 
+# Always report a terminal marker, including signals and abnormal shell exits.
+# The trap is registered immediately before the runner and runs exactly once.
+cycle_finished=0
+emit_end_marker() {
+  local status=$?
+  if [[ "$cycle_finished" -eq 0 ]]; then
+    cycle_finished=1
+    trap - EXIT
+    if [[ "$status" -eq 0 ]]; then
+      echo "[$(date -Is)] AI26 Laskin collection end runner_status=0"
+    else
+      echo "[$(date -Is)] AI26 Laskin collection end runner_status=$status (tick partial/interrupted; see status/errors above)"
+    fi
+  fi
+}
+trap emit_end_marker EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 echo "[$(date -Is)] AI26 Laskin collection start"
 # The runner returns 1 whenever any source recorded an error (status: partial),
 # so a single transient upstream failure (e.g. arXiv HTTP 429) would abort this
@@ -77,12 +95,8 @@ set +e
   --max-jobs "${LACLAUGPT_AI26_MAX_NON_BROWSER_JOBS:-6}" \
   --per-source-limit "${LACLAUGPT_AI26_PER_SOURCE_LIMIT:-5}" \
   --limit "${LACLAUGPT_AI26_BATCH_LIMIT:-40}" \
-  --tracked-plan "$TRACKED_PLAN"
+  --tracked-plan "$TRACKED_PLAN" \\
+  --enforce-source-budgets
 runner_status=$?
 set -e
-if [[ "$runner_status" -ne 0 ]]; then
-  echo "[$(date -Is)] AI26 Laskin collection end runner_status=${runner_status} (tick partial; see status/errors above)"
-else
-  echo "[$(date -Is)] AI26 Laskin collection end"
-fi
 exit "$runner_status"
