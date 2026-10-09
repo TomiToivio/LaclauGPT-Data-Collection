@@ -64,12 +64,16 @@ fi
 # The trap is registered immediately before the runner and runs exactly once.
 cycle_finished=0
 emit_end_marker() {
+  # $? is captured as the first statement, before any other command can clobber it.
   local status=$?
   if [[ "$cycle_finished" -eq 0 ]]; then
     cycle_finished=1
     trap - EXIT
     if [[ "$status" -eq 0 ]]; then
-      echo "[$(date -Is)] AI26 Laskin collection end runner_status=0"
+      # A CLEAN tick keeps the plain end marker. The marker distinguishes "this
+      # stage stopped" from "this stage finished", so appending runner_status=0 to
+      # a successful tick breaks every reader that parses an unqualified end line.
+      echo "[$(date -Is)] AI26 Laskin collection end"
     else
       echo "[$(date -Is)] AI26 Laskin collection end runner_status=$status (tick partial/interrupted; see status/errors above)"
     fi
@@ -95,7 +99,7 @@ set +e
   --max-jobs "${LACLAUGPT_AI26_MAX_NON_BROWSER_JOBS:-6}" \
   --per-source-limit "${LACLAUGPT_AI26_PER_SOURCE_LIMIT:-5}" \
   --limit "${LACLAUGPT_AI26_BATCH_LIMIT:-40}" \
-  --tracked-plan "$TRACKED_PLAN" \\
+  --tracked-plan "$TRACKED_PLAN" \
   --enforce-source-budgets
 runner_status=$?
 set -e
