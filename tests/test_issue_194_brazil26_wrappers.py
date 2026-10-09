@@ -118,4 +118,6 @@ def test_cron_pins_paths_for_every_worker_and_preserves_other_jobs(tmp_path: Pat
         assert f"LACLAUGPT_ENV_FILE={env['LACLAUGPT_ENV_FILE']}" in tokens
         assert "LACLAUGPT_STUDY_CONFIG=data/config/study.yaml" in tokens
         assert "LACLAUGPT_DATA_ROOT=data/selected" in tokens
-    assert any(job.startswith("*/15 * * * *") for job in jobs)
+    # Issue #233 supersedes the 15-minute media cadence.
+    assert any(job.startswith("*/30 * * * *") for job in jobs)
+    assert not any(job.startswith("*/15 * * * *") for job in jobs)

@@ -87,11 +87,21 @@ class MediaDownloader:
         backend: MediaBackend | None = None,
         workers: int = 4,
         fetcher: Callable[[str], tuple[bytes, str]] | None = None,
+        allowed_platforms: frozenset[str] | None = None,
     ) -> None:
         self.store = store
         self.backend = backend or FilesystemBackend(store.media_dir, store.root)
         self.workers = max(1, workers)
         self._fetcher = fetcher
+        # Issue #233: when set, only media whose record platform is in this set
+        # is enqueued. The Brazil26 deployment passes {"x","instagram","tiktok"}
+        # so a queued job for a disabled family is skipped at the queue, not
+        # downloaded and discarded later.
+        self.allowed_platforms = (
+            frozenset(p.strip().lower() for p in allowed_platforms)
+            if allowed_platforms is not None
+            else None
+        )
 
     @staticmethod
     def _record_fields(record: dict) -> tuple[str, str, str, list[dict]]:
@@ -128,6 +138,8 @@ class MediaDownloader:
         queued: set[str] = set()
         for record in records:
             collection_id, platform, source_id, refs = self._record_fields(record)
+            if self.allowed_platforms is not None and platform.strip().lower() not in self.allowed_platforms:
+                continue
             source_hash = hashlib.sha256(source_id.encode()).hexdigest()[:16]
             for position, ref in enumerate(refs):
                 url = str(ref.get("url") or "")

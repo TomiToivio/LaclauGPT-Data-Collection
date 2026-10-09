@@ -59,9 +59,12 @@ def test_brazil26_public_codebook_and_manifest_are_loadable() -> None:
 
     parsed = tomllib.loads(manifest.read_text(encoding="utf-8"))
     assert parsed["feed"]
+    # Issue #233: Brazil26 collects X/Instagram/TikTok only, so the institutional
+    # RSS rows stay documented but disabled -- load_feed_manifest returns none.
+    assert all(row.get("enabled") is False for row in parsed["feed"])
+    assert parsed["enabled_platforms"] == ["x", "instagram", "tiktok"]
     feeds = load_feed_manifest(manifest)
-    assert feeds
-    assert all(feed.get("arena") == "institutional" for feed in feeds)
+    assert feeds == []
 
 
 def test_brazil26_handoff_identity_is_isolated_from_ai26() -> None:

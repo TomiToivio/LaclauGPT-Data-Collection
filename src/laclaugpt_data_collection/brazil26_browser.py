@@ -27,6 +27,13 @@ from .config import Settings
 from .distributed_capture import DistributedCaptureSink
 from .distributed_media_runner import MediaRunLockedError, run_distributed_media
 from .models import CanonicalRecord
+from .source_allowlist import (
+    BRAZIL26_PLATFORMS,
+    SourceAllowlistError,
+    assert_brazil26_only,
+    enabled_platforms,
+    load_manifest,
+)
 from .store import utc_stamp
 from .study import load_config
 
@@ -580,6 +587,7 @@ def run_preflight(
     data_root: str | Path | None = None,
     require_browser: bool = True,
     repo_root: Path | None = None,
+    distributed: bool = False,
 ) -> int:
     root = (repo_root or _repo_root()).resolve()
     problems: list[str] = []
@@ -637,6 +645,51 @@ def run_preflight(
         or runtime.get("LACLAUGPT_CACHE_BACKEND") == "redis"
         or runtime.get("LACLAUGPT_DISTRIBUTED_CONFIG_BACKEND") == "redis"
     )
+
+    # Issue #233: when the deployment is the distributed one, assert the source
+    # policy and the Allas/Mongo configuration here rather than discovering it on
+    # the first cron tick. The policy check runs in both modes -- a localhost
+    # run must also collect only X/Instagram/TikTok.
+    source_policy: dict[str, Any] = {}
+    try:
+        manifest_path = Path(
+            runtime.get("LACLAUGPT_SOURCE_MANIFEST")
+            or chosen_data_root / "config" / "brazil26.sources.toml"
+        )
+        if manifest_path.is_file():
+            manifest = load_manifest(manifest_path)
+            assert_brazil26_only(manifest)
+            platforms = sorted(enabled_platforms(manifest))
+            source_policy = {"manifest": str(manifest_path), "enabled_platforms": platforms}
+            missing = sorted(set(BRAZIL26_PLATFORMS) - set(platforms))
+            if missing:
+                warnings.append(
+                    "source manifest does not enable: " + ", ".join(missing)
+                )
+        else:
+            source_policy = {"manifest": str(manifest_path), "enabled_platforms": []}
+            warnings.append(
+                f"source manifest not found: {manifest_path}; source policy is unverified"
+            )
+    except SourceAllowlistError as exc:
+        problems.append(str(exc))
+    except Exception as exc:  # noqa: BLE001 - preflight must never crash
+        warnings.append(f"source policy could not be read: {exc}")
+
+    if distributed:
+        if runtime.get("LACLAUGPT_OBJECT_BACKEND") != "s3":
+            problems.append(
+                "distributed preflight requires LACLAUGPT_OBJECT_BACKEND=s3 (CSC Allas)"
+            )
+        if not runtime.get("LACLAUGPT_S3_BUCKET"):
+            problems.append("distributed preflight requires LACLAUGPT_S3_BUCKET")
+        if runtime.get("LACLAUGPT_RECORD_BACKEND") != "mongodb":
+            problems.append(
+                "distributed preflight requires LACLAUGPT_RECORD_BACKEND=mongodb"
+            )
+        if not runtime.get("LACLAUGPT_MONGODB_URI"):
+            problems.append("distributed preflight requires LACLAUGPT_MONGODB_URI")
+
     result = {
         "status": "ok" if not problems else "invalid",
         "project_id": PROJECT_ID,
@@ -647,6 +700,8 @@ def run_preflight(
         "extension_manifest": str(extension),
         "browser_command": browser_command,
         "distributed_requested": bool(distributed_keys),
+        "distributed_preflight": bool(distributed),
+        "source_policy": source_policy,
         "problems": problems,
         "warnings": warnings,
     }
@@ -771,6 +826,11 @@ def _parser() -> argparse.ArgumentParser:
     preflight.add_argument("--study-config", default=None)
     preflight.add_argument("--data-root", default=None)
     preflight.add_argument("--no-browser", action="store_true")
+    preflight.add_argument(
+        "--distributed",
+        action="store_true",
+        help="also assert the 3-platform source policy and Allas/Mongo configuration (#233)",
+    )
 
     status = sub.add_parser("status", help="show the localhost Brazil26 session and data status")
     status.add_argument("--data-root", default="./data")
@@ -815,6 +875,7 @@ def main(argv: list[str] | None = None) -> int:
             study_config=args.study_config,
             data_root=args.data_root,
             require_browser=not args.no_browser,
+            distributed=getattr(args, "distributed", False),
         )
     if args.command == "status":
         return run_status(data_root=args.data_root, host=args.host, port=args.port)

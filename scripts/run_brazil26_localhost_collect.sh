@@ -52,17 +52,33 @@ flock -n 9 || { echo "Brazil26 collection already running; exiting cleanly" >&2;
 
 cd "$ROOT"
 
-# One scheduler, two canonical passes. RSS handles directly configured feeds.
-# The plugin pass consumes only directly executable rows. It never expands a
-# YouTube channel homepage into guessed video targets.
-laclaugpt-server-rss \
-  --study-config "$STUDY_CONFIG" \
-  --source-manifest "$SOURCE_MANIFEST" \
-  --collection-id brazil26 \
-  --worker-id localhost-rss \
-  --max-feeds "${LACLAUGPT_RSS_MAX_FEEDS:-3}" \
-  --per-feed-limit "${LACLAUGPT_RSS_PER_FEED_LIMIT:-6}" \
-  --limit "${LACLAUGPT_RSS_BATCH_LIMIT:-30}"
+# Issue #233: the manifest is the source policy. Refuse a manifest that enables
+# anything outside X/Instagram/TikTok before collecting a single row.
+python -m laclaugpt_data_collection.source_allowlist \
+  --manifest "$SOURCE_MANIFEST" --require-brazil26-only || {
+  echo "Brazil26 source policy violation in $SOURCE_MANIFEST" >&2
+  exit 3
+}
+
+# One scheduler, two canonical passes -- but only for families the manifest
+# permits. The RSS pass runs only when the manifest enables the `rss` plugin;
+# for the Brazil26 X/IG/TikTok-only policy it does not, so the scheduler is
+# skipped rather than run and filtered. The plugin pass consumes only directly
+# executable rows; it never expands a YouTube channel homepage into guessed
+# video targets.
+if python -m laclaugpt_data_collection.source_allowlist \
+     --manifest "$SOURCE_MANIFEST" --require-plugin rss; then
+  laclaugpt-server-rss \
+    --study-config "$STUDY_CONFIG" \
+    --source-manifest "$SOURCE_MANIFEST" \
+    --collection-id brazil26 \
+    --worker-id localhost-rss \
+    --max-feeds "${LACLAUGPT_RSS_MAX_FEEDS:-3}" \
+    --per-feed-limit "${LACLAUGPT_RSS_PER_FEED_LIMIT:-6}" \
+    --limit "${LACLAUGPT_RSS_BATCH_LIMIT:-30}"
+else
+  echo "RSS is not an enabled Brazil26 source family; skipping the RSS pass (#233)."
+fi
 
 python -m laclaugpt_data_collection.brazil26_localhost_collect \
   --source-manifest "$SOURCE_MANIFEST" \
