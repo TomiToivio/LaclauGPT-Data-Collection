@@ -58,6 +58,8 @@ else
 fi
 
 echo "[$(date -Is)] AI26 Laskin collection start"
+# Preserve exit status without suppressing the terminal marker on partial ticks.
+set +e
 "${RUN[@]}" \
   --study-config "$STUDY_CONFIG" \
   --source-manifest "$SOURCE_MANIFEST" \
@@ -67,4 +69,7 @@ echo "[$(date -Is)] AI26 Laskin collection start"
   --max-jobs "${LACLAUGPT_AI26_MAX_NON_BROWSER_JOBS:-6}" \
   --per-source-limit "${LACLAUGPT_AI26_PER_SOURCE_LIMIT:-5}" \
   --limit "${LACLAUGPT_AI26_BATCH_LIMIT:-40}"
-echo "[$(date -Is)] AI26 Laskin collection end"
+runner_status=$?
+set -e
+echo "[$(date -Is)] AI26 Laskin collection end runner_status=$runner_status"
+exit "$runner_status"
