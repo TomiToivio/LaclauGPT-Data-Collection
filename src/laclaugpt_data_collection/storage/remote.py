@@ -300,6 +300,14 @@ class S3ObjectStore:
             aws_secret_access_key=secret_access_key or None,
             config=Config(
                 signature_version=signature_version,
+                # CSC Allas (Ceph-backed S3) rejects the streaming checksums modern
+                # botocore attaches by default: every PUT fails with a bare 400
+                # InvalidArgument / MissingContentLength while list/head/get still
+                # work, so a broken client looks healthy until the first write.
+                # tools/upload_media_to_allas.py documents this and pins the same
+                # value; the shared store must too, or the media worker (#233) can
+                # never upload a video to Allas.
+                request_checksum_calculation="when_required",
                 s3={"addressing_style": addressing_style},
             ),
         )
