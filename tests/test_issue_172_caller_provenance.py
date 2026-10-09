@@ -22,6 +22,11 @@ class FakeSink:
     def ingest(self, payload):
         self.records.append(payload)
 
+    def ingest_with_status(self, payload):
+        # Test double for the #222 create/update split: every record is new.
+        self.records.append(payload)
+        return payload, True
+
 
 def test_issue_172_laskin_runner_stamps_agent_execution_provenance(monkeypatch, tmp_path: Path) -> None:
     record = NormalizedRecord(

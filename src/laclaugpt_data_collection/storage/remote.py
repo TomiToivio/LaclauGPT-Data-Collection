@@ -28,6 +28,53 @@ def _run_id(record: CanonicalRecord) -> str:
     return ""
 
 
+def _carry_forward_media_state(
+    incoming: dict[str, Any], existing: Mapping[str, Any]
+) -> None:
+    """Copy resolved media back-references from a stored document into new payload.
+
+    Issue #210: ``replace_one`` is a full-document replace, so a re-ingest that
+    carries an empty ``object_ref`` would discard a pointer the media worker had
+    already resolved. The object is still in the durable media index, but the
+    downloader treats the terminal ``completed`` status as "nothing to do", so
+    nothing would ever restore the pointer. Carrying it forward on every write
+    stops the loss recurring; ``repair_media_references`` fixes refs already lost.
+
+    Matching is on ``(media_index, url)`` so a shifted position cannot attach the
+    wrong object. A ref the incoming record has genuinely dropped stays dropped.
+    """
+    def _refs(container: Any) -> list[dict[str, Any]]:
+        if not isinstance(container, dict):
+            return []
+        refs = container.get("media_references")
+        return [r for r in refs if isinstance(r, dict)] if isinstance(refs, list) else []
+
+    incoming_refs = _refs(incoming.get("content"))
+    if not incoming_refs:
+        return
+    stored_by_key: dict[tuple[int, str], dict[str, Any]] = {}
+    for ref in _refs((existing or {}).get("content")):
+        key = (int(ref.get("media_index", -1)), str(ref.get("url") or ""))
+        if str(ref.get("object_ref") or ""):
+            stored_by_key[key] = ref
+    for position, ref in enumerate(incoming_refs):
+        if str(ref.get("object_ref") or ""):
+            continue
+        prior = stored_by_key.get((int(ref.get("media_index", position)), str(ref.get("url") or "")))
+        if prior is None:
+            continue
+        ref["object_ref"] = str(prior.get("object_ref") or "")
+        if prior.get("checksum"):
+            ref["checksum"] = str(prior["checksum"])
+        prior_meta = prior.get("metadata")
+        if isinstance(prior_meta, dict):
+            metadata = ref.setdefault("metadata", {})
+            for field in ("byte_size", "mime_type", "download_status"):
+                if field in prior_meta and field not in metadata:
+                    metadata[field] = prior_meta[field]
+            metadata["carried_forward_from_prior_ingest"] = True
+
+
 class MongoRecordStore:
     def __init__(
         self,
@@ -93,12 +140,38 @@ class MongoRecordStore:
             "collection_id": collection_id,
         }
 
-    def upsert(self, record: CanonicalRecord) -> None:
+    def upsert(self, record: CanonicalRecord) -> bool:
+        """Persist one record; return True when it was newly created (issue #222).
+
+        ``replace_one(..., upsert=True)`` collapses a re-sync onto the existing
+        document, so the write is idempotent but the caller cannot tell a new
+        document from a re-write. The collection cycle needs exactly that
+        distinction to report corpus growth rather than sync operations.
+
+        It also replaces the whole document, which is how issue #210 lost media
+        back-references: a re-ingest of a record whose object was already
+        downloaded came back with ``object_ref == ""`` and the durable media
+        index then skipped the repair as "already complete". So the payload
+        carries forward any ``object_ref``/``checksum`` the stored document had
+        for the same media ref, before writing.
+
+        Resolution: read the existing document once, merge media state into the
+        payload, write, and report whether the document was newly created. The
+        ``source_url``/``project_id``/``collection_id`` triple is unique by index,
+        and this is a single-machine collector, so the read-then-write is not a
+        correctness race (a concurrent duplicate would still land one document;
+        the return value is a metric, not a concurrency guarantee).
+        """
+        existing = self._collection.find_one(self._query(record))
+        payload = self._payload(record)
+        if existing:
+            _carry_forward_media_state(payload, existing)
         self._collection.replace_one(
             self._query(record),
-            self._payload(record),
+            payload,
             upsert=True,
         )
+        return existing is None
 
     def upsert_many(self, records: Iterable[CanonicalRecord]) -> None:
         try:

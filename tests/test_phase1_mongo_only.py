@@ -21,7 +21,9 @@ class FakeCollection:
         ]
         self.documents.append(payload)
 
-    def find_one(self, query: dict[str, Any], projection: dict[str, int]) -> dict[str, int] | None:
+    def find_one(
+        self, query: dict[str, Any], projection: dict[str, int] | None = None
+    ) -> dict[str, int] | None:
         del projection
         for doc in self.documents:
             if all(doc.get(key) == value for key, value in query.items()):

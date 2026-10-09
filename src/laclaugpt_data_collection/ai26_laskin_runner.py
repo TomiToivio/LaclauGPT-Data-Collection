@@ -327,6 +327,8 @@ def run_phase1_laskin(
             "non_browser_records_collected": 0,
             "non_browser_records_synced": 0,
             "records_synced": 0,
+            "records_new": 0,
+            "records_updated": 0,
             "skipped_before_publication_floor": 0,
             "warnings": [],
             "errors": setup_errors,
@@ -347,6 +349,7 @@ def run_phase1_laskin(
         rotation=rotation * max_feeds,
     )
     remaining = max(limit - int(rss.get("records_synced", 0)), 0)
+    created = int(rss.get("records_new", 0))
     sink = DistributedCaptureSink(settings)
     sink.assert_private_config(study_config)
     retry_policy = load_collector_retry_policy(study_config)
@@ -407,9 +410,11 @@ def run_phase1_laskin(
                 arena = str(record.source.raw_metadata.get("arena") or "")
                 if arena:
                     payload["arena"] = arena
-                sink.ingest(payload)
+                _, record_created = sink.ingest_with_status(payload)
                 synced += 1
                 outcome["records_synced"] += 1
+                if record_created:
+                    created += 1
         except SourceJobError as exc:
             outcome.update(
                 status="blocked" if exc.status_code in (401, 403) else "error",
@@ -432,6 +437,8 @@ def run_phase1_laskin(
         "non_browser_records_collected": collected,
         "non_browser_records_synced": synced,
         "records_synced": int(rss.get("records_synced", 0)) + synced,
+        "records_new": created,
+        "records_updated": (int(rss.get("records_synced", 0)) + synced) - created,
         "skipped_before_publication_floor": int(rss.get("skipped_before_publication_floor", 0)) + skipped_before_floor,
         "warnings": warnings,
         "errors": errors,

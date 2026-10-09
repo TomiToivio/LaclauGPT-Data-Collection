@@ -134,6 +134,11 @@ class FakeSink:
     def ingest(self, payload):
         self.records.append(payload)
 
+    def ingest_with_status(self, payload):
+        # Test double for the #222 create/update split: every record is new.
+        self.records.append(payload)
+        return payload, True
+
 
 def test_phase1_laskin_rss_uses_canonical_sink_and_date_floor(
     tmp_path: Path, monkeypatch

@@ -66,9 +66,13 @@ class SQLiteRecordStore:
             )
         con.execute("DROP TABLE records_legacy")
 
-    def upsert(self, record: CanonicalRecord) -> None:
+    def upsert(self, record: CanonicalRecord) -> bool:
+        """Persist one record; return True when it was newly created (issue #222)."""
         payload = record.model_dump_json()
         with self._connect() as con:
+            exists = con.execute(
+                "SELECT 1 FROM records WHERE source_url = ?", (record.source_url,)
+            ).fetchone()
             con.execute(
                 """
                 INSERT INTO records(source_url, schema_version, payload_json)
@@ -79,6 +83,7 @@ class SQLiteRecordStore:
                 """,
                 (record.source_url, record.schema_version, payload),
             )
+        return exists is None
 
     def upsert_many(self, records: Iterable[CanonicalRecord]) -> None:
         rows = [

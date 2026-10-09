@@ -8,7 +8,16 @@ from ..models import CanonicalRecord
 
 
 class RecordStore(Protocol):
-    def upsert(self, record: CanonicalRecord) -> None: ...
+    def upsert(self, record: CanonicalRecord) -> bool:
+        """Persist one record; return True when it was newly created.
+
+        The return value exists so a collection cycle can report *corpus growth*
+        (new documents) separately from *sync operations* (upserts, which include
+        re-writes of records already in the store). A store that cannot tell the
+        difference may return ``False``; callers must never infer growth from the
+        operation count alone.
+        """
+        ...
 
     def upsert_many(self, records: Iterable[CanonicalRecord]) -> None: ...
 

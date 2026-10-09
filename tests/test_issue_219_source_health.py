@@ -42,6 +42,10 @@ def run_tick(monkeypatch, tmp_path, jobs, *, limit=10, rss_count=0):
         def ingest(self, payload):
             pass
 
+        def ingest_with_status(self, payload):
+            # Sink contract gained create/update reporting in #222.
+            return payload, True
+
     monkeypatch.setattr(runner, "DistributedCaptureSink", Sink)
     monkeypatch.setattr(runner, "load_non_browser_jobs", lambda path: jobs)
     monkeypatch.setattr(runner, "preflight_optional_dependencies", lambda jobs: [])

@@ -81,10 +81,13 @@ class CSVRecordStore:
             for record in sorted(records, key=lambda item: item.source_url):
                 writer.writerow(record_to_csv_row(record))
 
-    def upsert(self, record: CanonicalRecord) -> None:
+    def upsert(self, record: CanonicalRecord) -> bool:
+        """Persist one record; return True when it was newly created (issue #222)."""
         records = {item.source_url: item for item in self._read_all()}
+        created = record.source_url not in records
         records[record.source_url] = record
         self._write_all(records.values())
+        return created
 
     def upsert_many(self, records: Iterable[CanonicalRecord]) -> None:
         current = {item.source_url: item for item in self._read_all()}
