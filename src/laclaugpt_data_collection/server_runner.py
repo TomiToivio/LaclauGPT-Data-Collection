@@ -49,7 +49,8 @@ class Phase0MongoStore:
         self._collection.create_index("document_id", name="document_id")
         self._collection.create_index("source_date", name="source_date")
 
-    def upsert(self, record: CanonicalRecord) -> None:
+    def upsert(self, record: CanonicalRecord) -> bool:
+        """Persist idempotently, returning True when a new document was created (#222)."""
         metadata = record.source.raw_metadata
         source_title = str(metadata.get("source_title") or record.content.title or "").strip()
         source_name = str(metadata.get("source_name") or "").strip()
@@ -301,10 +302,16 @@ def run_distributed_rss(
     )
 
     synced = 0
+    records_new = 0
+    records_updated = 0
     errors: list[str] = []
     for record in records[:limit]:
         try:
-            store.upsert(record)
+            created = store.upsert(record)
+            if created:
+                records_new += 1
+            else:
+                records_updated += 1
             synced += 1
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{record.source_url}: {str(exc)[:180]}")
@@ -318,6 +325,8 @@ def run_distributed_rss(
         "feed_names": [str(feed.get("name") or "") for feed in feeds],
         "records_collected": len(records),
         "records_synced": synced,
+        "records_new": records_new,
+        "records_updated": records_updated,
         "mongodb_collection": store.collection_name,
         "warnings": warnings,
         "errors": errors,
