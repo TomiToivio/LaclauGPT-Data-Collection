@@ -196,6 +196,35 @@ class MongoRecordStore:
             query["collection_id"] = collection_id
         return self._collection.find_one(query, {"_id": 1}) is not None
 
+    def count_by_source_since(
+        self,
+        source_name: str,
+        *,
+        since_iso: str,
+        collection_id: str | None = None,
+    ) -> int:
+        """Count records a source has contributed at or after `since_iso` (issue #215).
+
+        Read-only and bounded: one indexed count, used to enforce the study's
+        declared per-source daily cap. A missing index degrades to a scan, so the
+        caller can pass a small window; the daily cap only needs today.
+        """
+        query: dict[str, Any] = {
+            "project_id": self.project_id,
+            "provenance.captured_at": {"$gte": since_iso},
+            "$or": [
+                {"source.raw_metadata.source_name": source_name},
+                {"source.name": source_name},
+                {"source.author": source_name},
+            ],
+        }
+        if collection_id:
+            query["collection_id"] = collection_id
+        try:
+            return int(self._collection.count_documents(query))
+        except Exception:  # noqa: BLE001 - a cap must never fail collection
+            return 0
+
     def pending_media_records(
         self,
         *,

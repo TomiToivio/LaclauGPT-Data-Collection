@@ -320,6 +320,7 @@ def run_phase1_laskin(
     limit: int = 40,
     rotation: int | None = None,
     tracked_plan: str | Path | None = None,
+    enforce_source_budgets: bool = False,
 ) -> dict[str, Any]:
     routed = collection_id or settings.project_id
     if routed != settings.project_id:
@@ -350,6 +351,8 @@ def run_phase1_laskin(
             "notification_errors": [],
             "source_outcomes": [],
             "manifest_drift": None,
+            "source_budget": None,
+            "deferred_by_source_budget": 0,
         }
 
     rss = run_phase1_rss(
@@ -365,9 +368,37 @@ def run_phase1_laskin(
     )
     remaining = max(limit - int(rss.get("records_synced", 0)), 0)
     created = int(rss.get("records_new", 0))
+    deferred_by_budget = 0
     sink = DistributedCaptureSink(settings)
     sink.assert_private_config(study_config)
     retry_policy = load_collector_retry_policy(study_config)
+
+    # Issue #215: the study DECLARES per-source daily caps in `source_budgets`, but
+    # nothing enforced them, so a prolific source's records accumulated unchecked.
+    # Opt-in, because enabling a cap changes what the corpus contains -- a sampling
+    # decision. The day's count comes from the store, since one hourly cycle is one
+    # process and a memory counter would reset every tick.
+    budget = None
+    if enforce_source_budgets:
+        from .source_budget import SourceDailyBudget, load_source_caps, utc_day
+
+        identities = [str(row.get("name") or "") for row in all_jobs if row.get("name")]
+        # Map each configured source to its platform, so only account-shaped
+        # sources receive a per-source cap.
+        source_platform = {
+            str(row.get("name")): str(row.get("kind") or "").replace("_account", "")
+            for row in all_jobs
+            if row.get("name")
+        }
+        caps = load_source_caps(study_config, identities, platforms=source_platform)
+        if caps:
+            since = f"{utc_day()}T00:00:00+00:00"
+            budget = SourceDailyBudget(
+                caps=caps,
+                count_today=lambda name, _day: sink.records.count_by_source_since(
+                    name, since_iso=since, collection_id=routed
+                ),
+            )
     policy = RealtimePolicy.ai26()
     jobs = select_job_window(all_jobs, max_jobs=max_jobs, rotation=rotation * max_jobs)
     synced = 0
@@ -425,6 +456,9 @@ def run_phase1_laskin(
                 arena = str(record.source.raw_metadata.get("arena") or "")
                 if arena:
                     payload["arena"] = arena
+                if budget is not None and not budget.admit(payload):
+                    deferred_by_budget += 1
+                    continue
                 _, record_created = sink.ingest_with_status(payload)
                 synced += 1
                 outcome["records_synced"] += 1
@@ -480,6 +514,8 @@ def run_phase1_laskin(
         "warnings": warnings,
         "errors": errors,
         "source_outcomes": source_outcomes,
+        "source_budget": (budget.summary() if budget is not None else None),
+        "deferred_by_source_budget": deferred_by_budget,
         "manifest_drift": manifest_drift,
         "notification_errors": list(rss.get("notification_errors") or []) + list(sink.notification_errors),
     }
@@ -495,6 +531,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-jobs", type=int, default=6)
     parser.add_argument("--per-source-limit", type=int, default=5)
     parser.add_argument("--limit", type=int, default=40)
+    parser.add_argument(
+        "--enforce-source-budgets",
+        action="store_true",
+        help="apply the study's declared per-source daily caps (#215)",
+    )
     parser.add_argument(
         "--tracked-plan",
         default=None,
@@ -512,6 +553,7 @@ def main(argv: list[str] | None = None) -> int:
         per_source_limit=args.per_source_limit,
         limit=args.limit,
         tracked_plan=args.tracked_plan,
+        enforce_source_budgets=args.enforce_source_budgets,
     )
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     return 0 if not result["errors"] else 1
