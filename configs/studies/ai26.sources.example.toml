@@ -255,6 +255,44 @@ active = true
 last_verified = "2026-10-02"
 
 # ---------------------------------------------------------------------------
+# Creator-rights, European-labour and Finnish public-interest stratum
+# (added 2026-10-03 from the daily coverage audit; see the 2026-10-03 report)
+# ---------------------------------------------------------------------------
+
+[[feed]]
+name = "authors_alliance"
+feed_url = "https://www.authorsalliance.org/feed/"
+homepage = "https://www.authorsalliance.org/"
+arena = "grassroots"
+source_family = "creator rights / copyright / AI training and licensing"
+sampling_rationale = "Authors Alliance: US authors'-rights organisation publishing legal analysis of AI training, copyright and licensing questions (Bartz v. Anthropic, Thomson Reuters v. ROSS, library e-book licensing). The grassroots arena names creative work and copyright in its sampling_focus and US in its regions, but held that stratum only through union-labour sources (SAG-AFTRA, WGA West); this adds the rights-and-licensing articulation. Inclusion is a SAMPLING decision, never an ideological classification. Verified live 2026-10-03 with 10 items, newest 2026-10-02. NOT all items are AI-related; lightweight relevance filtering at analysis stage only."
+priority = "P1"
+active = true
+last_verified = "2026-10-03"
+
+[[feed]]
+name = "etui"
+feed_url = "https://www.etui.org/rss.xml"
+homepage = "https://www.etui.org/"
+arena = "grassroots"
+source_family = "European labour / automation / works councils and AI at work"
+sampling_rationale = "European Trade Union Institute: the EU-level labour-research layer on AI at work, works councils, working time and restructuring, with a live September-October 2026 strand on shaping AI at the workplace. The grassroots arena's sampling_focus names labour and automation and its regions include the EU, but that stratum had only US unions plus one Finnish union. Inclusion is a SAMPLING decision, never an ideological classification. Verified live 2026-10-03 with 10 items, newest 2026-10-02. NOT all items are AI-related; lightweight relevance filtering at analysis stage only."
+priority = "P1"
+active = true
+last_verified = "2026-10-03"
+
+[[feed]]
+name = "sitra"
+feed_url = "https://www.sitra.fi/feed/"
+homepage = "https://www.sitra.fi/"
+arena = "grassroots"
+source_family = "Finnish public-interest foresight / AI, society and public services"
+sampling_rationale = "Sitra, the Finnish public innovation fund: frequent Finnish-language material on AI in society and public services, including explicit risk framings (e.g. 'Voiko tekoäly tappaa meidät kaikki?', 28 Sep 2026). The grassroots arena declares languages [en, fi] but the collected Finnish-language evidence base was effectively empty (four X records, three below the publication floor), so the Finland component of the initial scope had no first-party Finnish material. Inclusion is a SAMPLING decision, never an ideological classification; this is a public-interest institution, not a mobilisation actor. Verified live 2026-10-03 with 12 items, newest 2026-10-02. NOT all items are AI-related; lightweight relevance filtering at analysis stage only."
+priority = "P1"
+active = true
+last_verified = "2026-10-03"
+
+# ---------------------------------------------------------------------------
 # Public web endpoints
 # ---------------------------------------------------------------------------
 
