@@ -61,12 +61,66 @@ else
 fi
 
 echo "[$(date -Is)] AI26 Laskin collection start"
+
+# Issue #240: the end marker used to be emitted only on the normal path after the
+# runner. #217 fixed the *exit-status* path (a partial tick no longer aborts under
+# `set -e` before the marker), but any OTHER exit path still lost it — and on
+# 2026-10-09T03:10 a tick emitted its complete JSON record and then nothing, with no
+# OOM, no reboot and no cron timeout to explain it. The cause was not identifiable
+# from the evidence available, so the fix is to make the invariant structural rather
+# than to guess the trigger: an EXIT trap fires for every exit path, including a
+# caught signal, so a tick can no longer read as a silently stopped stage.
+#
+# NOTE the trap is armed HERE, after the start marker and after the early
+# preflight/lock exits above, because those must not emit an end for a tick that
+# never started.
+END_EMITTED=0
+runner_status=""
+RUNNER_PID=""
+emit_end_marker() {
+  # Exactly once, whatever path we leave by.
+  [[ "$END_EMITTED" -eq 1 ]] && return 0
+  END_EMITTED=1
+  if [[ -n "$runner_status" && "$runner_status" -ne 0 ]]; then
+    echo "[$(date -Is)] AI26 Laskin collection end runner_status=${runner_status} (tick partial; see status/errors above)"
+  elif [[ -z "$runner_status" && -n "${SIGNALLED:-}" ]]; then
+    # Killed before the runner reported: name the signal so the tick is diagnosable
+    # instead of merely absent.
+    echo "[$(date -Is)] AI26 Laskin collection end interrupted signal=${SIGNALLED} (runner never reported; see wrapper log)"
+  else
+    echo "[$(date -Is)] AI26 Laskin collection end"
+  fi
+}
+# Convert catchable signals into a clean exit so the EXIT trap runs. 128+signo is
+# the conventional shell status, and it keeps a signal distinguishable from a
+# partial tick (1) in the marker. The runner is stopped first so we never orphan
+# it while its parent exits.
+on_signal() {
+  SIGNALLED="$1"
+  if [[ -n "$RUNNER_PID" ]] && kill -0 "$RUNNER_PID" 2>/dev/null; then
+    kill -TERM "$RUNNER_PID" 2>/dev/null || true
+    wait "$RUNNER_PID" 2>/dev/null || true
+  fi
+  exit "$2"
+}
+trap 'emit_end_marker' EXIT
+trap 'on_signal TERM 143' TERM
+trap 'on_signal INT 130' INT
+trap 'on_signal HUP 129' HUP
+
 # The runner returns 1 whenever any source recorded an error (status: partial),
 # so a single transient upstream failure (e.g. arXiv HTTP 429) would abort this
 # wrapper under `set -e` *before* the end marker below, leaving a tick that reads
 # as a silently stopped stage even though its records were collected. Capture the
 # runner status, always emit the end marker, and propagate the status so cron/CI
 # still sees a non-zero exit for a partial tick.
+#
+# The runner is BACKGROUNDED and then waited on, not run in the foreground. This
+# is load-bearing for #240: bash defers a trap for the whole lifetime of a
+# foreground child, so a TERM arriving while the runner worked would not run any
+# handler until the runner finished on its own — and if the runner was killed with
+# the wrapper, the marker was lost outright. `wait` is interruptible, so the trap
+# now fires promptly on the signal that actually occurred.
 set +e
 "${RUN[@]}" \
   --study-config "$STUDY_CONFIG" \
@@ -77,12 +131,10 @@ set +e
   --max-jobs "${LACLAUGPT_AI26_MAX_NON_BROWSER_JOBS:-6}" \
   --per-source-limit "${LACLAUGPT_AI26_PER_SOURCE_LIMIT:-5}" \
   --limit "${LACLAUGPT_AI26_BATCH_LIMIT:-40}" \
-  --tracked-plan "$TRACKED_PLAN"
+  --tracked-plan "$TRACKED_PLAN" &
+RUNNER_PID=$!
+wait "$RUNNER_PID"
 runner_status=$?
 set -e
-if [[ "$runner_status" -ne 0 ]]; then
-  echo "[$(date -Is)] AI26 Laskin collection end runner_status=${runner_status} (tick partial; see status/errors above)"
-else
-  echo "[$(date -Is)] AI26 Laskin collection end"
-fi
+RUNNER_PID=""
 exit "$runner_status"
