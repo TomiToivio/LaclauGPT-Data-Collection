@@ -93,12 +93,27 @@ class MongoRecordStore:
             "collection_id": collection_id,
         }
 
-    def upsert(self, record: CanonicalRecord) -> None:
+    def upsert(self, record: CanonicalRecord) -> bool:
+        """Persist one record; return True when it was newly created (issue #222).
+
+        ``replace_one(..., upsert=True)`` collapses a re-sync onto the existing
+        document, so the write is idempotent but the caller cannot tell a new
+        document from a re-write. The collection cycle needs exactly that
+        distinction to report corpus growth rather than sync operations.
+
+        Resolution: check for the existing document first, then write. The
+        ``source_url``/``project_id``/``collection_id`` triple is unique by index,
+        and this is a single-machine collector, so the read-then-write is not a
+        correctness race (a concurrent duplicate would still land one document;
+        the return value is a metric, not a concurrency guarantee).
+        """
+        existing = self._collection.find_one(self._query(record), {"_id": 1})
         self._collection.replace_one(
             self._query(record),
             self._payload(record),
             upsert=True,
         )
+        return existing is None
 
     def upsert_many(self, records: Iterable[CanonicalRecord]) -> None:
         try:

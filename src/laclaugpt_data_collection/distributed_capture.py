@@ -119,7 +119,25 @@ class DistributedCaptureSink:
             self.notification_errors.append(f"{name}: {exc}")
 
     def ingest(self, record_data: dict[str, Any]) -> CanonicalRecord:
-        """Persist idempotently and publish lightweight collection/handoff events."""
+        """Persist idempotently and publish lightweight collection/handoff events.
+
+        Returns the canonical record. Callers that must distinguish a new
+        document from a re-write should use :meth:`ingest_with_status`
+        (issue #222).
+        """
+        record, _ = self.ingest_with_status(record_data)
+        return record
+
+    def ingest_with_status(
+        self, record_data: dict[str, Any]
+    ) -> tuple[CanonicalRecord, bool]:
+        """Persist one record; return ``(record, created)``.
+
+        ``created`` is True when the store held no document for this identity
+        before the write. Issue #222: a cycle must distinguish corpus growth
+        (``created``) from sync operations (every write), because RSS re-emits
+        its current window hourly and the raw upsert count over-reports growth.
+        """
         collection_id = str(record_data.get("collection_id") or self.settings.project_id)
         arena = str(record_data.get("arena") or "")
         canonical_data = {
@@ -145,7 +163,7 @@ class DistributedCaptureSink:
         if arena:
             record.source.raw_metadata.setdefault("arena", arena)
 
-        self.records.upsert(record)
+        created = self.records.upsert(record)
         common = {
             "project_id": self.settings.project_id,
             "collection_id": collection_id,
@@ -172,7 +190,7 @@ class DistributedCaptureSink:
                     "source_priority": str(handoff["source_priority"]),
                 },
             )
-        return record
+        return record, created
 
     def smoke_check(self) -> dict[str, str]:
         """Verify the control-plane dependencies without exposing credentials."""

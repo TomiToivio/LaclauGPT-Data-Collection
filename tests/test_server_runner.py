@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -223,6 +224,12 @@ class FakeMongoCollection:
 
     def update_one(self, query, update, *, upsert=False):
         self.updates.append((query, update, upsert))
+        # Mirror pymongo: report an inserted (upserted) document the first time a
+        # given document_id is written, a matched update thereafter. Phase0MongoStore
+        # returns `upserted_id is not None` so the runner can count NEW records
+        # separately from re-writes (issue #222).
+        seen = any(q == query for q, _, _ in self.updates[:-1])
+        return SimpleNamespace(upserted_id=None if seen else "new-id")
 
 
 class FakeMongoDatabase:

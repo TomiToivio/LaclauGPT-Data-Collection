@@ -69,11 +69,14 @@ class Phase0MongoStore:
         }
         # Identity is the stable document id when one is known, so a re-collected
         # article updates in place; source_url remains the canonical identity anchor.
-        self._collection.update_one(
+        # Report whether the document was newly created (issue #222): update_one's
+        # own result distinguishes an upserted insert from a matched update.
+        result = self._collection.update_one(
             {"document_id": document_id},
             {"$set": fields},
             upsert=True,
         )
+        return result.upserted_id is not None
 
 
 def phase0_collection_name(project_id: str) -> str:
@@ -364,6 +367,7 @@ def run_phase1_rss(
     # projects must not inherit that policy accidentally.
     policy = RealtimePolicy.ai26() if routed_collection == "ai26" else None
     synced = 0
+    created = 0
     skipped_before_floor = 0
     errors: list[str] = []
     notification_errors: list[str] = []
@@ -409,11 +413,13 @@ def run_phase1_rss(
                 arena = str(record.source.raw_metadata.get("arena") or "")
                 if arena:
                     payload["arena"] = arena
-                sink.ingest(payload)
+                _, record_created = sink.ingest_with_status(payload)
             else:
                 assert store is not None
-                store.upsert(record)
+                record_created = store.upsert(record)
             synced += 1
+            if record_created:
+                created += 1
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{record.source_url}: {str(exc)[:180]}")
 
@@ -429,6 +435,8 @@ def run_phase1_rss(
         "feed_names": [str(feed.get("name") or "") for feed in feeds],
         "records_collected": len(records),
         "records_synced": synced,
+        "records_new": created,
+        "records_updated": synced - created,
         "skipped_before_publication_floor": skipped_before_floor,
         "storage_mode": storage_mode,
         "storage_target": storage_target,

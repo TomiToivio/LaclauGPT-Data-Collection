@@ -99,8 +99,11 @@ class MongoRecordStore:
             "collection_id": collection_id,
         }
 
-    def upsert(self, record: CanonicalRecord) -> None:
+    def upsert(self, record: CanonicalRecord) -> bool:
+        """Persist one record; return True when it was newly created (issue #222)."""
+        existing = self._collection.find_one(self._query(record), {"_id": 1})
         self._collection.replace_one(self._query(record), self._payload(record), upsert=True)
+        return existing is None
 
     def upsert_many(self, records: Iterable[CanonicalRecord]) -> None:
         try:
