@@ -8,7 +8,6 @@ from __future__ import annotations
 import argparse
 import difflib
 import hashlib
-import shutil
 import sys
 import tomllib
 from datetime import datetime, timezone
