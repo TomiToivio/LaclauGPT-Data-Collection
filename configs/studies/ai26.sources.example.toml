@@ -315,6 +315,21 @@ last_verified = "2026-10-03"
 # ---------------------------------------------------------------------------
 
 [[feed]]
+name = "sak"
+# Verified live 2026-10-09 (#239): HTTP 200 with 10 items, newest
+# 2026-10-09T08:06:07Z, channel title "SAK", all first-party Finnish-language
+# labour/policy material. The canonical URL is /feed/ -- /rss.xml 301-redirects,
+# so the redirecting form is not used (the #205 defect class).
+feed_url = "https://www.sak.fi/feed/"
+homepage = "https://www.sak.fi/"
+arena = "grassroots"
+source_family = "Finnish central trade-union confederation / labour / AI at work"
+sampling_rationale = "SAK, the central Finnish trade-union confederation (the umbrella body of which teollisuusliitto is an affiliate and alongside sttk, the salaried confederation). The tracked plan already carries one SAK affiliate and the salaried confederation but not the central confederation itself, so this completes the Finnish labour articulation at the confederation level rather than duplicating a row: distinct actor, distinct voice. It serves the grassroots arena's 'labour and automation' sampling_focus and its declared [en, fi] language scope, and the paper's Finland component. Inclusion is a SAMPLING decision, never an ideological classification; SAK is a bargaining confederation with its own position, not a movement actor, and group membership asserts nothing about its discourse. Verified live 2026-10-09 with 10 items, newest 2026-10-09. NOT all items are AI-related; lightweight relevance filtering at analysis stage only."
+priority = "P1"
+active = true
+last_verified = "2026-10-09"
+
+[[feed]]
 name = "sttk"
 feed_url = "https://www.sttk.fi/feed/"
 homepage = "https://www.sttk.fi/"
@@ -716,7 +731,12 @@ priority = "P1"
 
 [[mastodon_account]]
 name = "Timnit Gebru"
-acct = "@TimnitGebru@mastodon.social"
+# Repointed 2026-10-09 (#239): the former mastodon.social account is dormant --
+# 69 statuses with last_status_at 2022-11-04, almost four years below the study's
+# 2026-09-01 publication floor -- so the P1 row could never yield a record. The
+# active account is on dair-community.social (5302 statuses, last 2026-10-08),
+# the same instance as the Emily M. Bender row. Both were re-verified live.
+acct = "@timnitgebru@dair-community.social"
 arena = "elites"
 source_family = "Critical AI / political economy"
 priority = "P1"

@@ -270,6 +270,48 @@ class MongoRecordStore:
         )
 
 
+class ObjectStoreError(RuntimeError):
+    """An object-store operation failed, in a form a cron operator can act on.
+
+    Issue #233 criterion 5: a failure must "surface actionable diagnostics". The
+    `reason` is a stable token, so a log reader or a test can branch on it without
+    parsing a vendor message.
+    """
+
+    def __init__(self, message: str, *, reason: str = "unknown") -> None:
+        super().__init__(message)
+        self.reason = reason
+
+
+def classify_object_store_failure(exc: BaseException) -> str:
+    """Map a storage exception onto a stable, actionable reason token.
+
+    The classes matter operationally because the remedy differs: an expired CSC
+    Allas token must be renewed, a wrong bucket/prefix must be fixed in config, a
+    transport failure just needs a retry, and a missing object means the upload did
+    not land. Collapsing them into one "upload failed" is what makes unattended cron
+    undiagnosable.
+    """
+    code = str(getattr(exc, "response", {}).get("Error", {}).get("Code", "") or "")
+    status = getattr(exc, "response", {}).get("ResponseMetadata", {}).get("HTTPStatusCode")
+    text = f"{code} {exc}".casefold()
+    if code in {"ExpiredToken", "TokenRefreshRequired", "InvalidToken", "RequestExpired"}:
+        return "credential_expired"
+    if code in {"AccessDenied", "InvalidAccessKeyId", "SignatureDoesNotMatch", "403"}:
+        return "credential_rejected"
+    if code in {"NoSuchBucket", "404"} or "nosuchbucket" in text:
+        return "bucket_or_prefix_wrong"
+    if code in {"NoSuchKey", "NotFound"} or "not found" in text:
+        return "object_missing"
+    if code in {"SlowDown", "RequestTimeout", "RequestTimeTooSkewed"} or isinstance(
+        exc, (TimeoutError, ConnectionError)
+    ):
+        return "transient_transport"
+    if status in {500, 502, 503, 504}:
+        return "transient_transport"
+    return "unknown"
+
+
 class S3ObjectStore:
     def __init__(
         self,
@@ -322,14 +364,49 @@ class S3ObjectStore:
         payload: bytes,
         *,
         content_type: str = "application/octet-stream",
+        verify: bool = True,
     ) -> str:
+        """Upload an object and, by default, confirm it actually landed.
+
+        Issue #233 criterion 5 asks that an upload be *verified* and that a failure
+        be *actionable*. A bare `put_object` returning without raising proves only
+        that the request was accepted -- and CSC Allas is Ceph-backed, where a
+        response can be lost or a truncated body accepted. So the object's size is
+        read back and compared with what was sent. `verify=False` exists for a store
+        that does not implement HeadObject; the default is on.
+
+        A failure raises `ObjectStoreError` carrying a `reason` a cron operator can
+        act on, rather than a bare botocore traceback.
+        """
         resolved = self._key(key)
-        self._client.put_object(
-            Bucket=self.bucket,
-            Key=resolved,
-            Body=payload,
-            ContentType=content_type,
-        )
+        try:
+            self._client.put_object(
+                Bucket=self.bucket,
+                Key=resolved,
+                Body=payload,
+                ContentType=content_type,
+            )
+        except Exception as exc:  # noqa: BLE001 - classified below
+            raise ObjectStoreError(
+                f"upload failed for {resolved}: {exc}",
+                reason=classify_object_store_failure(exc),
+            ) from exc
+
+        if verify:
+            try:
+                head = self._client.head_object(Bucket=self.bucket, Key=resolved)
+            except Exception as exc:  # noqa: BLE001 - classified below
+                raise ObjectStoreError(
+                    f"upload not verifiable for {resolved}: {exc}",
+                    reason=classify_object_store_failure(exc),
+                ) from exc
+            landed = head.get("ContentLength")
+            if landed is not None and int(landed) != len(payload):
+                raise ObjectStoreError(
+                    f"upload truncated for {resolved}: sent {len(payload)} bytes, "
+                    f"store reports {landed}",
+                    reason="truncated_upload",
+                )
         return f"s3://{self.bucket}/{resolved}"
 
     def put_text(
