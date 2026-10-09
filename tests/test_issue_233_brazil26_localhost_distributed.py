@@ -68,9 +68,11 @@ def test_the_public_example_manifest_is_brazil26_policy_compliant() -> None:
 
 
 def test_allowlist_cli_passes_and_fails() -> None:
+    import sys
+
     manifest = ROOT / "configs/studies/brazil26.sources.example.toml"
     ok = subprocess.run(
-        [str(ROOT / ".venv/bin/python"), "-m",
+        [sys.executable, "-m",
          "laclaugpt_data_collection.source_allowlist",
          "--manifest", str(manifest), "--require-brazil26-only"],
         capture_output=True, text=True, cwd=ROOT,
@@ -79,7 +81,7 @@ def test_allowlist_cli_passes_and_fails() -> None:
 
     # RSS is not enabled, so requiring it must fail with a non-zero code.
     rss = subprocess.run(
-        [str(ROOT / ".venv/bin/python"), "-m",
+        [sys.executable, "-m",
          "laclaugpt_data_collection.source_allowlist",
          "--manifest", str(manifest), "--require-plugin", "rss"],
         capture_output=True, text=True, cwd=ROOT,
