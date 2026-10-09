@@ -37,7 +37,7 @@ class RSSCollector:
             entries = list(parsed.entries[: self.max_items_per_feed])
             result.raw_items_seen += len(entries)
             for entry in entries:
-                record = _entry_to_record(feed_url, entry)
+                record = _entry_to_record(feed_url, entry, feed_language=str(parsed.feed.get("language", "") or ""))
                 if record:
                     result.records.append(record)
         if not result.records:
@@ -51,7 +51,7 @@ class RSSCollector:
         return result
 
 
-def _entry_to_record(feed_url: str, entry: Any) -> NormalizedRecord | None:
+def _entry_to_record(feed_url: str, entry: Any, *, feed_language: str = "") -> NormalizedRecord | None:
     link = str(getattr(entry, "link", "") or "")
     title = str(getattr(entry, "title", "") or "")
     summary = str(getattr(entry, "summary", "") or "")
@@ -64,10 +64,17 @@ def _entry_to_record(feed_url: str, entry: Any) -> NormalizedRecord | None:
         return None
     author = str(getattr(entry, "author", "") or "")
     raw_entry = dict(entry) if hasattr(entry, "items") else {"value": str(entry)}
-    return NormalizedRecord(
+    from ..language import resolve_language
+
+    language, language_method = resolve_language(
+        "\\n\\n".join(part for part in (title, summary) if part),
+        declared=str(getattr(entry, "language", "") or feed_language),
+    )
+    record = NormalizedRecord(
         document_id=document_id,
         platform="rss",
         author=author,
+        language=language,
         timestamp=published,
         source_url=link,
         text="\n\n".join(part for part in (title, summary) if part),
@@ -78,6 +85,7 @@ def _entry_to_record(feed_url: str, entry: Any) -> NormalizedRecord | None:
             visited_url=feed_url,
             api_url=link,
             transformations=["rss-atom-parse", "map-entry"],
-            metadata={"source_publication_time_present": bool(published)},
+            metadata={"source_publication_time_present": bool(published), "language_method": language_method},
         ),
     )
+    return record
