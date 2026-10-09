@@ -35,6 +35,18 @@ laclaugpt-brazil26 preflight
 
 Preflight checks the Brazil study identity, writable data directory, browser extension manifest, Firefox command/profile and study separation. Missing MongoDB/Redis/S3 is **not** an error in the default local profile.
 
+The same checks are available as a non-destructive **dry-run** of the whole start.
+`--dry-run` resolves the study config, data root, runtime env, Firefox command,
+cron policy and source policy, prints one JSON plan, and exits **without**
+starting a backend, launching Firefox or touching the crontab. It is safe on a
+fresh checkout and returns 0 when a real start would proceed, 2 when it would
+fail — so it doubles as a pre-collection gate:
+
+```bash
+laclaugpt-brazil26 --dry-run            # local profile plan
+laclaugpt-brazil26 --dry-run --distributed   # also assert the Allas/Mongo + source policy
+```
+
 For backend-only work:
 
 ```bash
@@ -43,13 +55,20 @@ laclaugpt-brazil26 preflight --no-browser
 
 ## Start and stop
 
-Normal daily start is one command:
+Normal daily start is one command. The wrapper sources the ignored runtime env,
+resolves the same study/data precedence as the cron wrappers, and starts the
+researcher session (loopback capture backend, session state under the Brazil26
+data root, then the configured Firefox profile):
 
 ```bash
-laclaugpt-brazil26
+bash scripts/start_brazil26_localhost.sh            # one-command start
+bash scripts/start_brazil26_localhost.sh --dry-run  # print the plan, start nothing
+bash scripts/start_brazil26_localhost.sh --distributed  # require the Allas/Mongo preflight first
 ```
 
-It starts the loopback capture backend, records session state under the Brazil26 data root and launches the configured Firefox profile. Stop from the same terminal with Ctrl-C, or from another terminal with:
+`laclaugpt-brazil26` (no subcommand) is the same start with the study and data
+root taken from the environment. Stop from the same terminal with Ctrl-C, or
+from another terminal with:
 
 ```bash
 laclaugpt-brazil26 stop --data-root ./data
@@ -211,16 +230,17 @@ A clean validation result is the handoff gate to LaclauGPT-Data-Analysis. The an
 
 Use public-safe material:
 
-1. `laclaugpt-brazil26 preflight` returns `status: ok`.
-2. Start `laclaugpt-brazil26`.
-3. `laclaugpt-brazil26 status` reports `running` and the Brazil study.
-4. Capture one configured public page.
-5. Confirm a canonical row appears under `data/normalized/`.
-6. Run the bounded RSS worker once.
-7. Run media processing if the captured record contains media.
-8. Run `laclaugpt-brazil26 validate`.
-9. Restart the session and confirm existing records are not duplicated by source identity.
-10. Stop with Ctrl-C or `laclaugpt-brazil26 stop`.
+1. `laclaugpt-brazil26 --dry-run` returns a plan with `status: ready` and exit 0, and starts nothing.
+2. `laclaugpt-brazil26 preflight` returns `status: ok`.
+3. Start with `bash scripts/start_brazil26_localhost.sh`.
+4. `laclaugpt-brazil26 status` reports `running` and the Brazil study.
+5. Capture one configured public page.
+6. Confirm a canonical row appears under `data/normalized/`.
+7. Run the bounded RSS worker once.
+8. Run media processing if the captured record contains media.
+9. Run `laclaugpt-brazil26 validate`.
+10. Restart the session and confirm existing records are not duplicated by source identity.
+11. Stop with Ctrl-C or `laclaugpt-brazil26 stop`.
 
 ## Troubleshooting
 
