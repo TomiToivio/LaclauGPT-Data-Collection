@@ -28,7 +28,9 @@ class FakeStore:
         FakeStore.last = self
 
     def upsert(self, record):
+        created = not any(item.source_url == record.source_url for item in self.records)
         self.records.append(record)
+        return created
 
 
 class FakeRSSCollector:
@@ -154,6 +156,10 @@ def test_phase0_rss_upserts_directly_to_mongodb(
     )
     assert result["records_collected"] == 2
     assert result["records_synced"] == 1
+    # #222: the Phase 0 path reports corpus growth, not just write operations.
+    assert result["records_new"] == 1
+    assert result["records_updated"] == 0
+    assert result["records_new"] + result["records_updated"] == result["records_synced"]
     assert result["mongodb_collection"] == "laclaugpt2_ai26_scraper_collection"
     assert "duplicate_leases" not in result
     assert FakeStore.last is not None
@@ -176,6 +182,50 @@ def test_phase0_rss_requires_mongodb(tmp_path: Path) -> None:
 
     with pytest.raises(RuntimeError, match="requires LACLAUGPT_MONGODB_URI"):
         run_distributed_rss(MissingMongo(), source_manifest=manifest)
+
+
+def test_phase0_rss_reports_no_growth_when_it_only_reupserts(tmp_path: Path, monkeypatch) -> None:
+    """#222: the Phase 0 loop re-upserts already-stored records and must not call it growth."""
+    manifest = tmp_path / "sources.toml"
+    manifest.write_text(
+        '[[feed]]\nname="one"\nfeed_url="https://example.org/feed"\n'
+        'source_family="synthetic"\narena="elites"\npriority="P1"\n',
+        encoding="utf-8",
+    )
+
+    class PersistentStore:
+        """Store whose writes survive across cycles, like the Phase 0 collection."""
+
+        documents: list = []
+
+        def __init__(self, uri, database, project_id, **kwargs):
+            self.collection_name = f"laclaugpt2_{project_id}_scraper_collection"
+
+        def upsert(self, record):
+            created = not any(item.source_url == record.source_url for item in PersistentStore.documents)
+            PersistentStore.documents.append(record)
+            return created
+
+    monkeypatch.setattr(
+        "laclaugpt_data_collection.server_runner.Phase0MongoStore", PersistentStore
+    )
+    monkeypatch.setattr("laclaugpt_data_collection.server_runner.RSSCollector", FakeRSSCollector)
+
+    first = run_distributed_rss(
+        SettingsStub(), source_manifest=manifest, collection_id="ai26",
+        max_feeds=1, per_feed_limit=2, limit=1, rotation=0,
+    )
+    second = run_distributed_rss(
+        SettingsStub(), source_manifest=manifest, collection_id="ai26",
+        max_feeds=1, per_feed_limit=2, limit=1, rotation=0,
+    )
+
+    assert first["records_synced"] == 1
+    assert first["records_new"] == 1
+    assert first["records_updated"] == 0
+    assert second["records_synced"] == 1, "the re-upsert still happened"
+    assert second["records_new"] == 0, "but it created nothing"
+    assert second["records_updated"] == 1
 
 
 def test_phase0_collection_name_matches_analysis_contract() -> None:
