@@ -126,21 +126,28 @@ def fetch_web_child(
             response = None
             original = current
             seen: set[str] = set()
+            # `requested` is the exact URL handed to the server for the current
+            # hop; `current` is its canonical form, used only as the record
+            # identity. The two are tracked separately on purpose: the canonical
+            # form strips a trailing slash, so requesting the canonical URL and
+            # then comparing canonical forms makes a site that redirects
+            # "/blog" -> "/blog/" look like an unbreakable loop. The loop guard
+            # therefore keys on the raw requested URL, and redirects are followed
+            # from the server's raw Location (#205).
+            requested = current
             for _ in range(5):
-                if current in seen:
-                    # Canonicalization (which strips a trailing slash) can make a
-                    # redirect point back at the URL we already requested. Stop
-                    # instead of spending hops on an unbreakable loop.
+                if requested in seen:
                     return WebFetchOutcome(current, None, "redirect_loop")
-                seen.add(current)
-                if not host_validator(current):
+                seen.add(requested)
+                if not host_validator(requested):
                     return WebFetchOutcome(current, None, "unsafe_or_unresolvable_host")
-                response = client.get(current)
+                response = client.get(requested)
                 if response.status_code in {301, 302, 303, 307, 308}:
                     location = response.headers.get("location")
                     if not location:
                         return WebFetchOutcome(current, None, "redirect_without_location")
-                    current = canonicalize_source_url(urljoin(current, location))
+                    requested = urljoin(requested, location)
+                    current = canonicalize_source_url(requested)
                     continue
                 break
             if response is None:

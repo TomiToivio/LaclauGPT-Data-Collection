@@ -113,17 +113,21 @@ def test_failed_fetch_returns_error_without_mutating_parent() -> None:
     assert parent.source_url == "https://x.com/example/status/1"
 
 
-def test_redirect_to_own_canonical_url_is_a_loop_not_an_error() -> None:
-    """Canonicalization strips the trailing slash, so a site that redirects
-    "/blog" back to "/blog/" would bounce forever. That must be detected as a
-    redirect loop instead of surfacing a raw 301 HTTPStatusError (#199)."""
+def test_trailing_slash_redirect_is_followed_not_a_loop() -> None:
+    """A site that redirects "/blog" -> "/blog/" must be followed, not treated
+    as a loop (#205). Redirects are followed from the server's raw Location and
+    only the final URL is canonicalized, so the trailing-slash hop resolves."""
     calls: list[str] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         calls.append(str(request.url))
         if request.url.path == "/blog":
             return httpx.Response(301, headers={"location": "/blog/"})
-        return httpx.Response(200, headers={"content-type": "text/html"}, text="<html>ok</html>")
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/html"},
+            text="<html><title>Blog</title><body>ok</body></html>",
+        )
 
     outcome = fetch_web_child(
         "https://example.org/blog/",
@@ -131,9 +135,32 @@ def test_redirect_to_own_canonical_url_is_a_loop_not_an_error() -> None:
         transport=httpx.MockTransport(handler),
         host_validator=lambda _url: True,
     )
+    assert outcome.error == ""
+    assert outcome.record is not None
+    # The seed canonicalizes to /blog; the server redirects to /blog/ which is a
+    # 200, and the final canonical record identity is /blog again.
+    assert outcome.record.source_url == "https://example.org/blog"
+    assert calls == ["https://example.org/blog", "https://example.org/blog/"]
+
+
+def test_genuine_redirect_loop_is_still_detected() -> None:
+    """A real self-referential loop (raw URL A -> raw URL B -> raw URL A) is
+    still caught rather than fetched forever."""
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(str(request.url))
+        if request.url.path == "/a":
+            return httpx.Response(301, headers={"location": "/b"})
+        return httpx.Response(301, headers={"location": "/a"})
+
+    outcome = fetch_web_child(
+        "https://example.org/a",
+        _parent(),
+        transport=httpx.MockTransport(handler),
+        host_validator=lambda _url: True,
+    )
     assert outcome.record is None
     assert outcome.error == "redirect_loop"
-    # The seed is canonicalized to /blog and its redirect resolves back to the
-    # same URL, so the loop is caught before a second request is issued.
-    assert calls == ["https://example.org/blog"]
+    assert calls == ["https://example.org/a", "https://example.org/b"]
 
