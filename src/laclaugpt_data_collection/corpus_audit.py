@@ -188,6 +188,13 @@ def audit_records(
     represented = {record_source_name(r) for r in materialized}
     represented |= {record_author(r) for r in materialized}
     unrepresented = sorted(c for c in configured if c not in represented)
+    # "checked, none missing" and "never checked" are DIFFERENT facts, and a summary
+    # that reports both as `0 unrepresented` hides the difference: a reader sees
+    # "0 configured source(s) unrepresented" and concludes the X-stratum check
+    # passed, when `--configured-sources` was omitted and nothing was compared at
+    # all. #207's core finding is exactly a nominal stratum, so this tool must not
+    # be able to fake its own all-clear. `checked` makes the state explicit.
+    configured_checked = bool(configured)
 
     declared_empty = [p for p in DECLARED_PLATFORMS if platform_counts.get(p, 0) == 0]
 
@@ -233,6 +240,7 @@ def audit_records(
         },
         "configured_sources": {
             "configured": len(configured),
+            "checked": configured_checked,
             "unrepresented": unrepresented,
             "unrepresented_count": len(unrepresented),
         },
@@ -240,7 +248,20 @@ def audit_records(
 
 
 def audit_summary(report: dict[str, Any]) -> str:
-    """One-line summary for a log line or issue comment."""
+    """One-line summary for a log line or issue comment.
+
+    The configured-source clause must distinguish "checked, none missing" from
+    "not checked": reporting both as `0 ... unrepresented` is how #207's nominal
+    stratum would read as an all-clear.
+    """
+    configured = report["configured_sources"]
+    if configured.get("checked"):
+        configured_clause = (
+            f"{configured['unrepresented_count']} of {configured['configured']} "
+            "configured source(s) unrepresented"
+        )
+    else:
+        configured_clause = "configured-source check not run (pass --configured-sources)"
     return (
         f"corpus audit: {report['total']} records | "
         f"grassroots {report['by_arena']['shares'].get('grassroots', 0.0):.1%}, "
@@ -248,6 +269,6 @@ def audit_summary(report: dict[str, Any]) -> str:
         f"top-{report['concentration']['top_n']} share "
         f"{report['concentration']['top_n_share']:.1%} | "
         f"{report['by_language']['unlabelled']} without language | "
-        f"{report['configured_sources']['unrepresented_count']} configured source(s) unrepresented | "
+        f"{configured_clause} | "
         f"{len(report['by_platform']['declared_but_empty'])} declared platform(s) empty"
     )

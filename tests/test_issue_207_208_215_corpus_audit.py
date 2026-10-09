@@ -169,6 +169,24 @@ class TestDeclaredPlatformsAndFloor:
         assert report["configured_sources"]["unrepresented"] == ["OpenAI", "timnitGebru"]
         assert report["configured_sources"]["unrepresented_count"] == 2
 
+    def test_a_check_that_did_not_run_is_not_an_all_clear(self) -> None:
+        """'never checked' and 'checked, none missing' must not read the same.
+
+        #207 is precisely a nominal stratum: a report that prints
+        ``0 configured source(s) unrepresented`` when ``--configured-sources``
+        was omitted would let the tool fake its own all-clear. The state must be
+        explicit in the report and the summary.
+        """
+        unchecked = audit_records([_rec(source_name="X")])
+        assert unchecked["configured_sources"]["checked"] is False
+        summary = audit_summary(unchecked)
+        assert "not run" in summary
+        assert "0 configured source(s) unrepresented" not in summary
+
+        checked = audit_records([_rec(source_name="X")], configured_sources=["X"])
+        assert checked["configured_sources"]["checked"] is True
+        assert "not run" not in audit_summary(checked)
+
 
 class TestNoInventedVerdict:
     def test_the_report_has_no_threshold_keys(self) -> None:
