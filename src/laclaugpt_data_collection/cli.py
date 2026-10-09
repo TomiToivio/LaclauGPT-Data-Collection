@@ -61,6 +61,17 @@ def _plugins_list(_args: argparse.Namespace) -> int:
     return 0
 
 
+def _manifest_drift(args: argparse.Namespace) -> int:
+    from .manifest_drift import compare_manifests, drift_summary
+
+    report = compare_manifests(args.deployed, args.tracked)
+    print(json.dumps(report, indent=2, sort_keys=True))
+    print(drift_summary(report), file=sys.stderr)
+    if args.fail_on_drift and not report["in_sync"]:
+        return 1
+    return 0
+
+
 def _distributed_check(args: argparse.Namespace) -> int:
     from .distributed_capture import DistributedCaptureSink
 
@@ -113,6 +124,19 @@ def _build_parser() -> argparse.ArgumentParser:
     doctor = sub.add_parser("doctor", help="validate a safe local/server profile")
     doctor.add_argument("--profile", help="path to a checked-in example or ignored local TOML profile")
     doctor.set_defaults(func=_doctor)
+
+    drift = sub.add_parser(
+        "manifest-drift",
+        help="report how the deployed source manifest differs from the tracked plan",
+    )
+    drift.add_argument("--deployed", required=True, help="manifest the pipeline reads")
+    drift.add_argument("--tracked", required=True, help="audited plan under configs/studies/")
+    drift.add_argument(
+        "--fail-on-drift",
+        action="store_true",
+        help="exit 1 when the manifests differ (for a CI or cron gate)",
+    )
+    drift.set_defaults(func=_manifest_drift)
 
     plugins = sub.add_parser("plugins", help="inspect the versioned collection-plugin registry")
     plugin_sub = plugins.add_subparsers(dest="plugins_command", required=True)

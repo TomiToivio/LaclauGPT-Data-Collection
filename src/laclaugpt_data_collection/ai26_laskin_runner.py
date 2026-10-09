@@ -319,6 +319,7 @@ def run_phase1_laskin(
     per_source_limit: int = 5,
     limit: int = 40,
     rotation: int | None = None,
+    tracked_plan: str | Path | None = None,
 ) -> dict[str, Any]:
     routed = collection_id or settings.project_id
     if routed != settings.project_id:
@@ -348,6 +349,7 @@ def run_phase1_laskin(
             "setup_errors": setup_errors,
             "notification_errors": [],
             "source_outcomes": [],
+            "manifest_drift": None,
         }
 
     rss = run_phase1_rss(
@@ -439,6 +441,28 @@ def run_phase1_laskin(
             outcome.update(status="error", reason="collection_or_ingest_failed")
             errors.append(f"{row.get('kind')}:{row.get('name','unnamed')}: {str(exc)[:180]}")
 
+    # Issue #206: make source-manifest drift visible every cycle. The deployed
+    # manifest is gitignored runtime config; the audited plan lives in
+    # configs/studies/. When the plan gains a source, nothing used to say the
+    # running set was behind it. `tracked_plan` is opt-in so the runner never
+    # guesses a repository path, and the comparison is read-only.
+    manifest_drift: dict[str, Any] | None = None
+    if tracked_plan is not None:
+        try:
+            from .manifest_drift import compare_manifests, drift_summary
+
+            drift_report = compare_manifests(source_manifest, tracked_plan)
+            manifest_drift = {
+                "in_sync": drift_report["in_sync"],
+                "summary": drift_summary(drift_report),
+                "added": drift_report["added"],
+                "removed": drift_report["removed"],
+                "deployed_total": drift_report["deployed_total"],
+                "tracked_total": drift_report["tracked_total"],
+            }
+        except Exception as exc:  # noqa: BLE001 - a report must not fail the cycle
+            manifest_drift = {"in_sync": None, "error": str(exc)[:180]}
+
     return {
         "status": "ok" if not errors else "partial",
         "project_id": settings.project_id,
@@ -456,6 +480,7 @@ def run_phase1_laskin(
         "warnings": warnings,
         "errors": errors,
         "source_outcomes": source_outcomes,
+        "manifest_drift": manifest_drift,
         "notification_errors": list(rss.get("notification_errors") or []) + list(sink.notification_errors),
     }
 
@@ -470,6 +495,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-jobs", type=int, default=6)
     parser.add_argument("--per-source-limit", type=int, default=5)
     parser.add_argument("--limit", type=int, default=40)
+    parser.add_argument(
+        "--tracked-plan",
+        default=None,
+        help="audited plan under configs/studies/; when set, report manifest drift",
+    )
     args = parser.parse_args(argv)
     result = run_phase1_laskin(
         Settings(),
@@ -481,6 +511,7 @@ def main(argv: list[str] | None = None) -> int:
         max_jobs=args.max_jobs,
         per_source_limit=args.per_source_limit,
         limit=args.limit,
+        tracked_plan=args.tracked_plan,
     )
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     return 0 if not result["errors"] else 1

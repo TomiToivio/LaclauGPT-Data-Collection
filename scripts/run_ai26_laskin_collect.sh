@@ -9,6 +9,9 @@ ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 ENV_FILE=${LACLAUGPT_ENV_FILE:-"$ROOT_DIR/.env"}
 STUDY_CONFIG=${LACLAUGPT_AI26_STUDY_CONFIG:-"$ROOT_DIR/data/config/ai26.yaml"}
 SOURCE_MANIFEST=${LACLAUGPT_AI26_SOURCE_MANIFEST:-"$ROOT_DIR/data/config/ai26.sources.toml"}
+# Issue #206: the audited plan the deployed manifest should track. Reported, never
+# enforced -- a drift line in the cycle log makes a stale deployment visible.
+TRACKED_PLAN=${LACLAUGPT_AI26_TRACKED_PLAN:-"$ROOT_DIR/configs/studies/ai26.sources.example.toml"}
 LOCK_FILE=${LACLAUGPT_AI26_COLLECT_LOCK:-"$ROOT_DIR/data/tmp/ai26-laskin-collect.lock"}
 
 mkdir -p "$ROOT_DIR/data/tmp" "$ROOT_DIR/data/logs"
@@ -73,7 +76,8 @@ set +e
   --max-feeds "${LACLAUGPT_AI26_MAX_FEEDS:-8}" \
   --max-jobs "${LACLAUGPT_AI26_MAX_NON_BROWSER_JOBS:-6}" \
   --per-source-limit "${LACLAUGPT_AI26_PER_SOURCE_LIMIT:-5}" \
-  --limit "${LACLAUGPT_AI26_BATCH_LIMIT:-40}"
+  --limit "${LACLAUGPT_AI26_BATCH_LIMIT:-40}" \
+  --tracked-plan "$TRACKED_PLAN"
 runner_status=$?
 set -e
 if [[ "$runner_status" -ne 0 ]]; then
