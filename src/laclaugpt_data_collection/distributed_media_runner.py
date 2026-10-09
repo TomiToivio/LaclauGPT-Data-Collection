@@ -65,6 +65,80 @@ class S3MediaBackend(MediaBackend):
         return False
 
 
+def repair_media_references(
+    records: list[dict[str, Any]],
+    media_states: dict[str, list[dict[str, Any]]],
+    *,
+    default_collection: str,
+) -> list[dict[str, Any]]:
+    """Re-attach completed media references the record lost to a later re-ingest.
+
+    Issue #210: re-ingest replaces the whole document, so a ref whose object is
+    already durably stored comes back with ``object_ref == ""``. The downloader
+    then skips it (the media index says ``completed``, which is terminal), so
+    nothing in the scheduled path can ever clear it — 97 records (12.3% of the
+    store) were invisible to Analysis for this reason.
+
+    The durable state is not lost: the SQLite ``media_index`` still carries the
+    S3 path and checksum. This copies that state back onto any ref the record
+    still lists but whose ``object_ref`` is empty, and returns the records it
+    changed. It writes nothing itself; the caller re-ingests what it returns.
+
+    A ref is repaired only when its media_index row's status is terminal
+    *and* records a non-empty local_path, so a genuinely unfinished download is
+    left for the downloader.
+    """
+    from .media import TERMINAL_MEDIA_STATUSES
+
+    touched: list[dict[str, Any]] = []
+    for record in records:
+        collection_id, _ = routing_metadata(record, default_collection=default_collection)
+        source_id = str(record.get("source_url") or "")
+        if not source_id:
+            continue
+        content = record.get("content")
+        if not isinstance(content, dict):
+            continue
+        refs = content.get("media_references")
+        if not isinstance(refs, list) or not refs:
+            continue
+        states = media_states.get(source_id)
+        if not states:
+            continue
+        by_index: dict[int, dict[str, Any]] = {}
+        for state in states:
+            status = str(state.get("status") or "")
+            path = str(state.get("local_path") or "")
+            if status in TERMINAL_MEDIA_STATUSES and path:
+                by_index[int(state.get("media_index", -1))] = state
+        changed = False
+        for position, ref in enumerate(refs):
+            if not isinstance(ref, dict):
+                continue
+            if str(ref.get("object_ref") or ""):
+                continue
+            state = by_index.get(int(ref.get("media_index", position)))
+            if state is None:
+                continue
+            # Prefer the row whose recorded url matches the ref, so a shifted
+            # index cannot attach the wrong object.
+            state_url = str(state.get("url") or "")
+            ref_url = str(ref.get("url") or "")
+            if state_url and ref_url and state_url != ref_url:
+                continue
+            ref["object_ref"] = str(state.get("local_path") or "")
+            ref["checksum"] = str(state.get("sha256") or "")
+            metadata = ref.setdefault("metadata", {})
+            metadata.setdefault("byte_size", state.get("byte_size"))
+            metadata.setdefault("mime_type", state.get("mime_type"))
+            metadata["download_status"] = "completed"
+            metadata["repaired_from_media_index"] = True
+            changed = True
+        if changed:
+            touched.append(record)
+    return touched
+
+
 def apply_media_results(
     records: list[dict[str, Any]],
     jobs: list[MediaJob],
@@ -210,6 +284,30 @@ def _run_distributed_media_unlocked(
             backend=S3MediaBackend(object_store),
             workers=workers,
         )
+        # Issue #210: repair refs whose durable media already exists but whose
+        # document lost the back-reference to a later re-ingest. This runs FIRST,
+        # before enqueue, because the downloader skips these rows by design (the
+        # media index says "completed", which is terminal) and would otherwise
+        # never revisit them. Repaired refs also stop the record appearing in the
+        # pending set on the next cycle.
+        repaired: list[dict[str, Any]] = []
+        try:
+            repair_states = {
+                str(record.get("source_url") or ""): store.media_states(
+                    str(record.get("source_url") or ""),
+                    collection_id=settings.project_id,
+                )
+                for record in records
+                if record.get("source_url")
+            }
+            repaired = repair_media_references(
+                records,
+                repair_states,
+                default_collection=settings.project_id,
+            )
+        except Exception as exc:  # noqa: BLE001
+            sink.notification_errors.append(f"media-ref repair skipped: {exc}")
+
         jobs = downloader.enqueue_from_records(records)
         results = downloader.run_queue(jobs)
         touched = apply_media_results(
@@ -220,6 +318,9 @@ def _run_distributed_media_unlocked(
         )
         for record in touched:
             sink.ingest(record)
+        for record in repaired:
+            if record not in touched:
+                sink.ingest(record)
         return {
             "project_id": settings.project_id,
             "run_id": settings.run_id,
@@ -233,6 +334,7 @@ def _run_distributed_media_unlocked(
             "access_restricted": sum(row.get("status") == "access_restricted" for row in results),
             "skipped": max(len(records) - len(jobs), 0),
             "mongo_refreshed": len(touched),
+            "media_refs_repaired": len(repaired),
         }
     finally:
         store.close()

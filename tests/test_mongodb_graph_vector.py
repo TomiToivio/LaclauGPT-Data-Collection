@@ -27,7 +27,9 @@ class FakeCollection:
         self.documents = [doc for doc in self.documents if not all(doc.get(k) == v for k, v in query.items())]
         self.documents.append(payload)
 
-    def find_one(self, query: dict[str, Any], projection: dict[str, int]) -> dict[str, int] | None:
+    def find_one(
+        self, query: dict[str, Any], projection: dict[str, int] | None = None
+    ) -> dict[str, int] | None:
         del projection
         return {"_id": 1} if any(all(doc.get(k) == v for k, v in query.items()) for doc in self.documents) else None
 

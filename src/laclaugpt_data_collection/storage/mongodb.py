@@ -6,7 +6,7 @@ from typing import Any
 
 from ..handoff import build_handoff
 from ..models import CanonicalRecord, canonicalize_source_url
-from .remote import _routing_metadata, _run_id
+from .remote import _carry_forward_media_state, _routing_metadata, _run_id
 
 
 class MongoRecordStore:
@@ -100,9 +100,16 @@ class MongoRecordStore:
         }
 
     def upsert(self, record: CanonicalRecord) -> bool:
-        """Persist one record; return True when it was newly created (issue #222)."""
-        existing = self._collection.find_one(self._query(record), {"_id": 1})
-        self._collection.replace_one(self._query(record), self._payload(record), upsert=True)
+        """Persist one record; return True when it was newly created (issue #222).
+
+        Carries resolved media back-references forward so a re-ingest cannot wipe
+        an ``object_ref`` the media worker already wrote (issue #210).
+        """
+        existing = self._collection.find_one(self._query(record))
+        payload = self._payload(record)
+        if existing:
+            _carry_forward_media_state(payload, existing)
+        self._collection.replace_one(self._query(record), payload, upsert=True)
         return existing is None
 
     def upsert_many(self, records: Iterable[CanonicalRecord]) -> None:
