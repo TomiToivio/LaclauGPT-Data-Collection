@@ -121,6 +121,11 @@ class MastodonCollector:
     def _failure_state(exc: Exception) -> tuple[bool, str | None, int | None]:
         response = getattr(exc, "response", None)
         status_value = getattr(exc, "status_code", None) or getattr(response, "status_code", None)
+        # Mastodon.py exposes API error HTTP status in exc.args[1].
+        if status_value is None and len(exc.args) > 1:
+            candidate = exc.args[1]
+            if isinstance(candidate, int) and not isinstance(candidate, bool):
+                status_value = candidate
         try:
             status_code = int(status_value) if status_value is not None else None
         except (TypeError, ValueError):
