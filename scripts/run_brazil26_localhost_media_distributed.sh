@@ -49,24 +49,47 @@ else
   exit 2
 fi
 
-# Distributed plane: MongoDB is the record/status store and S3 is CSC Allas.
-# These are set (not cleared) deliberately -- the point of this wrapper. Values
-# come from the ignored runtime env or the environment; nothing is committed.
-export LACLAUGPT_RECORD_BACKEND=${LACLAUGPT_RECORD_BACKEND:-mongodb}
-export LACLAUGPT_OBJECT_BACKEND=${LACLAUGPT_OBJECT_BACKEND:-s3}
+# Distributed plane: MongoDB is the record/status store and S3 is CSC Allas. This is
+# not a default, it is this wrapper's contract -- so the backends are set
+# unconditionally, and an explicit conflicting value is REFUSED rather than ignored.
+#
+# Both halves matter:
+#   * an override that silently won (`${VAR:-s3}`) would leave this wrapper *called*
+#     the distributed path while writing videos to the local filesystem and records
+#     to CSV: #233's AC3 unmet while every log line looked healthy. That is the same
+#     silent-bypass shape the local-first wrapper guards against in the opposite
+#     direction, by pinning filesystem/csv outright;
+#   * silently overriding an operator's explicit setting would be its own lie. If the
+#     environment says filesystem, this host is misconfigured for the remote profile
+#     and the operator should hear it, with the file to fix named.
+require_distributed_backend() {
+  local name="$1" want="$2" got="${!1:-}"
+  if [[ -n "$got" && "$got" != "$want" ]]; then
+    echo "distributed media requires $name=$want, but the environment set '$got'." >&2
+    echo "This wrapper is the CSC Allas + MongoDB path (#233); run on the local plane it" >&2
+    echo "would upload nothing while the cron still reported success." >&2
+    echo "Fix: unset $name in the runtime env, or schedule the local-first wrapper" >&2
+    echo "(run_brazil26_localhost_media.sh) via LACLAUGPT_BRAZIL26_MEDIA_MODE=local." >&2
+    exit 2
+  fi
+  export "$name=$want"
+}
+require_distributed_backend LACLAUGPT_RECORD_BACKEND mongodb
+require_distributed_backend LACLAUGPT_OBJECT_BACKEND s3
 export LACLAUGPT_CACHE_BACKEND=${LACLAUGPT_CACHE_BACKEND:-memory}
 export LACLAUGPT_DISTRIBUTED_CONFIG_BACKEND=${LACLAUGPT_DISTRIBUTED_CONFIG_BACKEND:-local}
 export LACLAUGPT_MESSAGING_BACKEND=${LACLAUGPT_MESSAGING_BACKEND:-none}
 export LACLAUGPT_TASK_QUEUE_BACKEND=${LACLAUGPT_TASK_QUEUE_BACKEND:-direct}
 
 # Fail closed with an actionable message rather than a stack trace when the
-# deployment is not actually configured for Allas/Mongo. Allas credentials come
-# from allas-conf / ~/.aws (boto3), never from this env file.
-if [[ "${LACLAUGPT_OBJECT_BACKEND}" == "s3" && -z "${LACLAUGPT_S3_BUCKET:-}" ]]; then
+# deployment is not actually configured for Allas/Mongo. Unconditional now that the
+# backends above cannot be anything else. Allas credentials come from allas-conf /
+# ~/.aws (boto3), never from this env file.
+if [[ -z "${LACLAUGPT_S3_BUCKET:-}" ]]; then
   echo "distributed media requires LACLAUGPT_S3_BUCKET (Allas bucket); refusing to fall back to filesystem" >&2
   exit 2
 fi
-if [[ "${LACLAUGPT_RECORD_BACKEND}" == "mongodb" && -z "${LACLAUGPT_MONGODB_URI:-}" ]]; then
+if [[ -z "${LACLAUGPT_MONGODB_URI:-}" ]]; then
   echo "distributed media requires LACLAUGPT_MONGODB_URI; refusing to run without the metadata store" >&2
   exit 2
 fi

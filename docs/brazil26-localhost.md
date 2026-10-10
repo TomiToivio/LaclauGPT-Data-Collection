@@ -188,15 +188,29 @@ project-scoped MongoDB, use the distributed wrapper instead:
 bash scripts/run_brazil26_localhost_media_distributed.sh
 ```
 
-It sets (does not clear) `LACLAUGPT_RECORD_BACKEND=mongodb` and
-`LACLAUGPT_OBJECT_BACKEND=s3`, refuses to run without `LACLAUGPT_S3_BUCKET` /
+It sets `LACLAUGPT_RECORD_BACKEND=mongodb` and `LACLAUGPT_OBJECT_BACKEND=s3`
+**unconditionally**, refuses to run without `LACLAUGPT_S3_BUCKET` /
 `LACLAUGPT_MONGODB_URI` (fail closed, never a silent filesystem fallback), and
 enforces the source policy before touching the network. Allas credentials come
 from `allas-conf` / `~/.aws`, never from the env file.
 
-Install **one** media cron entry per host. The installer writes the local-first
-wrapper; to schedule the distributed one, point the marker-managed block at the
-`..._media_distributed.sh` wrapper and verify a single scheduled tick.
+An explicit conflicting setting is **refused**, not quietly overridden: if the
+environment pins `LACLAUGPT_OBJECT_BACKEND=filesystem` or
+`LACLAUGPT_RECORD_BACKEND=csv` (which the local-first wrapper legitimately does),
+this wrapper exits 2 and names the variable. Running it on the local plane would
+upload nothing while the cron still reported success, so the misconfiguration has
+to surface.
+
+Install **one** media cron entry per host, and pick the worker with the installer
+rather than editing the crontab by hand:
+
+```bash
+LACLAUGPT_BRAZIL26_MEDIA_MODE=allas bash scripts/install_cron_brazil26.sh   # CSC Allas
+LACLAUGPT_BRAZIL26_MEDIA_MODE=local bash scripts/install_cron_brazil26.sh   # local-first (default)
+```
+
+Switching mode removes the other mode's entry, because the two wrappers share one
+lock and would otherwise fight over it.
 
 ### Source policy (X, Instagram and TikTok only)
 
