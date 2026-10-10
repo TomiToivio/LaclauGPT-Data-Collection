@@ -9,6 +9,8 @@ that the cron cadence is 30 minutes with no stale 15-minute entry.
 """
 from __future__ import annotations
 
+import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -95,15 +97,112 @@ def test_allowlist_cli_passes_and_fails() -> None:
 # --------------------------------------------------------------------------- #
 
 def test_distributed_media_wrapper_pins_s3_and_mongodb() -> None:
+    """The backends are this wrapper's *contract*, not defaults.
+
+    This test previously asserted the override-permitting form
+    (`${LACLAUGPT_OBJECT_BACKEND:-s3}`) as though it were the fix. That form is
+    exactly what a stale private env needs to silently drop the worker back onto the
+    local plane, so the assertion had made the defect look guarded. The check is now
+    about strength: neither backend may be overridable at all.
+    """
     text = (ROOT / "scripts/run_brazil26_localhost_media_distributed.sh").read_text(encoding="utf-8")
-    assert 'LACLAUGPT_OBJECT_BACKEND=${LACLAUGPT_OBJECT_BACKEND:-s3}' in text
-    assert 'LACLAUGPT_RECORD_BACKEND=${LACLAUGPT_RECORD_BACKEND:-mongodb}' in text
+    assert "require_distributed_backend" in text
+    for name in ("LACLAUGPT_RECORD_BACKEND", "LACLAUGPT_OBJECT_BACKEND"):
+        assert f"${{{name}:-" not in text, f"{name} is still overridable"
+    assert "require_distributed_backend LACLAUGPT_RECORD_BACKEND mongodb" in text
+    assert "require_distributed_backend LACLAUGPT_OBJECT_BACKEND s3" in text
     # It must NOT clear the remote selectors the way the local-first wrapper does.
     assert "LACLAUGPT_S3_BUCKET=\n" not in text
     assert "LACLAUGPT_MONGODB_URI=\n" not in text
     # Fail closed rather than falling back to filesystem.
     assert "refusing to fall back to filesystem" in text
     assert "laclaugpt-distributed-media" in text
+
+
+def _distributed_checkout(tmp_path: Path, hostile_env: dict[str, str]):
+    """A synthetic checkout with shims, so the wrapper runs without any network."""
+    root = tmp_path / "checkout"
+    (root / "scripts").mkdir(parents=True)
+    shutil.copy2(ROOT / "scripts/run_brazil26_localhost_media_distributed.sh",
+                 root / "scripts/run_brazil26_localhost_media_distributed.sh")
+    data = root / "data"
+    (data / "config").mkdir(parents=True)
+    (data / "config" / "brazil26-localhost.env").write_text("LACLAUGPT_PROJECT_ID=brazil26\n", encoding="utf-8")
+    (data / "config" / "brazil26.sources.toml").write_text("[sources]\n", encoding="utf-8")
+    study = tmp_path / "study.yaml"
+    study.write_text("study: brazil26\n", encoding="utf-8")
+    home = tmp_path / "home"
+    (home / ".local" / "bin").mkdir(parents=True)
+    shim = tmp_path / "shim"
+    shim.mkdir()
+    python_shim = shim / "python"
+    python_shim.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    python_shim.chmod(0o755)
+    marker = tmp_path / "worker-ran"
+    worker = shim / "laclaugpt-distributed-media"
+    worker.write_text(f"#!/bin/sh\ntouch '{marker}'\nexit 0\n", encoding="utf-8")
+    worker.chmod(0o755)
+    env = {
+        **{k: v for k, v in os.environ.items() if not k.startswith("LACLAUGPT_")},
+        "PATH": f"{shim}:{os.environ['PATH']}",
+        "HOME": str(home),
+        "LACLAUGPT_ENV_FILE": str(data / "config" / "brazil26-localhost.env"),
+        "LACLAUGPT_STUDY_CONFIG": str(study),
+        "LACLAUGPT_DATA_ROOT": str(data),
+        "LACLAUGPT_PRIVATE_REPO": str(tmp_path / "private"),
+        "LACLAUGPT_S3_BUCKET": "test-bucket",
+        "LACLAUGPT_MONGODB_URI": "mongodb://example.invalid/test",
+        **hostile_env,
+    }
+    return root, marker, env
+
+
+def _run_distributed(root: Path, env: dict[str, str]):
+    return subprocess.run(
+        ["bash", str(root / "scripts" / "run_brazil26_localhost_media_distributed.sh")],
+        cwd=str(root), env=env, text=True, capture_output=True, timeout=60,
+    )
+
+
+@pytest.mark.parametrize(
+    "name, value, wanted",
+    [
+        ("LACLAUGPT_OBJECT_BACKEND", "filesystem", "LACLAUGPT_OBJECT_BACKEND=s3"),
+        ("LACLAUGPT_RECORD_BACKEND", "csv", "LACLAUGPT_RECORD_BACKEND=mongodb"),
+    ],
+)
+def test_a_stale_env_cannot_drop_the_distributed_worker_onto_the_local_plane(
+    tmp_path: Path, name: str, value: str, wanted: str
+) -> None:
+    """The reviewer's case: a stale private env must not silently bypass Allas/Mongo.
+
+    With the old `${VAR:-...}` form the override won, the credential checks were
+    skipped, and the worker ran the local plane while the cron reported success.
+    """
+    root, marker, env = _distributed_checkout(tmp_path, hostile_env={name: value})
+    result = _run_distributed(root, env)
+    assert result.returncode == 2, (result.returncode, result.stdout, result.stderr)
+    assert wanted in result.stderr, result.stderr
+    assert value in result.stderr, result.stderr
+    assert not marker.exists(), "the media worker ran despite the conflicting backend"
+
+
+def test_the_distributed_worker_still_runs_on_a_clean_env(tmp_path: Path) -> None:
+    """Guards the guard: a wrapper that refused everything would pass the tests above."""
+    root, marker, env = _distributed_checkout(tmp_path, hostile_env={})
+    result = _run_distributed(root, env)
+    assert result.returncode == 0, (result.returncode, result.stdout, result.stderr)
+    assert marker.exists(), "the media worker was never reached on a clean env"
+
+
+def test_missing_allas_settings_still_fail_closed_without_the_override(tmp_path: Path) -> None:
+    """The credential checks no longer sit behind a backend value that could change."""
+    root, marker, env = _distributed_checkout(tmp_path, hostile_env={})
+    env.pop("LACLAUGPT_S3_BUCKET")
+    result = _run_distributed(root, env)
+    assert result.returncode == 2, (result.returncode, result.stdout, result.stderr)
+    assert "LACLAUGPT_S3_BUCKET" in result.stderr
+    assert not marker.exists()
 
 
 def test_local_first_wrapper_keeps_its_zero_infrastructure_guarantee() -> None:
