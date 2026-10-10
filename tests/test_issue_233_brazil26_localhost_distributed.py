@@ -96,8 +96,11 @@ def test_allowlist_cli_passes_and_fails() -> None:
 
 def test_distributed_media_wrapper_pins_s3_and_mongodb() -> None:
     text = (ROOT / "scripts/run_brazil26_localhost_media_distributed.sh").read_text(encoding="utf-8")
-    assert 'LACLAUGPT_OBJECT_BACKEND=${LACLAUGPT_OBJECT_BACKEND:-s3}' in text
-    assert 'LACLAUGPT_RECORD_BACKEND=${LACLAUGPT_RECORD_BACKEND:-mongodb}' in text
+    assert "export LACLAUGPT_OBJECT_BACKEND=s3" in text
+    assert "export LACLAUGPT_RECORD_BACKEND=mongodb" in text
+    # Stale env values must never redirect this wrapper to a local backend.
+    assert "LACLAUGPT_OBJECT_BACKEND=${LACLAUGPT_OBJECT_BACKEND:-s3}" not in text
+    assert "LACLAUGPT_RECORD_BACKEND=${LACLAUGPT_RECORD_BACKEND:-mongodb}" not in text
     # It must NOT clear the remote selectors the way the local-first wrapper does.
     assert "LACLAUGPT_S3_BUCKET=\n" not in text
     assert "LACLAUGPT_MONGODB_URI=\n" not in text
