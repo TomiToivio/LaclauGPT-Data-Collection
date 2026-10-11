@@ -477,6 +477,14 @@ sampling_rationale = "Open-model, competition, innovation and safety discourse f
 priority = "P1"
 
 [[web_source]]
+name = "microsoft_ai_blog"
+homepage = "https://www.microsoft.com/en-us/ai/blog/"
+arena = "elites"
+source_family = "frontier lab / industry / deployment"
+sampling_rationale = "Microsoft is a frontier-adjacent industry actor and a co-signatory of the 29 Sep 2026 frontier accord; first-party AI blog with items inside the study window (issue #251)."
+priority = "P1"
+
+[[web_source]]
 name = "dair_blog"
 homepage = "https://www.dair-institute.org/blog/"
 arena = "elites"
