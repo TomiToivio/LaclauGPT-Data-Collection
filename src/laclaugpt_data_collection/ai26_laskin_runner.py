@@ -34,6 +34,10 @@ from .web_fetch import fetch_web_child
 _BROWSER_ONLY_TABLES = {"x_account", "browser_source", "instagram_account", "tiktok_account"}
 _WEB_SOURCE_FEED_FALLBACKS = {
     "https://openai.com/news": "https://openai.com/news/rss.xml",
+    # Microsoft AI blog (#251): the blog page has no scrapeable feed discovery on the
+    # browser-free stage, so the verified feed is collected directly. Keyed without the
+    # trailing slash because the lookup below rstrips it.
+    "https://www.microsoft.com/en-us/ai/blog": "https://www.microsoft.com/en-us/ai/blog/feed/",
 }
 
 _NON_BROWSER_TABLES = (
