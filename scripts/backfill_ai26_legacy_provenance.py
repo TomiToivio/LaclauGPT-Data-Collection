@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sys
 from collections import Counter
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -103,7 +102,7 @@ def main(argv=None) -> int:
             if args.apply:
                 result = col.update_one(q, {"$set": {
                     "arena": row["arena"],
-                    "source.raw_ref": "legacy:reviewed:" + row["source_name"],
+                    "source.raw_metadata.provenance_status": "legacy_reviewed_attribution",
                     "source.collector": "legacy_provenance_backfill",
                     "source.raw_metadata.source_name": row["source_name"],
                     "source.raw_metadata.arena": row["arena"],
