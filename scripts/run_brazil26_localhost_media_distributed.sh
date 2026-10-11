@@ -52,8 +52,10 @@ fi
 # Distributed plane: MongoDB is the record/status store and S3 is CSC Allas.
 # These are set (not cleared) deliberately -- the point of this wrapper. Values
 # come from the ignored runtime env or the environment; nothing is committed.
-export LACLAUGPT_RECORD_BACKEND=${LACLAUGPT_RECORD_BACKEND:-mongodb}
-export LACLAUGPT_OBJECT_BACKEND=${LACLAUGPT_OBJECT_BACKEND:-s3}
+# Always force the distributed backends. A stale private env must never silently
+# redirect this Allas deployment to local CSV/filesystem storage.
+export LACLAUGPT_RECORD_BACKEND=mongodb
+export LACLAUGPT_OBJECT_BACKEND=s3
 export LACLAUGPT_CACHE_BACKEND=${LACLAUGPT_CACHE_BACKEND:-memory}
 export LACLAUGPT_DISTRIBUTED_CONFIG_BACKEND=${LACLAUGPT_DISTRIBUTED_CONFIG_BACKEND:-local}
 export LACLAUGPT_MESSAGING_BACKEND=${LACLAUGPT_MESSAGING_BACKEND:-none}

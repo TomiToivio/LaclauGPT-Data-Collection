@@ -194,9 +194,19 @@ It sets (does not clear) `LACLAUGPT_RECORD_BACKEND=mongodb` and
 enforces the source policy before touching the network. Allas credentials come
 from `allas-conf` / `~/.aws`, never from the env file.
 
-Install **one** media cron entry per host. The installer writes the local-first
-wrapper; to schedule the distributed one, point the marker-managed block at the
-`..._media_distributed.sh` wrapper and verify a single scheduled tick.
+Install **one** media cron entry per host with the supported installer. For
+Brazil26 MongoDB + CSC Allas deployment, select the distributed media worker:
+
+```bash
+LACLAUGPT_BRAZIL26_MEDIA_MODE=allas bash scripts/install_cron_brazil26.sh
+crontab -l | sed -n '/BEGIN LACLAUGPT BRAZIL26/,/END LACLAUGPT BRAZIL26/p'
+```
+
+The installer places the Allas worker at `*/30 * * * *`, removes stale
+15-minute entries and replaces any previous local-first media entry. Its default
+mode is `local`, which does **not** upload to Allas. The distributed wrapper
+forces MongoDB and S3, even if an ignored env file contains stale local backend
+selectors. Validate real credentials and a completed scheduled tick on the host.
 
 ### Source policy (X, Instagram and TikTok only)
 
@@ -293,7 +303,8 @@ crontab -l | sed -n '/BEGIN LACLAUGPT BRAZIL26/,/END LACLAUGPT BRAZIL26/p'
 ```
 
 The installer derives `ROOT` from its checkout and passes the selected runtime
-env, study and data paths to all three workers. Media remains every 15 minutes.
+env, study and data paths to all three workers. Media runs every **30 minutes**
+(:00 and :30), in either local or Allas mode.
 Verify an actual scheduled tick and its output in `data/logs/` before retiring
 anything. Do not remove the stale directory while any editable install, running
 process or scheduled command still depends on it; preserve its local edits and
