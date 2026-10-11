@@ -444,6 +444,15 @@ source_family = "frontier lab / deployment / governance / safety"
 sampling_rationale = "Major frontier-lab discourse around capabilities, products, safety and policy. Uses the official RSS feed because the news landing page blocks automated HTML collection."
 priority = "P1"
 
+[[feed]]
+name = "microsoft_ai"
+feed_url = "https://www.microsoft.com/en-us/ai/blog/feed/"
+homepage = "https://www.microsoft.com/en-us/ai/blog/"
+arena = "elites"
+source_family = "frontier lab / industry / cloud and AI policy"
+sampling_rationale = "Microsoft's first-party AI discourse. Microsoft co-signed the 29 Sep 2026 White House frontier accord alongside OpenAI, Anthropic, Google, Meta and xAI, and was otherwise entirely unrepresented in the elites 'frontier-lab and industry discourse' focus: no feed, no web_source, no X handle and no study-config group (#251). Inclusion is a SAMPLING decision, never an ideological classification. Verified live 2026-10-11: the feed returns HTTP 301 and resolves to the Microsoft Cloud Blog feed, which serves 10 items, newest 2026-10-05, inside the 2026-09-01 publication floor. The landing page does not serve automated HTML, so the official RSS feed is used, as with openai_news."
+priority = "P1"
+
 [[web_source]]
 name = "anthropic_news"
 homepage = "https://www.anthropic.com/news"
