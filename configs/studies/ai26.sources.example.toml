@@ -444,6 +444,17 @@ source_family = "frontier lab / deployment / governance / safety"
 sampling_rationale = "Major frontier-lab discourse around capabilities, products, safety and policy. Uses the official RSS feed because the news landing page blocks automated HTML collection."
 priority = "P1"
 
+[[feed]]
+name = "microsoft_ai_blog"
+feed_url = "https://www.microsoft.com/en-us/ai/blog/feed/"
+homepage = "https://www.microsoft.com/en-us/ai/"
+arena = "elites"
+source_family = "frontier AI industry / deployment / governance"
+sampling_rationale = "First-party Microsoft AI discussion, including its role in frontier model deployment, enterprise infrastructure and AI governance. Expands the elites frontier-lab-and-industry stratum to include Microsoft (#251). Inclusion is a sampling decision, not an ideological label; articles must meet the study's existing date/relevance rules. Feed observed live in issue #251 (2026-10-11)."
+priority = "P1"
+active = true
+last_verified = "2026-10-11"
+
 [[web_source]]
 name = "anthropic_news"
 homepage = "https://www.anthropic.com/news"
@@ -786,6 +797,8 @@ priority = "P1"
 
 [[youtube_source]]
 name = "OpenAI"
+active = false
+inactive_reason = "No explicit video_urls and channel discovery is not implemented on the Laskin non-browser collector; retain sampling intention without scheduling impossible jobs (#249)."
 arena = "elites"
 source_family = "frontier lab / capability / deployment"
 mode = "transcript_only"
@@ -793,6 +806,8 @@ priority = "P1"
 
 [[youtube_source]]
 name = "Anthropic"
+active = false
+inactive_reason = "No explicit video_urls and channel discovery is not implemented on the Laskin non-browser collector; retain sampling intention without scheduling impossible jobs (#249)."
 arena = "elites"
 source_family = "frontier lab / safety / policy"
 mode = "transcript_only"
@@ -800,6 +815,8 @@ priority = "P1"
 
 [[youtube_source]]
 name = "Google DeepMind"
+active = false
+inactive_reason = "No explicit video_urls and channel discovery is not implemented on the Laskin non-browser collector; retain sampling intention without scheduling impossible jobs (#249)."
 arena = "elites"
 source_family = "frontier lab / research / safety"
 mode = "transcript_only"
@@ -807,6 +824,8 @@ priority = "P1"
 
 [[youtube_source]]
 name = "AI Now Institute"
+active = false
+inactive_reason = "No explicit video_urls and channel discovery is not implemented on the Laskin non-browser collector; retain sampling intention without scheduling impossible jobs (#249)."
 arena = "elites"
 source_family = "Critical AI / policy / political economy"
 mode = "transcript_only"
@@ -814,6 +833,8 @@ priority = "P1"
 
 [[youtube_source]]
 name = "European Commission AI policy events"
+active = false
+inactive_reason = "No explicit video_urls and channel discovery is not implemented on the Laskin non-browser collector; retain sampling intention without scheduling impossible jobs (#249)."
 arena = "parliamentary"
 source_family = "institutional governance"
 mode = "transcript_only"
@@ -828,6 +849,8 @@ priority = "P1"
 
 [[scholarly_query]]
 name = "critical_ai_political_economy"
+active = false
+inactive_reason = "Declared OpenAlex/Semantic Scholar/socArXiv services are not implemented; do not silently replace the intended stratum with arXiv (#249)."
 services = ["openalex", "semantic_scholar", "socArxiv"]
 query = "artificial intelligence AND (labour OR inequality OR discrimination OR surveillance OR political economy OR ownership)"
 arena = "elites"
@@ -842,6 +865,8 @@ priority = "P1"
 
 [[scholarly_query]]
 name = "ai_creative_labour"
+active = false
+inactive_reason = "Declared OpenAlex/Semantic Scholar/socArXiv services are not implemented; do not silently replace the intended stratum with arXiv (#249)."
 services = ["openalex", "semantic_scholar", "socArxiv"]
 query = "generative AI AND (copyright OR creative work OR artists OR labour OR automation)"
 arena = "grassroots"
@@ -849,6 +874,8 @@ priority = "P2"
 
 [[scholarly_query]]
 name = "left_techno_optimism"
+active = false
+inactive_reason = "Declared OpenAlex/Semantic Scholar/socArXiv services are not implemented; do not silently replace the intended stratum with arXiv (#249)."
 services = ["openalex", "semantic_scholar", "socArxiv"]
 query = "(AI OR automation) AND (post-work OR postcapitalism OR public ownership OR redistribution OR technological emancipation)"
 arena = "elites"
