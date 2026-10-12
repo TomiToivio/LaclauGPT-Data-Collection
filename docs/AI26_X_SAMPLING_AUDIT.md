@@ -98,11 +98,13 @@ Two structural observations:
    Bluesky-only). Governance-institution discourse is legitimate material, but it is not the
    same construct as parliamentary/electoral articulation, and §4.1 warns that "links between
    public discourse and policy outcomes must be demonstrated rather than inferred".
-2. **The grassroots arena is thin, and thinner than the design.** 3 of the 6 configured
+2. **The grassroots arena is thin, and thinner than the design.** 3 of the 5 configured
    grassroots groups carry **no X handles at all** (creator-rights/licensing,
    digital-rights/civil-liberties, data-centre/energy) — they are Bluesky/RSS-only. So the
    anti-AI/deployment-opposition and infrastructure-conflict strata that #258 asks to check
    have no X presence by design, and the grassroots X stratum is labour unions plus `@PauseAI`.
+   In group terms the design is balanced (elites 5, grassroots 5, parliamentary 1) while in
+   *X-handle* terms it is not — which is the gap that matters for a browser-collected stratum.
 
 **Left-wing techno-optimism: 0 X handles, deliberately.** `left_techno_optimism_discovery` is
 a discovery stratum using terms (`post-work`, `postcapitalism`, `public AI`, `public compute`,
