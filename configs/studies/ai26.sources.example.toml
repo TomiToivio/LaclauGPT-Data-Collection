@@ -6,21 +6,9 @@
 # RSS/Atom entries are executable by the server collector. X account entries
 # mirror the browser-tour strata in ai26.example.yaml and are intentionally
 # bounded. Runtime configuration may extend this manifest privately.
-#
-# Every `[[feed]]` row declares its arena status explicitly (#265). A row either
-# carries `arena = "<elites|grassroots|parliamentary>"`, or carries
-# `arena_unassigned = true` with an `arena_unassigned_reason`, which means no
-# arena was declared and the assignment is a sampling decision the author has not
-# made. Such rows are recorded as an explicit residual: the corpus audit reports
-# their records under `unknown-arena` rather than letting them dilute the
-# arena-stratified shares silently. Removing the field is not a fix; the guard in
-# `tests/test_ai26_feed_rows_declare_arena.py` fails if a row declares neither.
-#
-# A row that cannot produce a record carries `enabled = false` with an
-# `inactive_reason`. The sampling intention is retained -- the row is not deleted
-# -- but no collection job is scheduled for it, following the #249 pattern for
-# the YouTube and scholarly strata. `enabled` is the field the feed loader reads;
-# `active` is not consulted for feeds.
+# Every feed has an explicitly assigned arena (#265); assignments are sampling
+# provenance, not ideological labels. Disabled feeds retain their sampling
+# intention and use enabled = false, which the RSS loader actually honours.
 
 # ---------------------------------------------------------------------------
 # RSS / Atom backbone
@@ -80,7 +68,7 @@ source_family = "market techno-optimism / acceleration-adjacent"
 sampling_rationale = "Prominent market-oriented technological optimism and abundance/growth discourse."
 priority = "P1"
 enabled = false
-inactive_reason = "newest item 2024-07-05 is below window.start 2026-09-01; cannot produce a record under source_publication_time (#265)"
+inactive_reason = "Newest feed publication 2024-07-05 predates AI26 publication floor 2026-09-01; retain sampling intention, do not poll until a current source is verified (#265)."
 
 [[feed]]
 name = "tech_policy_press"
@@ -109,7 +97,7 @@ source_family = "public-interest AI / public infrastructure / open models"
 sampling_rationale = "Technology-positive public-AI discourse centered on public capacity, shared infrastructure, accountability and durable public goods."
 priority = "P1"
 enabled = false
-inactive_reason = "newest item 2026-07-24 is below window.start 2026-09-01; no record can pass the publication floor (#265)"
+inactive_reason = "Newest item 2026-07-24 predates AI26 publication floor 2026-09-01; retain sampling intention and re-verify if publisher resumes (#265)."
 
 [[feed]]
 name = "ada_lovelace"
@@ -119,10 +107,9 @@ arena = "elites"
 source_family = "public-interest AI / Critical AI / political economy / public compute"
 sampling_rationale = "Research on equitable distribution of AI benefits, public-interest governance, public compute and alternative political economies for AI. NOTE: verified 2026-09-11, channel alive but 0 items. Kept active pending publisher fix."
 priority = "P1"
-active = true
-last_verified = "2026-09-11"
 enabled = false
-inactive_reason = "publisher feed returns zero items (HTTP 200, empty body); no record can arrive (#265, #202)"
+inactive_reason = "Publisher feed responded with zero items on 2026-10-12; retain sampling intention without polling until a working endpoint is verified (#265, #202)."
+last_verified = "2026-09-11"
 
 [[feed]]
 name = "data_society"
@@ -132,10 +119,9 @@ arena = "elites"
 source_family = "Critical AI / labour / surveillance / social impacts"
 sampling_rationale = "Data-power research on AI in lived institutions: sociotechnical orderings, labour, surveillance, infrastructure critique and civic life. NOTE: feed verified live 2026-09-11 but served 0 items (channel alive, no content). Kept active pending publisher fix; remove if still empty at next verification."
 priority = "P1"
-active = true
-last_verified = "2026-09-11"
 enabled = false
-inactive_reason = "publisher feed returns zero items (HTTP 200, empty body); no record can arrive (#265, #202)"
+inactive_reason = "Publisher feed responded with zero items on 2026-10-12; retain sampling intention without polling until a working endpoint is verified (#265, #202)."
+last_verified = "2026-09-11"
 
 [[feed]]
 name = "green_web_foundation"
@@ -148,6 +134,7 @@ priority = "P1"
 
 [[feed]]
 name = "metr"
+arena = "elites"
 feed_url = "https://metr.org/feed.xml"
 homepage = "https://metr.org"
 source_family = "x-risk / evaluations"
@@ -155,10 +142,9 @@ sampling_rationale = "Model-evaluations research; safety-institutional discourse
 priority = "P1"
 active = true
 last_verified = "2026-09-11"
-arena_unassigned = true
-arena_unassigned_reason = "no arena declared; assignment is a sampling decision pending author review (#265). Records are reported under the corpus audit's unknown-arena residual."
 [[feed]]
 name = "interconnects"
+arena = "elites"
 feed_url = "https://www.interconnects.ai/feed"
 homepage = "https://www.interconnects.ai"
 source_family = "frontier-AI elite / bridge"
@@ -166,10 +152,9 @@ sampling_rationale = "Nathan Lambert: technical frontier-AI development, scaling
 priority = "P1"
 active = true
 last_verified = "2026-09-11"
-arena_unassigned = true
-arena_unassigned_reason = "no arena declared; assignment is a sampling decision pending author review (#265). Records are reported under the corpus audit's unknown-arena residual."
 [[feed]]
 name = "import_ai"
+arena = "elites"
 feed_url = "https://importai.substack.com/feed"
 homepage = "https://importai.substack.com"
 source_family = "AI-industry elite"
@@ -177,10 +162,9 @@ sampling_rationale = "Jack Clark (Anthropic co-founder): weekly industry-safety-
 priority = "P1"
 active = true
 last_verified = "2026-09-11"
-arena_unassigned = true
-arena_unassigned_reason = "no arena declared; assignment is a sampling decision pending author review (#265). Records are reported under the corpus audit's unknown-arena residual."
 [[feed]]
 name = "cset_georgetown"
+arena = "elites"
 feed_url = "https://cset.georgetown.edu/feed/"
 homepage = "https://cset.georgetown.edu"
 source_family = "governance / national security"
@@ -188,10 +172,9 @@ sampling_rationale = "CSET research commentary: compute, national security, infr
 priority = "P1"
 active = true
 last_verified = "2026-09-11"
-arena_unassigned = true
-arena_unassigned_reason = "no arena declared; assignment is a sampling decision pending author review (#265). Records are reported under the corpus audit's unknown-arena residual."
 [[feed]]
 name = "works_in_progress"
+arena = "elites"
 feed_url = "https://worksinprogress.co/rss.xml"
 homepage = "https://worksinprogress.co"
 source_family = "progress imaginary (P2)"
@@ -199,37 +182,34 @@ sampling_rationale = "Secondary source for contemporary progress-oriented techno
 priority = "P2"
 active = true
 last_verified = "2026-09-11"
-arena_unassigned = true
-arena_unassigned_reason = "no arena declared; assignment is a sampling decision pending author review (#265). Records are reported under the corpus audit's unknown-arena residual."
 [[feed]]
 name = "realtimetechpocalypse"
+arena = "elites"
 feed_url = "https://www.realtimetechpocalypse.com/feed"
 source_family = "critical_ai_tescreal"
 sampling_rationale = "Émile P. Torres's newsletter: TESCREAL, longtermism and existential-risk ideology critique; core critical-AI-TESCREAL long-form source."
 priority = "P1"
 active = true
 last_verified = "2026-09-13"
-arena_unassigned = true
-arena_unassigned_reason = "no arena declared; assignment is a sampling decision pending author review (#265). Records are reported under the corpus audit's unknown-arena residual."
 [[feed]]
 name = "yudkowsky_net"
+arena = "elites"
 feed_url = "https://www.yudkowsky.net/feed/"
 source_family = "x_risk_alignment"
 sampling_rationale = "Eliezer Yudkowsky's personal site feed: existential risk, alignment, AGI-catastrophe writing outside LessWrong."
 priority = "P1"
-active = true
-last_verified = "2026-09-13"
 enabled = false
-inactive_reason = "newest item 2020-09-04 is below window.start 2026-09-01; cannot produce a record under source_publication_time (#265)"
-arena_unassigned = true
-arena_unassigned_reason = "no arena declared; assignment is a sampling decision pending author review (#265). Records are reported under the corpus audit's unknown-arena residual."
+inactive_reason = "Newest feed publication 2020-09-04 predates AI26 publication floor 2026-09-01; retain sampling intention, do not poll until a current source is verified (#265)."
+last_verified = "2026-09-13"
 [[feed]]
 name = "petterijarvinen"
+arena = "elites"
 feed_url = "https://www.petterijarvinen.fi/feed/"
 source_family = "finland_public_discourse"
 sampling_rationale = "Petteri Järvinen's blog: high-signal Finnish-language AI public discourse (expert tier)."
 priority = "P1"
-active = true
+enabled = false
+inactive_reason = "Newest item 2026-08-03 predates AI26 publication floor 2026-09-01; retain Finnish sampling intention and re-verify if publisher resumes (#265)."
 last_verified = "2026-09-13"
 
 # ---------------------------------------------------------------------------
@@ -247,25 +227,20 @@ last_verified = "2026-09-13"
 # documents, not from source identity. Neither is AI-only; relevance filtering
 # stays at the analysis stage.
 # ---------------------------------------------------------------------------
-enabled = false
-inactive_reason = "newest item 2026-08-03 is below window.start 2026-09-01; no record can pass the publication floor (#265)"
-arena_unassigned = true
-arena_unassigned_reason = "no arena declared; assignment is a sampling decision pending author review (#265). Records are reported under the corpus audit's unknown-arena residual."
 
 [[feed]]
 name = "kaifulee_medium"
+arena = "elites"
 feed_url = "https://kaifulee.medium.com/feed"
 source_family = "china_ai_discourse"
 sampling_rationale = "Kai-Fu Lee on Medium: China/West AI competition, commercialization, future imaginaries from a leading China-AI voice."
 priority = "P1"
-active = true
-last_verified = "2026-09-13"
 enabled = false
-inactive_reason = "newest item 2024-10-19 is below window.start 2026-09-01; cannot produce a record under source_publication_time (#265)"
-arena_unassigned = true
-arena_unassigned_reason = "no arena declared; assignment is a sampling decision pending author review (#265). Records are reported under the corpus audit's unknown-arena residual."
+inactive_reason = "Newest feed publication 2024-10-19 predates AI26 publication floor 2026-09-01; retain sampling intention, do not poll until a current source is verified (#265)."
+last_verified = "2026-09-13"
 [[feed]]
 name = "datacenterknowledge"
+arena = "elites"
 feed_url = "https://www.datacenterknowledge.com/rss.xml"
 homepage = "https://www.datacenterknowledge.com"
 source_family = "data-centre / energy / environmental conflict"
@@ -273,8 +248,6 @@ sampling_rationale = "Industry trade press on AI infrastructure: power availabil
 priority = "P2"
 active = true
 last_verified = "2026-09-17"
-arena_unassigned = true
-arena_unassigned_reason = "no arena declared; assignment is a sampling decision pending author review (#265). Records are reported under the corpus audit's unknown-arena residual."
 
 [[feed]]
 name = "foxglove"
@@ -835,6 +808,26 @@ handle = "valtioneuvosto.fi"
 profile_url = "https://bsky.app/profile/valtioneuvosto.fi"
 arena = "parliamentary"
 source_family = "Finland government / national policy"
+priority = "P1"
+
+# Creator-rights sources explicitly declared in ai26.example.yaml (#266).
+# These are institutional sampling anchors, not ideological actor labels.
+[[bluesky_account]]
+name = "Writers Guild of America West"
+handle = "wgawest.bsky.social"
+profile_url = "https://bsky.app/profile/wgawest.bsky.social"
+arena = "grassroots"
+source_family = "creative labour / generative AI / bargaining"
+sampling_rationale = "First-party creative-labour and collective bargaining positions on AI and creators' rights; live in study window as verified 2026-10-12 (#266)."
+priority = "P1"
+
+[[bluesky_account]]
+name = "Creative Commons"
+handle = "creativecommons.bsky.social"
+profile_url = "https://bsky.app/profile/creativecommons.bsky.social"
+arena = "grassroots"
+source_family = "creator rights / open licensing / generative AI"
+sampling_rationale = "First-party open-licensing organisation for copyright, permission and AI-training policy discourse; live in study window as verified 2026-10-12 (#266)."
 priority = "P1"
 
 # ---------------------------------------------------------------------------

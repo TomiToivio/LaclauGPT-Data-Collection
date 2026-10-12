@@ -28,12 +28,6 @@ relevance:
   mode: retain_unjudged
 
 arenas:
-  # Arena coverage limit (#265): ten `[[feed]]` rows in the source manifest carry
-  # no arena, so their records are reported by the corpus audit under
-  # `unknown-arena` rather than counted into a stratum. That residual is declared,
-  # not silent -- see the manifest header. If a row is assigned an arena later, the
-  # assignment is a sampling decision and belongs in the manifest's `arena` field.
-
   elites:
     title: AI elites
     languages: [en]
@@ -204,6 +198,7 @@ source_budgets:
     daily_transcript_cap: 8
     download_media: false
   bluesky:
+    # Eight explicit manifest handles after #266, within this soft target.
     target_accounts: 12
     daily_record_cap: 100
   mastodon:
@@ -297,7 +292,7 @@ groups:
     accounts:
       x: [timnitGebru, emilymbender, AINowInstitute, AdaLovelaceInst]
       bluesky: [timnitgebru.blacksky.app, emilymbender.bsky.social]
-      mastodon: ["@TimnitGebru@mastodon.social", "@emilymbender@dair-community.social"]
+      mastodon: ["@timnitgebru@dair-community.social", "@emilymbender@dair-community.social"]
 
   - id: grassroots_labour_creator_x
     name: Labour and creator-rights mobilisation

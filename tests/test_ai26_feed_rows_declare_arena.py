@@ -119,3 +119,12 @@ def test_feeds_are_disabled_through_the_field_the_loader_reads() -> None:
         "feed row(s) set `active = false`, which the feed loader does not read, "
         f"without `enabled = false`: {silently_disabled}. Use `enabled`."
     )
+
+
+def test_known_stale_feeds_are_actually_disabled() -> None:
+    """Prevent source publication-floor exclusions from being polled forever."""
+    by_name = {row["name"]: row for row in feed_rows()}
+    for name in ("marc_andreessen", "yudkowsky_net", "kaifulee_medium",
+                 "public_ai_network", "petterijarvinen", "ada_lovelace", "data_society"):
+        assert by_name[name].get("enabled") is False, name
+        assert by_name[name].get("inactive_reason"), name
