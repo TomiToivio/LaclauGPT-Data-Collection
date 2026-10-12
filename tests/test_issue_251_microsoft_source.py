@@ -48,9 +48,10 @@ def test_microsoft_has_a_row_in_the_ai26_sampling_plan() -> None:
     rows = [
         r
         for r in _plan()
-        if "microsoft" in (r.get("name", "") + r.get("homepage", "")).lower()
+        if r.get("kind") == "web_source"
+        and "microsoft" in (r.get("name", "") + r.get("homepage", "")).lower()
     ]
-    assert rows, "no Microsoft row in the AI26 sampling plan"
+    assert rows, "no Microsoft web_source row in the AI26 sampling plan"
     row = rows[0]
     assert row["kind"] == "web_source"
     assert row["arena"] == "elites"
@@ -65,7 +66,11 @@ def test_the_microsoft_row_names_the_verified_feed_in_the_runner() -> None:
 
 def test_the_fallback_key_matches_the_homepage_the_runner_looks_up() -> None:
     """The runner rstrips '/', so the map key must be the homepage without it."""
-    row = next(r for r in _plan() if r.get("name") == "microsoft_ai_blog")
+    row = next(
+        r
+        for r in _plan()
+        if r.get("name") == "microsoft_ai_blog" and r.get("kind") == "web_source"
+    )
     key = row["homepage"].rstrip("/")
     assert f'"{key}"' in _fallback_block(), (
         "no fallback keyed on the row's homepage, so the row would seed a URL and "
@@ -89,5 +94,9 @@ def test_microsoft_is_excluded_from_the_rows_with_no_collection_path() -> None:
     legitimate new browser-stage seed, so it is recorded rather than frozen.
     """
     fallbacks = _fallback_block()
-    row = next(r for r in _plan() if r.get("name") == "microsoft_ai_blog")
+    row = next(
+        r
+        for r in _plan()
+        if r.get("name") == "microsoft_ai_blog" and r.get("kind") == "web_source"
+    )
     assert row["homepage"].rstrip("/") in fallbacks
