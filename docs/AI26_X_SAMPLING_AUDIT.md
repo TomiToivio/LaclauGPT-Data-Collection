@@ -164,3 +164,86 @@ first fix is deploying the existing groups.
 
 All three require the signed-in Firefox tour and distributed MongoDB writes of work package A.
 Until that runs, this audit should be read as **target-validity** evidence only.
+
+## 8. P0 core-panel verification against the author addendum (2026-10-12)
+
+The author's execution addendum nominates a **16-handle P0 pilot panel** for the first
+laptop/WSL run instead of the full 23-handle tour, explicitly "subject to live public
+verification" and requiring "actual current X profile/identity, public visibility, 2026-09-01+
+activity, language, and capture feasibility; evidence URLs and the inspection date".
+
+Same method, same **inspection date 2026-10-12**, same calibration. Evidence URL for each row
+is `https://x.com/<handle>`; the observed `og:title` is quoted.
+
+| P0 stratum (author) | Handle | `og:title` observed | Verdict |
+|---|---|---|---|
+| Acceleration / techno-optimism | `pmarca` | `Marc Andreessen 🇺🇸 (@pmarca) on X` | Exists, identity confirmed |
+| Acceleration / techno-optimism | `ylecun` | `Yann LeCun (@ylecun) on X` | Exists, identity confirmed |
+| Acceleration / techno-optimism | `sama` | `Sam Altman (@sama) on X` | Exists, identity confirmed |
+| Existential risk and safety | `ESYudkowsky` | `Eliezer Yudkowsky ⏹️ (@ESYudkowsky) on X` | Exists; bio self-declares **low volume** |
+| Existential risk and safety | `MIRI_AI` | `AI (@miri_ai) on X` | **REJECT — wrong entity.** Personal Japanese-language account, not MIRI |
+| Existential risk and safety | `FLI_org` | `Future of Life Institute (@FLI_org) on X` | Exists; broader-than-AI risk remit |
+| Critical AI / political economy | `timnitGebru` | `@timnitGebru (@dair-community.social/bsky.social) (@timnitGebru) on X` | Exists; X identity now displays a **Bluesky** account |
+| Critical AI / political economy | `emilymbender` | `@emilymbender.bsky.social (@emilymbender) on X` | Exists; same Bluesky-identity situation |
+| Critical AI / political economy | `AINowInstitute` | `AI Now Institute (@AINowInstitute) on X` | Exists, identity confirmed |
+| Frontier labs | `OpenAI` | `OpenAI (@OpenAI) on X` | Exists, identity confirmed |
+| Frontier labs | `AnthropicAI` | `Anthropic (@AnthropicAI) on X` | Exists, identity confirmed |
+| Organized resistance and labour | `PauseAI` | `PauseAI ⏸ (@PauseAI) on X` | Exists, identity confirmed |
+| Organized resistance and labour | `sagaftra` | `SAG-AFTRA (@sagaftra) on X` | Exists, identity confirmed |
+| Organized resistance and labour | `WGAWest` | `Writers Guild of America West (@WGAWest) on X` | Exists, identity confirmed |
+| Parliamentary / EU governance | `EU_Commission` | `European Commission (@EU_Commission) on X` | Exists, identity confirmed |
+| Parliamentary / EU governance | `Europarl_EN` | `European Parliament (@Europarl_EN) on X` | Exists, identity confirmed |
+
+**Result: 15 of the 16 nominations survive identity verification; 1 fails.** The failure is
+`MIRI_AI`, and it is the same defect as §2 — the P0 panel as currently drafted would sample a
+private individual's timeline under an existential-risk label. Substituting **`MIRIBerkeley`**
+(`MIRI (@MIRIBerkeley) on X`, bio stating MIRI's mission) keeps the stratum's intent and
+restores the intended actor. With that one substitution the P0 panel is 16 handles.
+
+**The addendum's own caveat applies and must stand:** these are "nominees from the existing
+configuration, not verified current handles". Existence and displayed identity are now
+verified; **recency is not** (see §11).
+
+## 9. P1 conditional substitutions — verification status
+
+| P1 candidate | `og:title` observed | Status for substitution |
+|---|---|---|
+| `GoogleDeepMind` | `Google DeepMind (@GoogleDeepMind) on X` | Exists; use only if the frontier-lab/infrastructure comparison is substantively missing |
+| `MetaAI` | `AI at Meta (@metaai) on X` — bio: *"We've moved, follow us at @AIatMeta"* | **Do not add as-is.** Use `AIatMeta` if a Meta leg is needed |
+| `NVIDIAAI` | `NVIDIA AI (@NVIDIAAI) on X` | Exists; company RSS/blog is the lower-noise route |
+| `AdaLovelaceInst` | `Ada Lovelace Institute (@AdaLovelaceInst) on X` | Exists; bio advertises Bluesky |
+| `uniglobalunion` | `UNI Global Union (@uniglobalunion) on X` | Exists, identity confirmed |
+| `OECD_AI` | `OECD.AI (@OECD_AI) on X` — *"14 followers · 0 following. Joined Nov 2021."* | **Useless as a collection target**; official policy documents are the right route |
+| `NIST` | `National Institute of Standards and Technology (@NIST) on X` | Exists; a standards agency — governance documents are richer than the timeline |
+
+This confirms the addendum's own instinct on all three governance/agency rows: `OECD_AI` and
+`NIST` are "often better represented through official web sources and policy documents" — for
+`OECD_AI` that is not a preference but a necessity, since the account is empty.
+
+## 10. The addendum's five explicit gaps — recorded, not filled
+
+The addendum lists five gaps to "investigate rather than invent X handles". This audit
+contributes evidence to each and fills none, because each is a sampling decision:
+
+1. **e/acc grassroots vs market techno-optimism.** The configured `techno_optimism_x` mixes a
+   venture-capital techno-optimist, an academic optimist and a frontier-lab CEO (§3), so it
+   cannot separate e/acc grassroots from market optimism. No X handle is proposed.
+2. **Cyborgist / human–AI integration / posthumanist discourse as a *separate candidate
+   imaginary*.** Recorded as unresolved; see the companion finding on the paper issue that no
+   scholarly fourfold Accel/Doomer/Cyborgist/Critical classification was verified.
+3. **Finnish political actors and labour.** Confirmed absent from the X list: no Finnish
+   parliamentary or party handle, and the Finnish Government is Bluesky-only (§4).
+4. **Politically meaningful anti-AI electoral mobilisation** (as opposed to generic technology
+   criticism). Confirmed thin: the only X handle in this space is `@PauseAI`, whose bio frames
+   it as *"community of volunteers"* seeking an international pause — an advocacy organisation,
+   not electoral mobilisation.
+5. **Global South / China / non-Western first-person voices.** Not represented in the X list;
+   recorded as a coverage gap.
+
+## 11. What "verified" does and does not mean here
+
+This audit establishes **existence and displayed identity**, at the stated inspection date. It
+does **not** establish the addendum's remaining criteria — public visibility beyond the profile
+shell, **2026-09-01+ activity**, language of posting, or capture feasibility. Those need the
+signed-in Firefox tour (work package A). Any panel built on this document is verified for
+*whose account it is*, not for *whether it is still posting*.
