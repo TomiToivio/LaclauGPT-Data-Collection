@@ -32,7 +32,14 @@ arenas:
     title: AI elites
     languages: [en]
     regions: [GLOBAL, US, EU, FI]
-    platforms: [rss, web, youtube, x, bluesky, mastodon, scholarly]
+    # Issue #249: `youtube` is deliberately NOT declared. The five
+    # [[youtube_source]] rows exist as a retained sampling intention, but all
+    # carry `active = false` (no explicit video_urls and no channel discovery on
+    # the browser-free collector), so no ACTIVE source can feed this arena from
+    # it. Declaring youtube would claim a stratum the study cannot collect. The
+    # inactive rows stay in the manifest; do not re-activate them to satisfy this
+    # list (re-activating is a sampling decision, not a declaration fix).
+    platforms: [rss, web, x, bluesky, mastodon, scholarly]
     sampling_focus:
       - frontier-lab and industry discourse
       - accelerationism and techno-optimism
@@ -46,7 +53,16 @@ arenas:
     title: Grassroots mobilisation around and against AI
     languages: [en, fi]
     regions: [GLOBAL, FI, EU, US]
-    platforms: [rss, web, youtube, x, bluesky, mastodon, tiktok, instagram]
+    # Issue #249: only platforms with an ACTIVE manifest row able to feed this
+    # arena are declared.
+    #   - `youtube`: all five [[youtube_source]] rows are `active = false`.
+    #   - `mastodon`: both [[mastodon_account]] rows are configured for the
+    #     elites arena only, so no mastodon source feeds grassroots.
+    #   - `tiktok` / `instagram`: no source rows exist and
+    #     `platforms.<p>.enabled` is false, so nothing can collect them here.
+    # The inactive/absent rows remain configured as sampling intention; they are
+    # excluded from the declaration, not deleted or re-activated.
+    platforms: [rss, web, x, bluesky]
     sampling_focus:
       - labour and automation
       - creative work and copyright
@@ -59,7 +75,12 @@ arenas:
     title: Parliamentary and electoral politics
     languages: [en, fi]
     regions: [FI, EU, US, GLOBAL]
-    platforms: [rss, web, youtube, x, bluesky, mastodon]
+    # Issue #249: `youtube` (all five [[youtube_source]] rows are `active =
+    # false`) and `mastodon` (both [[mastodon_account]] rows are configured for
+    # the elites arena only) are excluded: no ACTIVE source can feed this arena
+    # from either. The rows remain as retained sampling intention; do not
+    # re-activate them to satisfy this list.
+    platforms: [rss, web, x, bluesky]
     sampling_focus:
       - regulation and public oversight
       - innovation, competitiveness and the AI race
