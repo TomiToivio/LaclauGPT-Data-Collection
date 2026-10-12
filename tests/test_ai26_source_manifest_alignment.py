@@ -28,7 +28,7 @@ def test_inactive_feeds_explain_why_they_are_not_polled():
                  "public_ai_network", "petterijarvinen", "ada_lovelace",
                  "data_society"):
         row = next(row for row in manifest["feed"] if row["name"] == name)
-        assert row.get("active") is False, name
+        assert row.get("enabled") is False, name
         assert row.get("inactive_reason"), name
 
 
