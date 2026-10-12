@@ -28,6 +28,12 @@ relevance:
   mode: retain_unjudged
 
 arenas:
+  # Arena coverage limit (#265): ten `[[feed]]` rows in the source manifest carry
+  # no arena, so their records are reported by the corpus audit under
+  # `unknown-arena` rather than counted into a stratum. That residual is declared,
+  # not silent -- see the manifest header. If a row is assigned an arena later, the
+  # assignment is a sampling decision and belongs in the manifest's `arena` field.
+
   elites:
     title: AI elites
     languages: [en]

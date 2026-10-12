@@ -6,6 +6,21 @@
 # RSS/Atom entries are executable by the server collector. X account entries
 # mirror the browser-tour strata in ai26.example.yaml and are intentionally
 # bounded. Runtime configuration may extend this manifest privately.
+#
+# Every `[[feed]]` row declares its arena status explicitly (#265). A row either
+# carries `arena = "<elites|grassroots|parliamentary>"`, or carries
+# `arena_unassigned = true` with an `arena_unassigned_reason`, which means no
+# arena was declared and the assignment is a sampling decision the author has not
+# made. Such rows are recorded as an explicit residual: the corpus audit reports
+# their records under `unknown-arena` rather than letting them dilute the
+# arena-stratified shares silently. Removing the field is not a fix; the guard in
+# `tests/test_ai26_feed_rows_declare_arena.py` fails if a row declares neither.
+#
+# A row that cannot produce a record carries `enabled = false` with an
+# `inactive_reason`. The sampling intention is retained -- the row is not deleted
+# -- but no collection job is scheduled for it, following the #249 pattern for
+# the YouTube and scholarly strata. `enabled` is the field the feed loader reads;
+# `active` is not consulted for feeds.
 
 # ---------------------------------------------------------------------------
 # RSS / Atom backbone
@@ -64,6 +79,8 @@ arena = "elites"
 source_family = "market techno-optimism / acceleration-adjacent"
 sampling_rationale = "Prominent market-oriented technological optimism and abundance/growth discourse."
 priority = "P1"
+enabled = false
+inactive_reason = "newest item 2024-07-05 is below window.start 2026-09-01; cannot produce a record under source_publication_time (#265)"
 
 [[feed]]
 name = "tech_policy_press"
@@ -91,6 +108,8 @@ arena = "elites"
 source_family = "public-interest AI / public infrastructure / open models"
 sampling_rationale = "Technology-positive public-AI discourse centered on public capacity, shared infrastructure, accountability and durable public goods."
 priority = "P1"
+enabled = false
+inactive_reason = "newest item 2026-07-24 is below window.start 2026-09-01; no record can pass the publication floor (#265)"
 
 [[feed]]
 name = "ada_lovelace"
@@ -102,6 +121,8 @@ sampling_rationale = "Research on equitable distribution of AI benefits, public-
 priority = "P1"
 active = true
 last_verified = "2026-09-11"
+enabled = false
+inactive_reason = "publisher feed returns zero items (HTTP 200, empty body); no record can arrive (#265, #202)"
 
 [[feed]]
 name = "data_society"
@@ -113,6 +134,8 @@ sampling_rationale = "Data-power research on AI in lived institutions: sociotech
 priority = "P1"
 active = true
 last_verified = "2026-09-11"
+enabled = false
+inactive_reason = "publisher feed returns zero items (HTTP 200, empty body); no record can arrive (#265, #202)"
 
 [[feed]]
 name = "green_web_foundation"
@@ -132,6 +155,8 @@ sampling_rationale = "Model-evaluations research; safety-institutional discourse
 priority = "P1"
 active = true
 last_verified = "2026-09-11"
+arena_unassigned = true
+arena_unassigned_reason = "no arena declared; assignment is a sampling decision pending author review (#265). Records are reported under the corpus audit's unknown-arena residual."
 [[feed]]
 name = "interconnects"
 feed_url = "https://www.interconnects.ai/feed"
@@ -141,6 +166,8 @@ sampling_rationale = "Nathan Lambert: technical frontier-AI development, scaling
 priority = "P1"
 active = true
 last_verified = "2026-09-11"
+arena_unassigned = true
+arena_unassigned_reason = "no arena declared; assignment is a sampling decision pending author review (#265). Records are reported under the corpus audit's unknown-arena residual."
 [[feed]]
 name = "import_ai"
 feed_url = "https://importai.substack.com/feed"
@@ -150,6 +177,8 @@ sampling_rationale = "Jack Clark (Anthropic co-founder): weekly industry-safety-
 priority = "P1"
 active = true
 last_verified = "2026-09-11"
+arena_unassigned = true
+arena_unassigned_reason = "no arena declared; assignment is a sampling decision pending author review (#265). Records are reported under the corpus audit's unknown-arena residual."
 [[feed]]
 name = "cset_georgetown"
 feed_url = "https://cset.georgetown.edu/feed/"
@@ -159,6 +188,8 @@ sampling_rationale = "CSET research commentary: compute, national security, infr
 priority = "P1"
 active = true
 last_verified = "2026-09-11"
+arena_unassigned = true
+arena_unassigned_reason = "no arena declared; assignment is a sampling decision pending author review (#265). Records are reported under the corpus audit's unknown-arena residual."
 [[feed]]
 name = "works_in_progress"
 feed_url = "https://worksinprogress.co/rss.xml"
@@ -168,6 +199,8 @@ sampling_rationale = "Secondary source for contemporary progress-oriented techno
 priority = "P2"
 active = true
 last_verified = "2026-09-11"
+arena_unassigned = true
+arena_unassigned_reason = "no arena declared; assignment is a sampling decision pending author review (#265). Records are reported under the corpus audit's unknown-arena residual."
 [[feed]]
 name = "realtimetechpocalypse"
 feed_url = "https://www.realtimetechpocalypse.com/feed"
@@ -176,6 +209,8 @@ sampling_rationale = "Émile P. Torres's newsletter: TESCREAL, longtermism and e
 priority = "P1"
 active = true
 last_verified = "2026-09-13"
+arena_unassigned = true
+arena_unassigned_reason = "no arena declared; assignment is a sampling decision pending author review (#265). Records are reported under the corpus audit's unknown-arena residual."
 [[feed]]
 name = "yudkowsky_net"
 feed_url = "https://www.yudkowsky.net/feed/"
@@ -184,6 +219,10 @@ sampling_rationale = "Eliezer Yudkowsky's personal site feed: existential risk, 
 priority = "P1"
 active = true
 last_verified = "2026-09-13"
+enabled = false
+inactive_reason = "newest item 2020-09-04 is below window.start 2026-09-01; cannot produce a record under source_publication_time (#265)"
+arena_unassigned = true
+arena_unassigned_reason = "no arena declared; assignment is a sampling decision pending author review (#265). Records are reported under the corpus audit's unknown-arena residual."
 [[feed]]
 name = "petterijarvinen"
 feed_url = "https://www.petterijarvinen.fi/feed/"
@@ -208,6 +247,10 @@ last_verified = "2026-09-13"
 # documents, not from source identity. Neither is AI-only; relevance filtering
 # stays at the analysis stage.
 # ---------------------------------------------------------------------------
+enabled = false
+inactive_reason = "newest item 2026-08-03 is below window.start 2026-09-01; no record can pass the publication floor (#265)"
+arena_unassigned = true
+arena_unassigned_reason = "no arena declared; assignment is a sampling decision pending author review (#265). Records are reported under the corpus audit's unknown-arena residual."
 
 [[feed]]
 name = "kaifulee_medium"
@@ -217,6 +260,10 @@ sampling_rationale = "Kai-Fu Lee on Medium: China/West AI competition, commercia
 priority = "P1"
 active = true
 last_verified = "2026-09-13"
+enabled = false
+inactive_reason = "newest item 2024-10-19 is below window.start 2026-09-01; cannot produce a record under source_publication_time (#265)"
+arena_unassigned = true
+arena_unassigned_reason = "no arena declared; assignment is a sampling decision pending author review (#265). Records are reported under the corpus audit's unknown-arena residual."
 [[feed]]
 name = "datacenterknowledge"
 feed_url = "https://www.datacenterknowledge.com/rss.xml"
@@ -226,6 +273,8 @@ sampling_rationale = "Industry trade press on AI infrastructure: power availabil
 priority = "P2"
 active = true
 last_verified = "2026-09-17"
+arena_unassigned = true
+arena_unassigned_reason = "no arena declared; assignment is a sampling decision pending author review (#265). Records are reported under the corpus audit's unknown-arena residual."
 
 [[feed]]
 name = "foxglove"
