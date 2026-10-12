@@ -33,8 +33,28 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from bson import json_util
-from pymongo import MongoClient
+# pymongo is needed only to reach the store. Importing it lazily keeps the pure
+# resolution helpers importable (and unit-testable) where pymongo is absent, which
+# is the case in CI - a module-level import there broke the whole test file.
+try:
+    from bson import json_util
+    from pymongo import MongoClient
+except ImportError as _exc:  # pragma: no cover - only where pymongo is absent
+    json_util = None
+    MongoClient = None
+    _PYMONGO_ERROR: ImportError | None = _exc
+else:
+    _PYMONGO_ERROR = None
+
+
+def _require_pymongo() -> None:
+    """Fail with a clear message if the store dependency is missing."""
+    if _PYMONGO_ERROR is not None:
+        raise RuntimeError(
+            "The backfill needs pymongo to reach the store (pip install pymongo); "
+            "the resolution helpers import without it so they can be unit-tested."
+        ) from _PYMONGO_ERROR
+
 
 REPO = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = REPO / "configs" / "studies" / "ai26.sources.example.toml"
@@ -270,6 +290,7 @@ def main(argv: list[str] | None = None) -> int:
         print("error: --mongodb-uri or LACLAUGPT_MONGODB_URI is required", file=sys.stderr)
         return 2
 
+    _require_pymongo()
     rows = load_manifest_rows(args.manifest)
     client = MongoClient(args.mongodb_uri)
     col = client.get_default_database()[COLLECTION]
