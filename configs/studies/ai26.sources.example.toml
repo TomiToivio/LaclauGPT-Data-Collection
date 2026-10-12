@@ -788,6 +788,24 @@ arena = "parliamentary"
 source_family = "Finland government / national policy"
 priority = "P1"
 
+[[bluesky_account]]
+name = "Writers Guild of America West"
+handle = "wgawest.bsky.social"
+profile_url = "https://bsky.app/profile/wgawest.bsky.social"
+arena = "grassroots"
+source_family = "creative labour / generative AI / bargaining"
+sampling_rationale = "Declared by the design in grassroots_labour_creator_x and grassroots_creator_rights_licensing; the account-level counterpart of the WGA West X row, in the creator-rights stratum the grassroots arena's sampling_focus names (#266)."
+priority = "P1"
+
+[[bluesky_account]]
+name = "Creative Commons"
+handle = "creativecommons.bsky.social"
+profile_url = "https://bsky.app/profile/creativecommons.bsky.social"
+arena = "grassroots"
+source_family = "open licensing / creator rights / AI training"
+sampling_rationale = "Declared by the design in grassroots_creator_rights_licensing; the principal open-licensing organisation in the creative-work strand, whose account-level evidence was missing entirely (#266)."
+priority = "P1"
+
 # ---------------------------------------------------------------------------
 # Long-form and scholarly discovery
 # ---------------------------------------------------------------------------

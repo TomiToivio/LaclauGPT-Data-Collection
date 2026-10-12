@@ -291,7 +291,7 @@ groups:
     accounts:
       x: [timnitGebru, emilymbender, AINowInstitute, AdaLovelaceInst]
       bluesky: [timnitgebru.blacksky.app, emilymbender.bsky.social]
-      mastodon: ["@TimnitGebru@mastodon.social", "@emilymbender@dair-community.social"]
+      mastodon: ["@timnitgebru@dair-community.social", "@emilymbender@dair-community.social"]
 
   - id: grassroots_labour_creator_x
     name: Labour and creator-rights mobilisation
