@@ -46,7 +46,14 @@ def capture_to_record(capture: BrowserCapture) -> NormalizedRecord:
         document_id=document_id,
         platform=capture.platform.lower(),
         author=capture.author,
-        timestamp=capture.captured_at,
+        # The capture envelope carries no source publication time: browser/firefox/capture.js
+        # only ever sends `captured_at`. So the source publication time is left explicitly
+        # unset rather than filled from the capture clock, which is what
+        # `realtime.source_publication_time()` requires — collection/fetch timestamps are
+        # intentionally excluded, and a missing source time must stay explicit instead of
+        # being silently replaced. The capture clock is real collection metadata and belongs
+        # in `collected_at`, which interchange/kg/rag/phase0_mongo consumers read.
+        collected_at=capture.captured_at,
         source_url=capture.source_url,
         text=capture.text,
         media_references=media,

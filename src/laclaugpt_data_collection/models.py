@@ -255,6 +255,11 @@ class NormalizedRecord(CanonicalRecord):
                     raise ValueError("source_url or document_id is required")
                 source_url = f"{platform or 'source'}:{document_id}"
             timestamp = str(data.pop("timestamp", "") or "")
+            # Collection time is a different fact from source publication time and must not be
+            # confused with it: `source_publication_time()` deliberately ignores collection
+            # timestamps so that a missing source time stays explicit. Adapters that know only
+            # when they fetched call this out separately.
+            collected_at = str(data.pop("collected_at", "") or "") or None
             unix_timestamp = int(data.pop("unix_timestamp", 0) or 0)
             author = str(data.pop("author", "") or "")
             author_fullname = str(data.pop("author_fullname", "") or "")
@@ -305,6 +310,7 @@ class NormalizedRecord(CanonicalRecord):
                     author=author,
                     author_fullname=author_fullname,
                     created_at=timestamp or None,
+                    collected_at=collected_at,
                     language=language,
                     raw_ref=raw_ref or None,
                     raw_metadata={
