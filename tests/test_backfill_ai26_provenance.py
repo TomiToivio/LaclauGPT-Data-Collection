@@ -106,8 +106,8 @@ def test_manifest_rows_carry_arena_and_collector() -> None:
     by_name = {row["name"]: row for row in rows}
     assert by_name["lesswrong_frontpage"]["arena"] == "elites"
     assert by_name["lesswrong_frontpage"]["collector"] == "rss-feedparser"
-    # A row that declares no arena resolves to no arena (#250 must not guess).
-    assert by_name["interconnects"]["arena"] == ""
+    # Issue #265 now explicitly assigns the feed to elites; #250 must respect it.
+    assert by_name["interconnects"]["arena"] == "elites"
 
 
 def test_resolve_by_name_with_url_corroboration_is_high_confidence() -> None:
@@ -144,8 +144,8 @@ def test_apply_sets_provenance_arena_and_markers() -> None:
         "total": 3,
         "rss": 2,
         "web": 1,
-        "resolved_to_arena": 1,
-        "resolved_arena_less": 1,
+        "resolved_to_arena": 2,
+        "resolved_arena_less": 0,
         "resolved_total": 2,
         "unattributed": 1,
     }
@@ -161,10 +161,10 @@ def test_apply_sets_provenance_arena_and_markers() -> None:
     assert arena_doc["source"]["backfill"] == "#250"
     assert arena_doc["source"]["backfilled_at"] == "20260101T000000Z"
 
-    # The arena-less and unattributed documents keep arena == "" and are marked.
-    arena_less = next(d for d in col.docs if d["_id"] == "b")
-    assert arena_less["arena"] == ""
-    assert arena_less["source"]["raw_ref"] == "ai26.sources.example.toml#feed:interconnects"
+    # The newly classified feed is backfilled; unattributed stays arena-less.
+    newly_classified = next(d for d in col.docs if d["_id"] == "b")
+    assert newly_classified["arena"] == "elites"
+    assert newly_classified["source"]["raw_ref"] == "ai26.sources.example.toml#feed:interconnects"
 
     unattr = next(d for d in col.docs if d["_id"] == "c")
     assert unattr["arena"] == ""
