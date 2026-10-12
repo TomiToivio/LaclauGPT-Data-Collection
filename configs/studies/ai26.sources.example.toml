@@ -444,17 +444,6 @@ source_family = "frontier lab / deployment / governance / safety"
 sampling_rationale = "Major frontier-lab discourse around capabilities, products, safety and policy. Uses the official RSS feed because the news landing page blocks automated HTML collection."
 priority = "P1"
 
-[[feed]]
-name = "microsoft_ai_blog"
-feed_url = "https://www.microsoft.com/en-us/ai/blog/feed/"
-homepage = "https://www.microsoft.com/en-us/ai/"
-arena = "elites"
-source_family = "frontier AI industry / deployment / governance"
-sampling_rationale = "First-party Microsoft AI discussion, including its role in frontier model deployment, enterprise infrastructure and AI governance. Expands the elites frontier-lab-and-industry stratum to include Microsoft (#251). Inclusion is a sampling decision, not an ideological label; articles must meet the study's existing date/relevance rules. Feed observed live in issue #251 (2026-10-11)."
-priority = "P1"
-active = true
-last_verified = "2026-10-11"
-
 [[web_source]]
 name = "anthropic_news"
 homepage = "https://www.anthropic.com/news"

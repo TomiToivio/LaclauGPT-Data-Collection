@@ -2,7 +2,10 @@
 import tomllib
 from pathlib import Path
 
-from laclaugpt_data_collection.ai26_laskin_runner import load_non_browser_jobs
+from laclaugpt_data_collection.ai26_laskin_runner import (
+    _WEB_SOURCE_FEED_FALLBACKS,
+    load_non_browser_jobs,
+)
 from laclaugpt_data_collection.server_runner import load_feed_manifest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,16 +33,31 @@ def test_impossible_strata_retained_as_inactive_not_silently_reassigned():
 
 def test_microsoft_first_party_feed_is_active_elites_source():
     data = tomllib.loads(PATH.read_text(encoding="utf-8"))
-    rows = [row for row in data["feed"] if row["name"] == "microsoft_ai_blog"]
-    assert len(rows) == 1
-    assert rows[0]["feed_url"] == "https://www.microsoft.com/en-us/ai/blog/feed/"
-    assert rows[0]["arena"] == "elites"
-    assert rows[0]["active"] is True
+    # Exactly one Microsoft identity in the sampling frame (#256): the duplicate
+    # [[feed]] row added by #252 was removed, leaving the [[web_source]] row that #251
+    # itself recommended and that the browser-free stage reaches through the fallback
+    # map below.
+    identity = [
+        (table, row)
+        for table in ("feed", "web_source")
+        for row in data.get(table, [])
+        if row["name"] == "microsoft_ai_blog"
+    ]
+    assert len(identity) == 1
+    (table, row), = identity
+    assert table == "web_source"
+    assert row["arena"] == "elites"
+    # No `active`/`enabled` key means the row runs; the non-browser loader agrees.
+    assert row.get("enabled", row.get("active", True)) is not False
+    jobs = [job for job in load_non_browser_jobs(PATH) if job["name"] == "microsoft_ai_blog"]
+    assert len(jobs) == 1 and jobs[0]["kind"] == "web_source"
+    # The verified feed is reachable without a browser via the runner's fallback map.
+    assert _WEB_SOURCE_FEED_FALLBACKS[row["homepage"].rstrip("/")] == (
+        "https://www.microsoft.com/en-us/ai/blog/feed/"
+    )
     # A [[feed]] row is not a non-browser job: the Laskin non-browser loader only
     # serves the web_source/social/scholarly tables, and feeds are collected by the
-    # RSS path (server_runner.load_feed_manifest). Assert the row on the loader that
-    # actually consumes it, and that it is not double-scheduled as a job.
-    assert any(
-        feed["name"] == "microsoft_ai_blog" for feed in load_feed_manifest(PATH)
-    )
+    # RSS path (server_runner.load_feed_manifest). Assert the surviving identity is
+    # not double-scheduled as a job nor loaded as an RSS feed.
     assert not any(job["kind"] == "feed" for job in load_non_browser_jobs(PATH))
+    assert not any(feed["name"] == "microsoft_ai_blog" for feed in load_feed_manifest(PATH))
