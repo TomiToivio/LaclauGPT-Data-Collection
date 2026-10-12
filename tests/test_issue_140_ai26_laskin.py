@@ -17,7 +17,11 @@ def test_laskin_manifest_loader_excludes_browser_only_sources() -> None:
     assert "browser_source" not in kinds
     assert "instagram_account" not in kinds
     assert "tiktok_account" not in kinds
-    assert {"web_source", "bluesky_account", "mastodon_account", "youtube_source", "scholarly_query"} <= kinds
+    assert {"web_source", "bluesky_account", "mastodon_account", "scholarly_query"} <= kinds
+    # The five [[youtube_source]] rows are declared `active = false` with an explicit
+    # `inactive_reason` (#249): channel discovery is not implemented on the browser-free
+    # stage, so a retained-but-impossible row must not be scheduled as a job.
+    assert "youtube_source" not in kinds
 
 
 def test_laskin_non_browser_window_rotates_without_starving_tail() -> None:

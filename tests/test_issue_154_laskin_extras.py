@@ -21,7 +21,11 @@ def test_phase1_non_browser_extra_covers_source_specific_extras() -> None:
 def test_manifest_optional_job_kinds_have_a_dependency_contract() -> None:
     jobs = runner.load_non_browser_jobs(SOURCES)
     kinds = {str(job["kind"]) for job in jobs}
-    assert {"mastodon_account", "youtube_source", "scholarly_query"} <= kinds
+    assert {"mastodon_account", "scholarly_query"} <= kinds
+    # The [[youtube_source]] rows are declared inactive (#249), so no youtube job is
+    # scheduled on the browser-free stage; the dependency contract still covers the
+    # kind it would need if the stratum ever becomes collectable.
+    assert "youtube_source" not in kinds
     assert {"mastodon_account", "youtube_source", "scholarly_query"} <= set(
         runner._OPTIONAL_DEPENDENCY_CONTRACT
     )
