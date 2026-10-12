@@ -198,6 +198,7 @@ source_budgets:
     daily_transcript_cap: 8
     download_media: false
   bluesky:
+    # Eight explicit manifest handles after #266, within this soft target.
     target_accounts: 12
     daily_record_cap: 100
   mastodon:
@@ -291,7 +292,7 @@ groups:
     accounts:
       x: [timnitGebru, emilymbender, AINowInstitute, AdaLovelaceInst]
       bluesky: [timnitgebru.blacksky.app, emilymbender.bsky.social]
-      mastodon: ["@TimnitGebru@mastodon.social", "@emilymbender@dair-community.social"]
+      mastodon: ["@timnitgebru@dair-community.social", "@emilymbender@dair-community.social"]
 
   - id: grassroots_labour_creator_x
     name: Labour and creator-rights mobilisation
