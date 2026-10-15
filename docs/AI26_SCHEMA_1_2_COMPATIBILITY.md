@@ -16,7 +16,7 @@ Run: `pytest -q tests/test_issue_271_analysis_schema_compat.py`.
 
 ## Follow-up validation before production
 
-1. Vendor or pin the exact Analysis 1.2 JSON schema in CI and run `jsonschema.validate` on the projected fixtures, including analysis of all fields and the extension slot. An inspection of today's schemas is not a permanently pinned cross-repo contract.
+1. The inspected Analysis 1.2 schema is vendored as `schemas/analysis-research-record-1.2.0.schema.json` and validated with `jsonschema` against both legacy and 1.2 fixture views in CI. Re-sync and re-audit this pinned copy whenever Analysis changes its own schema.
 2. Integrate this versioned adapter at the actual Analysis ingestion boundary and exercise Collection → Analysis on synthetic records, including replay and source-content updates.
 3. Confirm operational handling of pre-existing stored 1.1 records with a read-only sample audit. Any live data migration requires operator approval.
 4. Maintain the existing AI26 Phase 1 contract (`ai26-phase1-handoff-v1`) separately from the 1.2 export view; no analytical inferences are added by Collection.
