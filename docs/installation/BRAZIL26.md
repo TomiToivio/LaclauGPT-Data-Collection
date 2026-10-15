@@ -62,11 +62,20 @@ The same source URL may exist in AI26 and Brazil26. Handoff identity includes `c
 After manual validation:
 
 ```bash
-bash scripts/install_cron_brazil26.sh
+bash scripts/install_cron_brazil26.sh           # install/refresh the managed block (idempotent)
+bash scripts/install_cron_brazil26.sh status    # health check: installed? mode? cadence? log sizes
 crontab -l
 ```
 
-The collector/media wrappers use `flock`, and the cron installer owns a marker-delimited Brazil26 block. Logs are written under `data/logs/`. Firefox itself remains interactive and is not placed in cron.
+Remove it again with the installer's own non-destructive removal mode — it
+prints the entries it owns, backs the crontab up and changes nothing else:
+
+```bash
+bash scripts/install_cron_brazil26.sh uninstall --dry-run   # print the plan, write nothing
+bash scripts/install_cron_brazil26.sh uninstall --yes       # remove only its own entries
+```
+
+The collector/media wrappers use `flock`, and the cron installer owns a marker-delimited Brazil26 block. Logs are written under `data/logs/`; inspect them with `tail -n 50 data/logs/brazil26-media.log`. Firefox itself remains interactive and is not placed in cron.
 
 ## Public/private boundary
 

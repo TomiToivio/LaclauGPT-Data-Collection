@@ -128,8 +128,9 @@ owns a marker-delimited block:
 ```
 
 Repeated installation replaces that block instead of adding duplicates. The
-media job runs every 15 minutes, passes the resolved private Brazil26 config and
-data root explicitly, and writes to:
+media job runs every 30 minutes (issue #233 supersedes the earlier 15-minute
+cadence), passes the resolved private Brazil26 config and data root explicitly,
+and writes to:
 
 ```text
 data/logs/brazil26-media.log
@@ -141,12 +142,22 @@ per-data-root lock, so overlapping media runs exit safely.
 Inspect the installed jobs with:
 
 ```bash
+bash scripts/install_cron_brazil26.sh status   # installed? mode? cadence? log sizes
 crontab -l
 tail -f data/logs/brazil26-media.log
 ```
 
-Remove the Brazil26 cron block by editing the crontab and deleting the lines
-between the two Brazil26 markers. Re-running `laclaugpt-brazil26` reinstalls it.
+Remove the Brazil26 cron block with the installer's own removal mode, which
+prints the entries it owns first, backs the crontab up and leaves every other
+crontab line untouched:
+
+```bash
+bash scripts/install_cron_brazil26.sh uninstall --dry-run   # print the plan
+bash scripts/install_cron_brazil26.sh uninstall --yes       # remove only its own entries
+```
+
+Do not edit the crontab by hand for this. Re-running `laclaugpt-brazil26`
+reinstalls the block.
 
 ## Continuing existing Brazil26 state
 
