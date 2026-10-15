@@ -383,6 +383,11 @@ def run_phase1_laskin(
             "deferred_by_source_budget": 0,
         }
 
+    # Reserve a bounded share for non-browser jobs before RSS re-syncs can exhaust
+    # the common write limit. This changes allocation, not the total tick cap.
+    # No reservation is needed when the manifest has no eligible jobs.
+    non_browser_reserve = min(limit // 2, max_jobs * per_source_limit) if all_jobs else 0
+    rss_limit = limit - non_browser_reserve
     rss = run_phase1_rss(
         settings,
         study_config=study_config,
@@ -391,7 +396,7 @@ def run_phase1_laskin(
         worker_id=worker_id,
         max_feeds=max_feeds,
         per_feed_limit=per_source_limit,
-        limit=limit,
+        limit=rss_limit,
         rotation=rotation * max_feeds,
     )
     remaining = max(limit - int(rss.get("records_synced", 0)), 0)
@@ -442,6 +447,7 @@ def run_phase1_laskin(
     warnings = list(rss.get("warnings") or [])
     errors = list(rss.get("errors") or [])
     source_outcomes: list[dict[str, Any]] = []
+    deferred_by_tick_limit = 0
 
     for row in jobs:
         outcome: dict[str, Any] = {
@@ -456,6 +462,7 @@ def run_phase1_laskin(
         }
         source_outcomes.append(outcome)
         if synced >= remaining:
+            deferred_by_tick_limit += 1
             continue
         try:
             records, source_warnings = _records_for_job(
@@ -532,6 +539,19 @@ def run_phase1_laskin(
         except Exception as exc:  # noqa: BLE001 - a report must not fail the cycle
             manifest_drift = {"in_sync": None, "error": str(exc)[:180]}
 
+    tick_budget = {
+        "limit": limit,
+        "rss_allocation": rss_limit,
+        "non_browser_reserved": non_browser_reserve,
+        "rss_synced": int(rss.get("records_synced", 0)),
+        "non_browser_synced": synced,
+        "unused": max(limit - int(rss.get("records_synced", 0)) - synced, 0),
+        "jobs_admitted": [o["name"] for o in source_outcomes if o["reason"] != "tick_record_limit"],
+        "jobs_deferred": [o["name"] for o in source_outcomes if o["reason"] == "tick_record_limit"],
+        "deferred_jobs_tick_limit": deferred_by_tick_limit,
+        "rotation": rotation,
+        "source_budget_deferrals_are_separate": True,
+    }
     return {
         "status": "ok" if not errors else "partial",
         "project_id": settings.project_id,
@@ -549,6 +569,8 @@ def run_phase1_laskin(
         "warnings": warnings,
         "errors": errors,
         "source_outcomes": source_outcomes,
+        "tick_budget": tick_budget,
+        "deferred_by_tick_limit": deferred_by_tick_limit,
         "source_budget": (budget.summary() if budget is not None else None),
         "deferred_by_source_budget": deferred_by_budget,
         "manifest_drift": manifest_drift,
