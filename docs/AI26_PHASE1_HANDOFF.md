@@ -6,6 +6,11 @@ This document pins the authoritative Collection-to-Analysis boundary for the AI2
 
 - **Contract version:** `ai26-phase1-handoff-v1`
 - **Canonical schema version:** `1.1.0`
+
+- **Version compatibility:** the producer's `1.1.0` is normalized to Analysis's canonical
+  `1.2.0` by the adapter in `laclaugpt_data_analysis/schema_version.py`; see
+  [AI26_SCHEMA_VERSION_COMPATIBILITY.md](AI26_SCHEMA_VERSION_COMPATIBILITY.md) for the
+  measurements, the stored-record counts and the one open contract question (issue #271).
 - **Producer:** `LaclauGPT-Data-Collection`
 - **Consumer:** `LaclauGPT-Data-Analysis`
 - **Authoritative model:** `laclaugpt_data_collection.models.CanonicalRecord`
