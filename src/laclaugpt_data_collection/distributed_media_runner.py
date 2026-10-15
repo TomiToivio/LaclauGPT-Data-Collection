@@ -272,6 +272,12 @@ def _run_distributed_media_unlocked(
     sink = DistributedCaptureSink(settings)
     sink.assert_private_config(study_config)
 
+    # Issue #287: resolved media can coexist with an obsolete waiting_media
+    # envelope and is invisible to the pending-download query. Repair it first.
+    handoffs_reconciled = sink.records.reconcile_waiting_media(
+        collection_id=settings.project_id, limit=limit
+    )
+
     remote_records = sink.records.pending_media_records(
         collection_id=settings.project_id,
         limit=limit,
@@ -366,6 +372,7 @@ def _run_distributed_media_unlocked(
             "skipped": max(len(records) - len(jobs), 0),
             "mongo_refreshed": len(touched),
             "media_refs_repaired": len(repaired),
+            "handoffs_reconciled": handoffs_reconciled,
         }
     finally:
         store.close()
