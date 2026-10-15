@@ -1,0 +1,112 @@
+# AI26 canonical record: schema version compatibility and migration
+
+**Status: reconciliation record for issue #271, verified 2026-10-15. No production migration is
+performed or proposed as done here.** This document answers the four acceptance items on #271 with
+measurements, and records one open contract question for the author.
+
+## The two versions, and what each is
+
+| Side | Declares | Where |
+|---|---|---|
+| Collection (producer) | `SCHEMA_VERSION = "1.1.0"` | `src/laclaugpt_data_collection/models.py:17`, `schemas/research-record.schema.json` (`const: 1.1.0`) |
+| Analysis (consumer) | `SCHEMA_VERSION = "1.2.0"` | `src/laclaugpt_data_analysis/canonical.py:27` |
+| Shared parity fixture | `1.1.0-draft` | `fixtures/cross_module/canonical_parity_v1.json` (meta repo) |
+
+They are **not two schemas**. They are the same schema at two version strings, and that is a
+measurement, not an assumption:
+
+```
+title:                 identical ("LaclauGPT Four-Layer Research Record")
+properties:            13 on both sides, identical sets
+required:              11 on both sides, identical sets
+properties only in one: none, in either direction
+definitions that differ: exactly one - schema_version ({"const": "1.1.0"} vs {"const": "1.2.0"})
+```
+
+So the caution on the issue - *do not just bump the const without verifying field semantics* - is
+answered: **there are no field semantics to break.** The difference is the version string alone.
+
+## Existing stored records (what is actually on disk)
+
+Measured against the live store, aggregate counts only, no research payloads read:
+
+| collection | documents | `schema_version` |
+|---|---|---|
+| `ai26__records` | ~1,514 | **1.1.0** (all) |
+| `brazil26__records` | ~2,853 | **1.1.0** (all) |
+| `default__records` | ~0 | - |
+
+**Every stored record is 1.1.0** - 4,367 documents across two project namespaces - and the AI26
+pipeline completes work against them every hour. So 1.1.0 records are not a broken legacy state; they
+are the corpus, and the consumer already handles them.
+
+## The adapter that already exists (this is the reconciliation)
+
+Analysis does not require Collection to emit `1.2.0`. It normalizes on ingest, in
+`src/laclaugpt_data_analysis/schema_version.py`:
+
+| Incoming `schema_version` | Behaviour |
+|---|---|
+| `1.1.0-draft` **and** the payload carries `fixture_version` | adapted as the cross-module parity fixture |
+| `1.1` or `1.1.0` | normalized to the canonical `1.2.0` model |
+| anything else | `UnsupportedSchemaVersion` - an explicit, loud rejection |
+
+That is the *explicit versioned adapter* option in acceptance item 3, and it is already implemented and
+tested on the Analysis side (`tests/test_canonical_contract.py` asserts the `1.1.0` to `1.2.0`
+normalization). **The reconciliation is therefore: pin nothing, bump nothing, and say plainly that the
+producer's 1.1.0 is normalized by the consumer's adapter.** Bumping Collection to `1.2.0` would change
+what 4,000+ existing records mean relative to new ones, for zero field difference - a cost with no
+benefit, and it would have to be deployed before it changed anything at all (see the deployment note
+below).
+
+## Acceptance item 2: the handoff contract, and the two different version axes
+
+Collection's Analysis handoff envelope (`build_handoff`) carries:
+
+- `contract_version: "1.0"` - **the envelope contract**, distinct from the record schema;
+- `handoff_key` = `sha256(collection_id \n source_url \n revision)` - stable identity;
+- `revision`, `status` (`ready` / `waiting_media` / `excluded`), `reason`, `project_id`,
+  `collection_id`, `arena`, `run_id`, `source_url`, `published_at`, `source_priority`.
+
+The record itself carries `schema_version`, and it also carries the provenance; the envelope identifies
+which record to read.
+
+**Do not conflate the two.** `contract_version` (`1.0`) versions the *handoff envelope*;
+`schema_version` (`1.1.0`) versions the *record*. A future change to one does not imply the other, and
+the fixtures use two further strings (`ai26-phase1-handoff-v1`) for still another purpose.
+
+`tests/test_schema_version_compatibility.py` exercises this end to end on fixtures: a legacy `1.1.0`
+record and a `1.2.0` record both produce a valid envelope, identity and revision are stable across
+repeats and change with the source, a text-only record is `ready`, and **neither record's
+`schema_version` is rewritten by the handoff** (acceptance item 4: old and new verified without
+destructive rewrites).
+
+## Open item for the author: the manifest gate never validates the producer
+
+`distributed_worker.py:195` refuses a handoff whose `manifest.schema_version` is not `1.2.0`:
+
+```python
+if manifest.schema_version != SCHEMA_VERSION:
+    raise ... f"schema mismatch: manifest={manifest.schema_version} runtime={SCHEMA_VERSION}"
+```
+
+But the handoff envelope above **carries no `schema_version` at all**, and the manifest in that
+comparison is the Analysis-side frozen run manifest - generated by Analysis itself. So the gate
+compares Analysis to Analysis and always passes; it has never been a cross-repo check. That is why
+records flow while the two repositories declare different versions.
+
+This is safe today (the fields are identical, and the adapter handles legacy), but it means the
+*contract* is weaker than it looks. Three options, none of them mine to pick:
+
+1. **Leave it, and document it** - the adapter is the contract; the gate is a self-check. Cheapest, and
+   honest once written down (this document).
+2. **Carry the producer's version in the envelope** and assert it there, so a genuinely foreign or
+   future schema cannot pass silently. This is a contract change across two repositories.
+3. **Pin both repositories to one version string** and let the gate be strict for real.
+
+## Deployment note
+
+Whatever is decided, **it will have no effect until the deployed Laskin runtime is refreshed**, and
+today showed the deployed runtime lagging `main` in at least three independent places (stale source
+manifest, this schema question, and an already-merged collection fix that was still not in effect two
+hours after its merge). "Merged" and "in effect" have been different things.

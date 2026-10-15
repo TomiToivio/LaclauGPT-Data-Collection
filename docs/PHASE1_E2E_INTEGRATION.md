@@ -23,6 +23,8 @@ python tools/verify_contracts.py
 The fixture and test verify:
 
 - one canonical `CanonicalRecord` schema, currently `1.1.0`;
+  the producer's version is normalized to Analysis's `1.2.0` by an explicit adapter -
+  see [AI26_SCHEMA_VERSION_COMPATIBILITY.md](AI26_SCHEMA_VERSION_COMPATIBILITY.md);
 - AI26 compatibility with `ai26-phase1-handoff-v1`;
 - AI26 localhost browser and Laskin non-browser records;
 - Brazil26 localhost browser and Laskin non-browser records;
