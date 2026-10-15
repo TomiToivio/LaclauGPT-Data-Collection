@@ -10,7 +10,6 @@ from laclaugpt_data_collection.analysis_schema_compat import analysis_1_2_view
 from laclaugpt_data_collection.handoff import build_handoff
 from laclaugpt_data_collection.models import CanonicalRecord
 
-
 FIXTURE = Path(__file__).parent / "fixtures" / "ai26_phase1_handoff_v1.json"
 
 
