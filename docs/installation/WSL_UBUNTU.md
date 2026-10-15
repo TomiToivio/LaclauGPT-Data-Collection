@@ -80,8 +80,14 @@ Run every wrapper manually once before installing cron. Then:
 ```bash
 bash scripts/install_cron_ai26.sh
 bash scripts/install_cron_brazil26.sh
+bash scripts/install_cron_brazil26.sh status
 crontab -l
 ```
+
+Remove the Brazil26 block again with
+`bash scripts/install_cron_brazil26.sh uninstall --dry-run` (add `--yes` to
+apply); it prints the entries it owns, backs the crontab up and leaves every
+other crontab line alone.
 
 Logs are written below `data/logs/`; locks below `data/tmp/`; downloads/staging below `data/downloads/` and `data/staging/`.
 

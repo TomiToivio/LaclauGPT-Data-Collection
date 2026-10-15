@@ -84,6 +84,59 @@ laclaugpt-brazil26 status --data-root ./data
 
 The command reports whether the backend is live, the active study returned by `/status`, the session metadata, and local normalized-file/row counts.
 
+## Cron operation cycle
+
+The scheduled half of the operation cycle — install, health check, log
+inspection and removal — is owned by one script, so no step of the documented
+procedure falls outside the repository:
+
+```bash
+bash scripts/install_cron_brazil26.sh --dry-run   # print the block that would be installed; write nothing
+bash scripts/install_cron_brazil26.sh             # install/refresh the managed block (idempotent)
+bash scripts/install_cron_brazil26.sh status      # health check: installed? mode? cadence? logs
+bash scripts/install_cron_brazil26.sh uninstall --dry-run   # print exactly which entries would be removed
+bash scripts/install_cron_brazil26.sh uninstall --yes       # remove them, after backing the crontab up
+```
+
+`--uninstall` and `remove` are accepted spellings of `uninstall`. Removal is
+non-destructive by construction:
+
+- it removes only the marker-managed block plus unmanaged lines that name one of
+  the four Brazil26 wrappers (`run_brazil26_localhost_sync.sh`,
+  `run_brazil26_localhost_collect.sh`, `run_brazil26_localhost_media.sh`,
+  `run_brazil26_localhost_media_distributed.sh`); every other crontab line is
+  preserved byte-for-byte, so an unrelated job that merely mentions Brazil26
+  survives;
+- it prints the exact plan before writing; without `--yes` it prompts on a
+  terminal and refuses (exit 2) when there is no terminal to prompt on;
+- it copies the previous crontab to
+  `data/backups/crontab-brazil26-<UTC>.txt` before writing (override the
+  directory with `LACLAUGPT_CRON_BACKUP_DIR`);
+- a second removal is an idempotent no-op;
+- it refuses (exit 2) and changes nothing when `crontab -l` fails, or when the
+  `BEGIN`/`END` markers are nested or unbalanced — the two cases where its own
+  entries cannot be told apart from somebody else's.
+
+`status` is read-only. It reports `installed`, the `media_mode` (`local`,
+`allas`, or `both`/`none` when the crontab contradicts itself), the cadence
+(flagging a surviving 15-minute entry), which workers are scheduled, and the
+Brazil26 logs with their sizes, plus the `tail -n 50` command for the media log.
+It exits 0 when healthy and 3 when the block is absent or degraded, so it can
+gate an unattended check.
+
+Log inspection is the same tree the cron entries write to:
+
+```bash
+tail -n 50 data/logs/brazil26-media.log   # or: ... status  — it lists the sizes
+ls -l data/logs/brazil26-*.log
+```
+
+A manual one-shot download is the same worker the 30-minute entry runs, invoked
+by hand: `bash scripts/run_brazil26_localhost_media.sh` (local-first) or
+`bash scripts/run_brazil26_localhost_media_distributed.sh` (CSC Allas), or
+`laclaugpt-brazil26 media --study-config "$BRAZIL26_CONFIG" --data-root ./data`.
+Do not add a second scheduler or a second downloader for it.
+
 ## Firefox setup
 
 Use a dedicated Brazil26 Firefox profile. In Firefox:
@@ -307,8 +360,15 @@ repointing cron alone. Then install and inspect the marker-managed block:
 
 ```bash
 bash scripts/install_cron_brazil26.sh
+bash scripts/install_cron_brazil26.sh status
 crontab -l | sed -n '/BEGIN LACLAUGPT BRAZIL26/,/END LACLAUGPT BRAZIL26/p'
 ```
+
+Before repointing the block elsewhere, remove the old one with
+`bash scripts/install_cron_brazil26.sh uninstall --dry-run` (add `--yes` to
+apply). It prints the entries it owns, refuses when the markers are ambiguous,
+and leaves every other crontab line alone — which is why the crontab no longer
+has to be edited by hand.
 
 The installer derives `ROOT` from its checkout and passes the selected runtime
 env, study and data paths to all three workers. Media runs every **30 minutes**
