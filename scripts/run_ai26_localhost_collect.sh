@@ -4,18 +4,25 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 # shellcheck source=scripts/ai26_runtime.sh
 . "${ROOT}/scripts/ai26_runtime.sh"
-ENV_FILE=${LACLAUGPT_ENV_FILE:-"$ROOT/data/config/ai26-localhost.env"}
-SOURCE_MANIFEST=${LACLAUGPT_SOURCE_MANIFEST:-"$ROOT/data/config/ai26.sources.toml"}
-STUDY_CONFIG=${LACLAUGPT_STUDY_CONFIG:-"$ROOT/data/config/ai26.yaml"}
+# shellcheck source=scripts/runtime_config.sh
+. "$ROOT/scripts/runtime_config.sh"
+# Issue #258: the runtime env, study config and source manifest are untracked
+# private configuration. LACLAUGPT_RUNTIME_CONFIG_ROOT repoints where they are
+# read from, which is the only supported way a runtime started from a Git
+# worktree can use the main checkout's configuration without copying a file.
+CONFIG_ROOT=$(laclaugpt_runtime_config_root "$ROOT")
+ENV_FILE=${LACLAUGPT_ENV_FILE:-"$CONFIG_ROOT/data/config/ai26-localhost.env"}
+SOURCE_MANIFEST=${LACLAUGPT_SOURCE_MANIFEST:-"$CONFIG_ROOT/data/config/ai26.sources.toml"}
+STUDY_CONFIG=${LACLAUGPT_STUDY_CONFIG:-"$CONFIG_ROOT/data/config/ai26.yaml"}
 LOCK_FILE=${LACLAUGPT_COLLECT_LOCK:-"$ROOT/data/tmp/ai26-localhost-collect.lock"}
 
 # Cron has neither .venv/bin nor ~/.local/bin on PATH.
 ai26_prepend_runtime_path
 
 mkdir -p "$ROOT/data/logs" "$ROOT/data/tmp"
-[[ -f "$ENV_FILE" ]] || { echo "missing runtime env: $ENV_FILE" >&2; exit 2; }
-[[ -f "$SOURCE_MANIFEST" ]] || { echo "missing private source manifest: $SOURCE_MANIFEST" >&2; exit 2; }
-[[ -f "$STUDY_CONFIG" ]] || { echo "missing private study config: $STUDY_CONFIG" >&2; exit 2; }
+[[ -f "$ENV_FILE" ]] || { laclaugpt_missing_runtime_config "runtime env" "$ENV_FILE" "$ROOT" docs/AI26_LOCALHOST_COLLECTION.md; exit 2; }
+[[ -f "$SOURCE_MANIFEST" ]] || { laclaugpt_missing_runtime_config "private source manifest" "$SOURCE_MANIFEST" "$ROOT" docs/AI26_LOCALHOST_COLLECTION.md; exit 2; }
+[[ -f "$STUDY_CONFIG" ]] || { laclaugpt_missing_runtime_config "private study config" "$STUDY_CONFIG" "$ROOT" docs/AI26_LOCALHOST_COLLECTION.md; exit 2; }
 
 set -a
 # shellcheck disable=SC1090

@@ -20,6 +20,9 @@ def setup_checkout(tmp_path: Path) -> tuple[Path, dict[str, str]]:
         "run_brazil26_localhost_collect.sh",
         "run_brazil26_localhost_sync.sh",
         "install_cron_brazil26.sh",
+        # The collect wrapper sources the shared runtime-configuration helper
+        # (issue #258); a synthetic checkout must carry it like a real one does.
+        "runtime_config.sh",
     ):
         shutil.copy(ROOT / "scripts" / name, scripts / name)
     bins = root / ".venv/bin"

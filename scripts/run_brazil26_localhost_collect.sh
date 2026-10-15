@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-ENV_FILE=${LACLAUGPT_ENV_FILE:-"$ROOT/data/config/brazil26-localhost.env"}
+# shellcheck source=scripts/runtime_config.sh
+. "$ROOT/scripts/runtime_config.sh"
+# Issue #258: the runtime env, study config and source manifest are untracked
+# private configuration. LACLAUGPT_RUNTIME_CONFIG_ROOT repoints where they are
+# read from, which is the only supported way a runtime started from a Git
+# worktree can use the main checkout's configuration without copying a file.
+CONFIG_ROOT=$(laclaugpt_runtime_config_root "$ROOT")
+ENV_FILE=${LACLAUGPT_ENV_FILE:-"$CONFIG_ROOT/data/config/brazil26-localhost.env"}
 MANIFEST_OVERRIDE=${LACLAUGPT_SOURCE_MANIFEST:-}
 DATA_OVERRIDE=${LACLAUGPT_DATA_ROOT:-}
 LOCK_FILE=${LACLAUGPT_COLLECT_LOCK:-"$ROOT/data/tmp/brazil26-localhost-collect.lock"}
@@ -9,13 +16,15 @@ STUDY_OVERRIDE=${LACLAUGPT_STUDY_CONFIG:-}
 
 export PATH="$ROOT/.venv/bin:${HOME:-/root}/.local/bin:$PATH"
 mkdir -p "$ROOT/data/logs" "$ROOT/data/tmp"
-[[ -f "$ENV_FILE" ]] || { echo "missing runtime env: $ENV_FILE" >&2; exit 2; }
+[[ -f "$ENV_FILE" ]] || { laclaugpt_missing_runtime_config "runtime env" "$ENV_FILE" "$ROOT" docs/brazil26-localhost.md; exit 2; }
 
 cd "$ROOT"
 set -a; source "$ENV_FILE"; set +a
-SOURCE_MANIFEST=${MANIFEST_OVERRIDE:-${LACLAUGPT_SOURCE_MANIFEST:-"$ROOT/data/config/brazil26.sources.toml"}}
+# The ignored env file may itself repoint the configuration root.
+CONFIG_ROOT=$(laclaugpt_runtime_config_root "$ROOT")
+SOURCE_MANIFEST=${MANIFEST_OVERRIDE:-${LACLAUGPT_SOURCE_MANIFEST:-"$CONFIG_ROOT/data/config/brazil26.sources.toml"}}
 export LACLAUGPT_DATA_ROOT=${DATA_OVERRIDE:-${LACLAUGPT_DATA_ROOT:-"$ROOT/data"}}
-[[ -f "$SOURCE_MANIFEST" ]] || { echo "missing Brazil26 source manifest: $SOURCE_MANIFEST" >&2; exit 2; }
+[[ -f "$SOURCE_MANIFEST" ]] || { laclaugpt_missing_runtime_config "Brazil26 source manifest" "$SOURCE_MANIFEST" "$ROOT" docs/brazil26-localhost.md; exit 2; }
 if [[ "${LACLAUGPT_PROJECT_ID:-brazil26}" != "brazil26" ]]; then
   echo "Brazil26 worker refuses LACLAUGPT_PROJECT_ID=${LACLAUGPT_PROJECT_ID}" >&2
   exit 2
@@ -40,8 +49,8 @@ export LACLAUGPT_S3_BUCKET=
 # laclaugpt-server-rss made --study-config a required argument; the RSS worker
 # refuses to run without the private study identity. Resolve it after the
 # runtime env is sourced so BRAZIL26_CONFIG from the ignored env file wins.
-STUDY_CONFIG=${STUDY_OVERRIDE:-${LACLAUGPT_STUDY_CONFIG:-${BRAZIL26_CONFIG:-"$ROOT/data/config/brazil26.yaml"}}}
-[[ -f "$STUDY_CONFIG" ]] || { echo "missing Brazil26 study config: $STUDY_CONFIG" >&2; exit 2; }
+STUDY_CONFIG=${STUDY_OVERRIDE:-${LACLAUGPT_STUDY_CONFIG:-${BRAZIL26_CONFIG:-"$CONFIG_ROOT/data/config/brazil26.yaml"}}}
+[[ -f "$STUDY_CONFIG" ]] || { laclaugpt_missing_runtime_config "Brazil26 study config" "$STUDY_CONFIG" "$ROOT" docs/brazil26-localhost.md; exit 2; }
 
 command -v flock >/dev/null
 command -v laclaugpt-server-rss >/dev/null || { echo "laclaugpt-server-rss missing" >&2; exit 2; }
