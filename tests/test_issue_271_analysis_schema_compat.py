@@ -3,6 +3,8 @@ import json
 from copy import deepcopy
 from pathlib import Path
 
+from jsonschema import Draft202012Validator
+
 import pytest
 
 from laclaugpt_data_collection.analysis_schema_compat import analysis_1_2_view
@@ -17,6 +19,17 @@ def legacy_record():
     payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
     payload.pop("contract_version")
     return CanonicalRecord.model_validate(payload).model_dump(mode="json")
+
+
+def test_vendored_analysis_schema_accepts_both_versions_via_adapter():
+    schema_path = Path(__file__).parents[1] / 'schemas' / 'analysis-research-record-1.2.0.schema.json'
+    schema = json.loads(schema_path.read_text(encoding='utf-8'))
+    validator = Draft202012Validator(schema)
+    for version in ('1.1.0', '1.2.0'):
+        value = legacy_record()
+        value['schema_version'] = version
+        errors = list(validator.iter_errors(analysis_1_2_view(value)))
+        assert not errors, [str(err) for err in errors]
 
 
 def test_legacy_1_1_projects_to_1_2_without_mutating_source():
