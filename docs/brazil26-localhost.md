@@ -185,6 +185,15 @@ to an existing approved manifest. Verify its active feed URLs before relying on
 scheduled collection. An example URL is not evidence of a successful live feed
 fetch. Until an operational manifest exists, RSS remains unconfigured.
 
+The runtime env file, the private study config and this manifest are read from
+`$LACLAUGPT_RUNTIME_CONFIG_ROOT/data/config/` (default: the checkout the wrapper
+lives in). Set `LACLAUGPT_RUNTIME_CONFIG_ROOT` to the checkout that owns the
+private `data/` tree when the wrapper is not running from it — the supported route
+for a runtime started from a Git worktree, whose untracked `data/` tree is absent
+by construction. That variable moves the *configuration* only; the record root
+stays `LACLAUGPT_DATA_ROOT`. The collector never generates, copies or borrows a
+manifest, so a genuinely absent sampling decision remains a hard stop (exit 2).
+
 Run the current localhost RSS worker with:
 
 ```bash
@@ -346,6 +355,29 @@ The printed package path must be under this checkout's `src/`. This prepares
 future scheduled workers; it does not migrate or restart an already-running
 browser backend. Other environments that still import from the stale directory
 must also be repointed before that directory can be retired.
+
+### A runtime rooted in a Git worktree
+
+`data/` is untracked, so a linked worktree (`.worktrees/<name>/`, whose `.git` is a
+file pointing at `<main>/.git/worktrees/<name>`) contains only the tracked tree.
+A wrapper run from there therefore reports a missing runtime env, study config or
+source manifest — for a checkout that can *never* own one — rather than for a
+skipped sampling decision. The collect wrapper now says so: it names the linked
+worktree, the main checkout, and whether the file exists there. Do not copy the
+private configuration into the worktree. Point the runtime at the checkout that
+owns it instead:
+
+```bash
+# the private configuration lives in the main checkout
+LACLAUGPT_RUNTIME_CONFIG_ROOT=<main-checkout>          # env / study config / manifest
+LACLAUGPT_DATA_ROOT=<main-checkout>/data               # only if the corpus is shared
+```
+
+Run the wrapper from the worktree once with that override and confirm the worker
+receives the main checkout's manifest path. If the main checkout does not have the
+file either, the decision really is absent and remains a hard stop; retiring the
+worktree or reinstalling the cron block from the canonical checkout (see below) is
+the fix, not creating a manifest by hand.
 
 Ensure the ignored runtime env file exists, `BRAZIL26_CONFIG` names the real
 private study, and `LACLAUGPT_SOURCE_MANIFEST` names an existing operational

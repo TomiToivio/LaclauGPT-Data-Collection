@@ -197,3 +197,11 @@ Inspect logs under `data/logs/`. If a cron wrapper reports that another run is a
 If MongoDB/Redis/Allas checks fail, first re-run `distributed-check` with the same sourced environment. Keep Redis authenticated and network-restricted. Do not expose the Firefox backend publicly.
 
 If Firefox capture works locally but remote MongoDB is unchanged, run `bash scripts/run_ai26_localhost_sync.sh`; browser capture and remote synchronization are deliberately separated in the current architecture rather than making browser JavaScript perform storage work.
+
+If a collect wrapper reports a missing runtime env, study config or source manifest, check which checkout is running it. The private configuration is read from `$LACLAUGPT_RUNTIME_CONFIG_ROOT/data/config/` (default: the checkout the wrapper lives in), and `data/` is untracked, so a wrapper run from a linked Git worktree (`.worktrees/<name>/`) can never find its own copy. The wrapper says whether the file exists in the main checkout and refuses either way: point it at the checkout that owns the private configuration with
+
+```bash
+LACLAUGPT_RUNTIME_CONFIG_ROOT=<main-checkout>
+```
+
+rather than copying the files into the worktree. A genuinely absent manifest or study config stays a hard stop — the wrapper never generates, copies or borrows one.
