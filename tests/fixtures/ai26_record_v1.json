@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.1.0",
+  "source_url": "https://example.invalid/ai26/record/1",
+  "source_native_ids": {
+    "platform": "example-1"
+  },
+  "raw_capture": {
+    "ref": "s3://example-bucket/ai26/raw/1.json",
+    "payload": null,
+    "checksum": "0000000000000000000000000000000000000000000000000000000000000000",
+    "content_type": "application/json",
+    "captured_at": "2026-10-01T10:00:00+00:00",
+    "metadata": {}
+  },
+  "source": {
+    "kind": "web_source",
+    "name": "example source",
+    "arena": "elites"
+  },
+  "content": {
+    "text": "An example post used by the contract tests.",
+    "language": "en"
+  },
+  "intermediate": {
+    "asr": [],
+    "ocr": [],
+    "frames": [],
+    "frame_analysis": [],
+    "translations": [],
+    "stage_outputs": {}
+  },
+  "analysis": {},
+  "human_readable": {
+    "summary": "",
+    "markdown": "",
+    "generated_at": "2026-10-01T10:05:00+00:00",
+    "generator": "example-generator-v1"
+  },
+  "provenance": [],
+  "review": {},
+  "legacy": {}
+}
