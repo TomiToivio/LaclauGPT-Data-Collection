@@ -166,6 +166,10 @@ class MongoRecordStore:
         payload = self._payload(record)
         if existing:
             _carry_forward_media_state(payload, existing)
+            # Recompute AFTER restoring durable references (#287).
+            payload["handoff"] = build_handoff(
+                payload, project_id=self.project_id, run_id=_run_id(record)
+            )
         self._collection.replace_one(
             self._query(record),
             payload,
@@ -257,6 +261,46 @@ class MongoRecordStore:
             }
             for document in cursor
         ]
+
+    def reconcile_waiting_media(self, *, collection_id: str | None = None, limit: int = 100) -> int:
+        """Repair stale waiting_media envelopes without re-downloading or re-ingesting.
+
+        Only update the handoff field, preserving the canonical record and its
+        resolved object references. A compare-and-set avoids overwriting a
+        handoff that another worker has already changed.
+        """
+        if limit < 1:
+            raise ValueError("limit must be at least 1")
+        query: dict[str, Any] = {
+            "project_id": self.project_id,
+            "handoff.status": "waiting_media",
+            "content.media_references": {
+                "$elemMatch": {"object_ref": {"$exists": True, "$nin": ["", None]}}
+            },
+        }
+        if collection_id:
+            query["collection_id"] = collection_id
+        repaired = 0
+        for document in self._collection.find(query).limit(limit):
+            previous = document.get("handoff") or {}
+            handoff = build_handoff(
+                document,
+                project_id=self.project_id,
+                run_id=str(previous.get("run_id") or ""),
+            )
+            if handoff["status"] != "ready":
+                continue
+            result = self._collection.update_one(
+                {
+                    "_id": document["_id"],
+                    "project_id": self.project_id,
+                    "handoff.status": "waiting_media",
+                    "handoff.handoff_key": previous.get("handoff_key"),
+                },
+                {"$set": {"handoff": handoff}},
+            )
+            repaired += int(result.modified_count)
+        return repaired
 
     @staticmethod
     def from_document(document: dict[str, Any]) -> CanonicalRecord:
