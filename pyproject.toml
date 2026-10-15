@@ -73,6 +73,7 @@ legacy-sources = [
 dev = [
   "pytest>=8.3,<9",
   "pytest-cov>=5,<6",
+  "jsonschema>=4.23,<5",
   "ruff>=0.6,<1",
   "mypy>=1.11,<2",
   "rdflib>=7,<8",
