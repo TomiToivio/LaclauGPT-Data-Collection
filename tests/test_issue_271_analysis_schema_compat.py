@@ -3,8 +3,8 @@ import json
 from copy import deepcopy
 from pathlib import Path
 
-from jsonschema import Draft202012Validator
 import pytest
+from jsonschema import Draft202012Validator
 
 from laclaugpt_data_collection.analysis_schema_compat import analysis_1_2_view
 from laclaugpt_data_collection.handoff import build_handoff
