@@ -383,6 +383,13 @@ def run_phase1_laskin(
             "deferred_by_source_budget": 0,
         }
 
+    # Reserve non-browser capacity before RSS re-syncs use the shared tick cap.
+    jobs = select_job_window(all_jobs, max_jobs=max_jobs, rotation=rotation * max_jobs)
+    non_browser_reserved = min(limit // 2, len(jobs) * per_source_limit) if jobs else 0
+    rss_limit = limit - non_browser_reserved
+    if rss_limit < 1:
+        raise ValueError("limit must allow at least one RSS slot")
+
     rss = run_phase1_rss(
         settings,
         study_config=study_config,
@@ -391,7 +398,7 @@ def run_phase1_laskin(
         worker_id=worker_id,
         max_feeds=max_feeds,
         per_feed_limit=per_source_limit,
-        limit=limit,
+        limit=rss_limit,
         rotation=rotation * max_feeds,
     )
     remaining = max(limit - int(rss.get("records_synced", 0)), 0)
@@ -435,7 +442,6 @@ def run_phase1_laskin(
                 ),
             )
     policy = RealtimePolicy.ai26()
-    jobs = select_job_window(all_jobs, max_jobs=max_jobs, rotation=rotation * max_jobs)
     synced = 0
     collected = 0
     skipped_before_floor = 0
@@ -532,6 +538,19 @@ def run_phase1_laskin(
         except Exception as exc:  # noqa: BLE001 - a report must not fail the cycle
             manifest_drift = {"in_sync": None, "error": str(exc)[:180]}
 
+    tick_budget = {
+        "limit": limit,
+        "rss_allocation": rss_limit,
+        "non_browser_reserved": non_browser_reserved,
+        "rss_synced": int(rss.get("records_synced", 0)),
+        "non_browser_synced": synced,
+        "unused": max(limit - int(rss.get("records_synced", 0)) - synced, 0),
+        "rss_collected": int(rss.get("records_collected", 0)),
+        "non_browser_collected": collected,
+        "deferred_jobs": [o["name"] for o in source_outcomes if o["reason"] == "tick_record_limit"],
+        "admitted_jobs": [o["name"] for o in source_outcomes if o["reason"] != "tick_record_limit"],
+        "note": "Source-budget deferred_total counts daily-cap records only, not tick deferrals.",
+    }
     return {
         "status": "ok" if not errors else "partial",
         "project_id": settings.project_id,
@@ -549,6 +568,7 @@ def run_phase1_laskin(
         "warnings": warnings,
         "errors": errors,
         "source_outcomes": source_outcomes,
+        "tick_budget": tick_budget,
         "source_budget": (budget.summary() if budget is not None else None),
         "deferred_by_source_budget": deferred_by_budget,
         "manifest_drift": manifest_drift,
