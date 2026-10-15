@@ -1,5 +1,11 @@
 # AI26 canonical record: schema version compatibility and migration
 
+**Which document is authoritative for what.** This document owns the *measurements*: what the two
+schemas actually contain, what the live corpus actually stores, and what happens on the consumer
+path. The *decision* and the Collection-side export adapter live in
+[AI26_SCHEMA_1_2_COMPATIBILITY.md](AI26_SCHEMA_1_2_COMPATIBILITY.md). Read that one for what we
+do; read this one for why we know it is safe.
+
 **Status: reconciliation record for issue #271, verified 2026-10-15. No production migration is
 performed or proposed as done here.** This document answers the four acceptance items on #271 with
 measurements, and records one open contract question for the author.
@@ -103,6 +109,34 @@ This is safe today (the fields are identical, and the adapter handles legacy), b
 2. **Carry the producer's version in the envelope** and assert it there, so a genuinely foreign or
    future schema cannot pass silently. This is a contract change across two repositories.
 3. **Pin both repositories to one version string** and let the gate be strict for real.
+
+## What the consumer path actually does (measured 2026-10-15)
+
+Running the chain on a **real stored record** rather than a fixture, with the adapter view from
+[AI26_SCHEMA_1_2_COMPATIBILITY.md](AI26_SCHEMA_1_2_COMPATIBILITY.md):
+
+| Step | Result |
+|---|---|
+| stored `ai26__records` document | 1.1.0, carrying routing fields (`project_id`, `collection_id`, `arena`, `handoff`) |
+| through the export adapter view | 1.2.0, routing fields dropped, `source_url` preserved |
+| strict validation against the vendored 1.2.0 schema | **0 errors** |
+| through Analysis's own normalizer | **rejected**: `source.backfill` and `source.backfilled_at` are extra inputs, `type=extra_forbidden` |
+
+So the producer is in order and the *consumer* is stricter than the contract both repositories
+publish: `source` is an open object in both JSON schemas, while Analysis's `SourceSection` model
+forbids undeclared keys. Filed there with the reproduction; the fix has a precedent in that
+repository's own `schema_version.py`, which documents preserving undeclared values in an extension
+namespace and does so on its parity-fixture path.
+
+**And the original claim was a red herring.** A raw stored record has exactly *one* violation against
+the shipped schema, and it is not the version: `additionalProperties: false` at the top level rejects
+the routing metadata the pipeline stamps at write time. The version string is a separate, benign
+matter the adapter already handles.
+
+**One fixture caveat.** `tests/fixtures/ai26_phase1_handoff_v1.json` is envelope-shaped, not
+record-shaped: it produces **9** schema errors against `research-record.schema.json`, including a
+missing required `human_readable`. Any fixture-based handoff acceptance must start from a complete
+record; the measurements above did.
 
 ## Deployment note
 
