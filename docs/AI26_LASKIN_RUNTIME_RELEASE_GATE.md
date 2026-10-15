@@ -107,3 +107,29 @@ the corpus, and the analysis worker is the cheaper of the two to bounce.
 * On a failed configuration rollout, stop the conflicting worker first, restore the timestamped runtime backups after reviewing the intended rollback, then repeat dry-run and runtime checks. Restoring manifests does **not** roll back already ingested data or installed Python code.
 
 Until these criteria are observed on Laskin, **keep both issues open**. GitHub-only changes are not evidence that an hourly runtime was deployed.
+
+
+### 2026-10-15 producer/consumer reconciliation status
+
+The versioned export adapter and the two distinct handoff/record fixture types
+are present on Collection `main`. Analysis PR
+[TomiToivio/LaclauGPT-Data-Analysis#355](https://github.com/TomiToivio/LaclauGPT-Data-Analysis/pull/355)
+has been merged, preserving the newer Analysis normalizer's
+`source.extensions` namespace. It is intended to fix the previously observed
+`source.backfill` / `source.backfilled_at` rejection. The merge itself is
+**not** evidence of successful ingestion on Laskin.
+
+`tests/test_issue271_provenance_boundary.py` checks, using a **complete**
+synthetic Collection record, that producer source extensions, source URL and
+routing metadata survive the opt-in 1.2 view, that the view validates against
+the vendored 1.2 JSON schema, and that conversion is idempotent. Routing fields
+remain in `legacy._collection_compat_extensions`; unknown `source` keys remain
+under `source` for Analysis to normalize into its own `source.extensions`.
+
+For final acceptance, run the current Analysis normalizer and actual worker on
+this exported view, including a replay and changed-text revision; then perform
+the read-only sanitized legacy sample and worker manifest audit on Laskin.
+**Record `schema_version`, handoff `contract_version`, and worker-manifest
+`schema_version` remain separate concepts.** Record exact installed Git SHAs
+and observed results in Analysis #341 before closing Collection #271. No
+production migration or deployment is authorized here.
