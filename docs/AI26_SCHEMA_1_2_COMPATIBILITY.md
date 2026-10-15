@@ -1,5 +1,9 @@
 # AI26 Collection 1.1.0 → Analysis 1.2.0 compatibility
 
+> This document owns the decision and the Collection-side adapter. The measurements behind it -
+> what the two schemas actually contain, what the live corpus stores, and the consumer-path result -
+> are in [AI26_SCHEMA_VERSION_COMPATIBILITY.md](AI26_SCHEMA_VERSION_COMPATIBILITY.md).
+
 Issues: Collection [#271](https://github.com/TomiToivio/LaclauGPT-Data-Collection/issues/271), Analysis [#341](https://github.com/TomiToivio/LaclauGPT-Data-Analysis/issues/341).
 
 ## Decision
