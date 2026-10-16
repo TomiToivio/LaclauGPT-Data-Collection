@@ -80,6 +80,15 @@ sampling_rationale = "Regulation, rights, national security, labour and platform
 priority = "P1"
 
 [[feed]]
+name = "eu_digital_strategy"
+feed_url = "https://digital-strategy.ec.europa.eu/en/rss.xml"
+homepage = "https://digital-strategy.ec.europa.eu/en"
+arena = "parliamentary"
+source_family = "EU governance / institutional documents"
+sampling_rationale = "First-party European Commission digital-strategy stream: the EU institutional articulation of AI regulation, oversight, competitiveness, copyright and the AI-observatory build-out (verified items: 'Commission holds special meeting of Scientific panel on frontier AI safety and risks', 2026-10-09; 'Establishing the European AI Observatory: Call for tenders', 2026-10-05; 'Targeted consultation to support a better copyright environment for creativity and innovation', 2026-09-29). Added 2026-10-16 as a SAMPLING decision because the paper's parliamentary arena rests on institutional documents for evidence of policy articulation, while the corpus held only two parliamentary `web` records and no first-party EU document stream. It complements, and does not replace, the existing `eu_ai_policy` page row. Inclusion is NOT an ideological classification: the Commission and its services are sampled for their institutional position in the policy process, not for a stance. Verified live 2026-10-16: HTTP 200, 10 items, newest 2026-10-09. Priority P2 so it does not displace the existing P1 tick budget. Not all items are AI-related; relevance is resolved at analysis stage, not at collection."
+priority = "P2"
+
+[[feed]]
 name = "gary_marcus"
 feed_url = "https://garymarcus.substack.com/feed"
 homepage = "https://garymarcus.substack.com"
