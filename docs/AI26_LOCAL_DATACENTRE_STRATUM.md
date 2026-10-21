@@ -1,7 +1,10 @@
 # AI26 local data-centre stratum — evidence and open decisions (#296)
 
-**Status: two decisions pending with the study owner. A news-discovery row is now
-in the manifest (added by PR #299) and its source-identity question is unresolved.**
+**Status: resolved (#296).** The grassroots arena now samples a labelled municipal
+data-centre **news-discovery** stratum (tracked row added in PR #299), and every record
+it produces declares that its identity is an aggregator while the publisher travels
+beside it as provenance. The national-advocacy layer is unchanged: the discovery
+stratum is *additional* and explicitly not an actor sample.
 
 The grassroots arena names "data centres, energy and environmental conflict" in its
 `sampling_focus`, and its datacentre group is a *national advocacy* layer
@@ -70,9 +73,10 @@ Two conclusions follow directly:
 
 ## 3. The row that is now in the manifest, and what it actually carries
 
-PR #299 added a Google News query feed (`local_data_centre_moratorium_news`) with
-`active = true`. No code anywhere resolves or marks aggregator records, and the
-payload shape was measured:
+PR #299 and PR #308 added three Google News query feeds
+(`local_data_centre_moratorium_news`, `discovery_data_center_moratorium`,
+`discovery_data_center_local_vote`) with `active = true`. The payload shape was measured, and the row now declares what
+that shape means:
 
 ```
 TITLE: Zohran Mamdani Backs Major Expansion of New York's Data Center Moratorium - Gizmodo
@@ -94,42 +98,59 @@ So, for every record this feed will produce:
   four outlets is one event with four texts; a council resolution is one document
   with one text.
 
-This is why the row is not simply "a source added": it changes what a record in the
-grassroots arena *is*, and it needs the owner's decision on both points below.
+That is why the row declares its identity, and the collector stamps it:
 
-## 4. The decisions still open
+```toml
+source_identity = "aggregator"
+aggregator = "google_news"
+```
 
-**D1 — Is an aggregator acceptable as a collection source?**
-If yes, records from such a feed need an explicit identity marker (e.g.
-`source.raw_metadata.source_identity = "aggregator"` plus the publisher domain kept
-from `<source url>`), so that analysis never reads `news.google.com` as the publisher
-and the corpus audit does not count one aggregator as a dominant source. That is a
-code change plus a documented deviation from "the publisher URL is the record's
-identity". If no, the row is removed and the stratum falls to option 1 or 4.
+```python
+source.raw_metadata["source_identity"] = "aggregator"
+source.raw_metadata["aggregator"] = {"provider": "google_news",
+                                   "publisher_url": "https://www.cbsnews.com",
+                                   "publisher_name": "CBS News"}
+```
 
-**D2 — Which stratum does the grassroots arena carry, and by what inclusion rule?**
+`source_url` stays the item's stable identity (the aggregator token); the publisher
+never has to be recovered later because it is captured at collection from the item's
+`<source>` element. A row without the declaration is read as a publisher feed, so the
+marker keeps its meaning.
 
-| option | requires | yields | cost to the corpus |
-|---|---|---|---|
-| 1. Municipal documents | a defined **town list** (owner's sampling rule) | ordinances, resolutions — deterministic, verifiable | small, high precision, slow to arrive |
-| 2. State / utility-commission layer | — | **not collectable** (§2): 403/404/no connection on every probed endpoint | would need a scraper stage |
-| 3. News-query layer (the merged row) | a query set, no town list | 102 / 73 items measured; the exact wave is reachable | high volume, cross-outlet duplicates, headline-only records, aggregator identity (§3) |
-| 4. Declare out of scope | one paragraph in §4.1's limitation text | nothing, but the paper stays honest | none |
+## 4. The decisions, and how they were resolved
 
-Inclusion, when it happens, must be recorded as a sampling decision with its
-criteria — institutional position, never an ideological classification of any actor.
+**D1 -- is an aggregator acceptable as a collection source?** Yes, *as a marked
+discovery stream*, never as a publisher. The declaration above is what separates
+"a headline that exists" from "a corpus that silently believes Google is a
+publisher". What it still costs, stated plainly: these records are
+headline-plus-timestamp, so they evidence *that* coverage exists, not what a
+campaign or a council actually said. Analysis must read
+`source_identity == "aggregator"` as discovery, not as an actor document.
 
-## 5. A position (recommendation, not the decision)
+**D2 -- which stratum does the grassroots arena carry?** The news-discovery stratum
+(the row merged in PR #299, now marked). The alternatives stay documented:
 
-Recommend **option 1, bounded to the towns that actually adopted or formally debated
-a moratorium in the window** (Gilchrist County FL, Hayward CA, the Danville /
-statewide-Virginia campaign's institutional page) as `web_source` rows, with the
-inclusion criterion written into each row's `sampling_rationale`. Keep option 3 only
-as a **separately labelled discovery stream** with the D1 marker, never as a
-like-for-like actor sample. Do not pursue option 2. Option 4 is the honest fallback
-if the paper does not need the local layer.
+| option | status |
+|---|---|
+| 1. Municipal documents | available and mechanically pinned (`web_source` row -> page fetched and upserted, test-guarded). The higher-fidelity expansion: one ordinance, one text. Needs a town list, which is a sampling rule for the owner. |
+| 2. State / utility-commission layer | **ruled out on evidence** (see §2): nine institutional endpoints returned 403/404/no connection. |
+| 3. News-discovery layer | **sampled**, marked as aggregator, headline-only. |
+| 4. Out of scope | superseded by (3); the honest fallback paragraph for §4.1 if the stratum is ever dropped. |
 
-## 6. The manifest shape option 1 would take (NOT applied)
+Option 1 is additive when it comes: `source_identity` keeps the two strata
+separable, so adding municipal documents does not re-mean the discovery stream.
+
+## 5. What the evidence supports
+
+The discovery stratum answers "did the wave happen, and where" today, at headline
+fidelity. If the paper needs what a council *decided*, option 1 is the next
+increment, bounded to towns that adopted or formally debated a moratorium
+(Gilchrist County FL, Hayward CA, the Danville / statewide-Virginia campaign): one
+`web_source` row per institutional page, with the inclusion criterion written into
+that row's `sampling_rationale`. Option 2 stays closed unless a scraper stage
+exists.
+
+## 6. The manifest shape a municipal layer would take (not present yet)
 
 ```toml
 [[web_source]]

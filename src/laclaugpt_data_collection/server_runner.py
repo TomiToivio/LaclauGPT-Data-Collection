@@ -189,6 +189,10 @@ def _stamp_source_metadata(
     arena = str(feed.get("arena") or "")
     if arena:
         record.source.raw_metadata["arena"] = arena
+    # #296: a row that declares it links at an aggregator says so once, here.
+    from .source_identity import apply_source_identity
+
+    record.source.raw_metadata.update(apply_source_identity(record, feed))
     # #294: a row-level `language = "fi"` fills an empty record language; a
     # value the feed or platform already provided is never overwritten.
     from .language import apply_declared_language

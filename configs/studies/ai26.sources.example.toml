@@ -472,7 +472,14 @@ last_verified = "2026-10-08"
 # A topic-based media-observation stratum for municipal data-centre campaigns (#296).
 # This samples NEWS COVERAGE, not first-party municipal/campaign documents.
 # Inclusion is geographic/topic-driven, not an ideological classification.
-# Google News RSS is unofficial; verify feed availability and article links on Laskin.
+#
+# source_identity = "aggregator" is not decoration: this feed's items link at
+# news.google.com/<token>, the publisher appears only in the item's <source>
+# element, and the payload is a headline (measured 2026-10-21, #296). The
+# declaration makes the collection stamp `source_identity` and an `aggregator`
+# block (provider + publisher url/name) on every record, so no reader mistakes the
+# aggregator's domain for the publisher's. A row without it is read as a publisher
+# feed, which is what every other feed in this manifest is.
 [[feed]]
 name = "local_data_centre_moratorium_news"
 feed_url = "https://news.google.com/rss/search?q=%22data+center%22+%28moratorium+OR+ordinance+OR+zoning+OR+protest%29&hl=en-US&gl=US&ceid=US:en"
@@ -480,6 +487,8 @@ homepage = "https://news.google.com/"
 arena = "grassroots"
 source_family = "local data-centre conflict / municipal media coverage"
 sampling_rationale = "Topic-based US English-language news discovery of local zoning, ordinances, moratoriums, and protests related to data centres. News coverage only, NOT first-party local campaign speech. Broad geography avoids cherry-picking municipalities; results remain subject to relevance and duplicate audits. Sampling inclusion is not a position or ideology label."
+source_identity = "aggregator"
+aggregator = "google_news"
 priority = "P2"
 active = true
 
@@ -967,6 +976,9 @@ priority = "P2"
 # ---- #296: municipal data-centre contest is discoverable by event, not enumerable by actor list ----
 # These two rows are an EVENT stream, labelled as such: an item is a lead, its publisher is the
 # actor, resolved before any claim about who is speaking. They do not silently join the actor frame.
+# `source_identity = "aggregator"` is what makes that resolution possible: the item's link is a
+# news.google.com token, so collection stores the publisher (url + name) beside it. A row without
+# the declaration is read as a publisher feed.
 [[feed]]
 name = "discovery_data_center_moratorium"
 feed_url = "https://news.google.com/rss/search?q=%22data%20center%22%20moratorium&hl=en-US&gl=US&ceid=US:en"
@@ -974,6 +986,8 @@ homepage = "https://news.google.com/"
 arena = "grassroots"
 source_family = "QUERY DISCOVERY / municipal data-centre contest (event stream, not an actor)"
 sampling_rationale = "Verified live 2026-10-21: HTTP 200, 102 items; surfaces municipal moratorium contests in jurisdictions not enumerated in advance (New York, Memphis). Admitted as a labelled discovery stratum so the grassroots actor frame is not silently redefined."
+source_identity = "aggregator"
+aggregator = "google_news"
 priority = "P1"
 
 [[feed]]
@@ -983,6 +997,8 @@ homepage = "https://news.google.com/"
 arena = "grassroots"
 source_family = "QUERY DISCOVERY / municipal data-centre contest (event stream, not an actor)"
 sampling_rationale = "Verified live 2026-10-21: HTTP 200, 100 items; council votes and county decisions. Same status as discovery_data_center_moratorium."
+source_identity = "aggregator"
+aggregator = "google_news"
 priority = "P2"
 
 [[feed]]
