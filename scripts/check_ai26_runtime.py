@@ -152,11 +152,49 @@ def compare_import_path(name: str, checkout: Path) -> Finding:
     )
 
 
+#: Declared runtime dependencies whose absence degrades the pipeline *silently*.
+#: ``langdetect`` is the case that produced issue #294: it is declared in pyproject's
+#: ``[feeds]`` extra, and without it ``resolve_language`` returns ``detector_unavailable`` --
+#: a blank label that looks exactly like "this text could not be classified". The
+#: parliamentary arena collected 296 rows with no language while the study declared
+#: ``languages: [en, fi]``, and nothing in any log said why.
+DECLARED_IMPORTS: tuple[str, ...] = ("feedparser", "langdetect", "pymongo", "redis")
+
+
+def compare_dependencies(
+    checkout: Path, *, imports: tuple[str, ...] = DECLARED_IMPORTS
+) -> Finding:
+    """Check that declared dependencies import under the checkout's own interpreter."""
+    python = checkout / ".venv" / "bin" / "python"
+    if not python.exists():
+        return Finding("dependencies", True, f"no {python}; skipped")
+    missing: list[str] = []
+    for module in imports:
+        result = subprocess.run(
+            [str(python), "-c", f"import {module}"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            missing.append(module)
+    if missing:
+        return Finding(
+            "dependencies",
+            False,
+            "declared but not importable: " + ", ".join(missing)
+            + " (installs from pyproject; a missing detector blanks labels silently)",
+        )
+    return Finding("dependencies", True, f"{len(imports)} declared import(s) present")
+
 def collect(root: Path, checkouts: list[Path], *, fetch: bool) -> list[Finding]:
     findings = [
         compare_config(name, root / tracked, root / deployed)
         for name, tracked, deployed in RUNTIME_CONFIG_PAIRS
     ]
+    # Dependencies belong to the repository that declares them, not to every sibling
+    # checkout: probing these imports inside a sibling would report that repository's
+    # environment as a defect of this one.
+    findings.append(compare_dependencies(root))
     for checkout in checkouts:
         label = f"code ({checkout.name})"
         findings.append(compare_checkout(label, checkout, fetch=fetch))
