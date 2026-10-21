@@ -1,23 +1,8 @@
-<!-- PHASE-BRANCH-POLICY:v3 -->
+## Development workflow and research phases
 
-## Mandatory phase-branch policy
+`main` is the active development branch. Create short-lived feature/fix branches from `main` and merge validated changes back to `main`. Research phases do not determine Git branch selection, and no `phase-N` branch synchronization is required. Existing phase branches can remain as historical references without being advanced or deleted.
 
-LaclauGPT keeps persistent phase branches: `phase-0`, `phase-1`, `phase-2`, `phase-3`, and `phase-4`.
-
-**Current active/stable phase: Phase 2.** All Phase 2 development, fixes, issue work, and pull requests target `main` directly. The `phase-2` ref is a passive compatibility/mirror branch and MUST represent the same validated tree as `main`; agents must not use it as the source or target branch for Phase 2 work. The `phase-1` branch is the preserved Phase 1 baseline, and `phase-0` remains the preserved Phase 0 baseline.
-
-Before making any issue-driven change, an agent MUST determine the issue's intended phase from explicit issue text, title, labels, milestone, linked plan, or repository documentation. Then:
-
-1. Phase 2 work starts from `main` and targets `main` directly. Short-lived issue branches, when useful, are created from `main` and PR back to `main`.
-2. Do not create new Phase 2 work from `phase-2`, and do not target Phase 2 PRs at `phase-2`.
-3. After validated Phase 2 changes land on `main`, keep the passive `phase-2` mirror synchronized to the same commit/tree.
-4. Phase 3 and Phase 4 work stays on the matching persistent `phase-N` branch (or a short-lived branch created from it) and must not land on `main` while Phase 2 is current.
-5. Phase 1 maintenance targets `phase-1`; Phase 0 maintenance targets `phase-0`. Neither maintenance line moves `main` backward.
-6. If an issue has no phase information, treat it as belonging to the current phase unless the task or roadmap clearly says otherwise. Currently that means Phase 2 on `main`.
-7. Do not silently move work between phases. If implementation reveals that an issue belongs to another phase, update/document the issue or report the mismatch before merging.
-8. Preserve `TOMI-LOCKED`, privacy, public/private, runtime-data, scientific-method, and module-boundary rules on every branch.
-
-See `docs/PHASE_BRANCHING.md` for the repository-wide workflow.
+The programme is currently in **research Phase 1**. Phase 2 is optional and may be skipped. Phases 3 and 4 concern research analyses and results, not distinct coding or pipeline branches. Preserve all existing privacy, scientific-method, locked-paper, and module-boundary constraints.
 
 # Agent and Contributor Rules
 
@@ -30,21 +15,21 @@ This file is the canonical shared contract. Agent-specific files such as `CLAUDE
 Keep this repository limited to data collection: source/browser/network capture, platform parsers, normalization, provenance, collection state, media/raw persistence, scheduling, and storage adapters. Analysis, dashboards, simulations and other module responsibilities belong elsewhere.
 
 
-## AI26 Phase 2 scope lock
+## AI26 active pipeline scope
 
-**This repository's `main` branch is now exclusively the AI26 Phase 2 implementation.**
+**This repository's `main` branch contains the active AI26 implementation (research Phase 1).**
 
 - AI26 is the only active/default study in this repository. New code, configuration, tests, examples, documentation, commands and agent work MUST assume AI26 unless Tomi explicitly says otherwise.
 - EP24, Hungary26 and Brazil26 are out of scope here. They will live in separate project repositories. Do not add new EP24/Hungary26/Brazil26 pipelines, codebooks, launchers, dashboards, adapters, deployment documentation or project-specific defaults here.
 - Historical compatibility code may remain temporarily when removing it would create unnecessary risk, but agents must treat it as dormant legacy. Do not extend, polish, modernize or use it as an architectural target.
 - The human-readable publication/researcher-facing versions belong in the legacy EP24 repositories or other project-specific repositories. These three AI26 repositories do **not** need to optimize for human readability right now.
-- Prefer machine-readable canonical records, provenance, evidence, reproducible Phase 2 processing and operational correctness over prose reports, human-readable summaries, researcher workbenches, exhibition views or legacy dashboards.
+- Prefer machine-readable canonical records, provenance, evidence, reproducible current-pipeline processing and operational correctness over prose reports, human-readable summaries, researcher workbenches, exhibition views or legacy dashboards.
 - Do not spend issue scope on making outputs friendlier to humans unless Tomi explicitly requests it. Human-in-the-loop scientific validation remains required; this rule is about software/output presentation, not removing human research responsibility.
-- Phase 2 work goes directly to `main` under the repository's current branch policy. Phase 0/1 branches remain historical baselines and are not defaults for new work.
+- Current pipeline work targets `main`; historical phase branches are not development targets.
 
-## Historical Phase 0/1 foundation
+## Historical implementation foundation
 
-The hand-coded implementation under `laclaugpt/` is retained as the historical Phase 0 foundation. The guidance below is archaeology/maintenance context only; it does not define new work on `main`, which is AI26 Phase 2.
+The hand-coded implementation under `laclaugpt/` is retained as the historical Phase 0 foundation. The guidance below is archaeology/maintenance context only; it does not define new work on `main`, which is the current AI26 pipeline.
 
 Agents MUST inspect `laclaugpt/` first before proposing or implementing Phase 1 work. Existing Phase 1 code outside `laclaugpt/` is a reference implementation and source of isolated functionality, tests, schemas, and interfaces. It is not automatically the canonical architecture.
 
