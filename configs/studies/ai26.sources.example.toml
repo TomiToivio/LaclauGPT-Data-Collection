@@ -460,6 +460,20 @@ priority = "P2"
 active = true
 last_verified = "2026-10-08"
 
+# A topic-based media-observation stratum for municipal data-centre campaigns (#296).
+# This samples NEWS COVERAGE, not first-party municipal/campaign documents.
+# Inclusion is geographic/topic-driven, not an ideological classification.
+# Google News RSS is unofficial; verify feed availability and article links on Laskin.
+[[feed]]
+name = "local_data_centre_moratorium_news"
+feed_url = "https://news.google.com/rss/search?q=%22data+center%22+%28moratorium+OR+ordinance+OR+zoning+OR+protest%29&hl=en-US&gl=US&ceid=US:en"
+homepage = "https://news.google.com/"
+arena = "grassroots"
+source_family = "local data-centre conflict / municipal media coverage"
+sampling_rationale = "Topic-based US English-language news discovery of local zoning, ordinances, moratoriums, and protests related to data centres. News coverage only, NOT first-party local campaign speech. Broad geography avoids cherry-picking municipalities; results remain subject to relevance and duplicate audits. Sampling inclusion is not a position or ideology label."
+priority = "P2"
+active = true
+
 # ---------------------------------------------------------------------------
 # Public web endpoints
 # ---------------------------------------------------------------------------
