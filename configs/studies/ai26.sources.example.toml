@@ -953,3 +953,43 @@ services = ["openalex", "semantic_scholar", "socArxiv"]
 query = "(AI OR automation) AND (post-work OR postcapitalism OR public ownership OR redistribution OR technological emancipation)"
 arena = "elites"
 priority = "P2"
+
+# ---- #295: the parliamentary arena needs parliamentary material, not only scholarship ----
+[[feed]]
+name = "europarl_press_releases"
+feed_url = "https://www.europarl.europa.eu/rss/doc/press-releases/en.xml"
+homepage = "https://www.europarl.europa.eu/news/en/press-room"
+arena = "parliamentary"
+source_family = "EU legislature / first-party parliamentary documents"
+sampling_rationale = "First-party European Parliament press-room stream: the legislature speaking in its own voice about legislation, oversight and plenary decisions. Added for #295, where the parliamentary arena held 40% technical ML papers from a scholarly query and no first-party parliamentary material. Read as institutional position in the policy process, not as a stance. Verified live 2026-10-21: HTTP 200, 20 items."
+priority = "P2"
+
+# ---- #296: municipal data-centre contest is discoverable by event, not enumerable by actor list ----
+# These two rows are an EVENT stream, labelled as such: an item is a lead, its publisher is the
+# actor, resolved before any claim about who is speaking. They do not silently join the actor frame.
+[[feed]]
+name = "discovery_data_center_moratorium"
+feed_url = "https://news.google.com/rss/search?q=%22data%20center%22%20moratorium&hl=en-US&gl=US&ceid=US:en"
+homepage = "https://news.google.com/"
+arena = "grassroots"
+source_family = "QUERY DISCOVERY / municipal data-centre contest (event stream, not an actor)"
+sampling_rationale = "Verified live 2026-10-21: HTTP 200, 102 items; surfaces municipal moratorium contests in jurisdictions not enumerated in advance (New York, Memphis). Admitted as a labelled discovery stratum so the grassroots actor frame is not silently redefined."
+priority = "P1"
+
+[[feed]]
+name = "discovery_data_center_local_vote"
+feed_url = "https://news.google.com/rss/search?q=%22data%20center%22%20(county%20OR%20council)%20(opposition%20OR%20vote)&hl=en-US&gl=US&ceid=US:en"
+homepage = "https://news.google.com/"
+arena = "grassroots"
+source_family = "QUERY DISCOVERY / municipal data-centre contest (event stream, not an actor)"
+sampling_rationale = "Verified live 2026-10-21: HTTP 200, 100 items; council votes and county decisions. Same status as discovery_data_center_moratorium."
+priority = "P2"
+
+[[feed]]
+name = "datacenterdynamics"
+feed_url = "https://www.datacenterdynamics.com/en/rss/"
+homepage = "https://www.datacenterdynamics.com"
+arena = "elites"
+source_family = "data-centre industry / developer-side trade press"
+sampling_rationale = "The developer side of the same municipal wave: siting, power and community concessions argued from the industry's position. Verified live 2026-10-21: HTTP 200, 20 items. Added for #296 as the counterpart to the grassroots opposition stratum, not as a neutral record."
+priority = "P2"
