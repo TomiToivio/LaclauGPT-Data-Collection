@@ -16,6 +16,7 @@ from urllib.parse import urlsplit
 
 from .collectors.rss import RSSCollector
 from .config import Settings
+from .language import unlabelled_language_warning
 from .models import CanonicalRecord
 
 
@@ -436,6 +437,14 @@ def run_phase1_rss(
         counts_toward_budget=lambda record: not before_publication_floor(record),
         diagnostics=fetch,
     )
+    # #294: a record stored without `source.language` cannot be used in the
+    # language-stratified sample the paper promises, and until now the cycle said
+    # nothing when a tag was lost. Report it, counted and by source. A warning,
+    # not an error: collection itself succeeded.
+    language_warning = unlabelled_language_warning(records)
+    if language_warning:
+        warnings.append(language_warning)
+
     synced = 0
     created = 0
     skipped_before_floor = 0

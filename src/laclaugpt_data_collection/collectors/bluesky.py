@@ -196,6 +196,17 @@ def _map_post(
     rkey = uri.rsplit("/", 1)[-1]
     web_url = f"https://bsky.app/profile/{handle}/post/{rkey}" if handle else ""
     indexed_at = str(post.get("indexedAt") or datetime.now(timezone.utc).isoformat())
+    # #294: `record.langs` is optional and the Valtioneuvosto account omits it, so
+    # reading it alone left every parliamentary bluesky row unlabelled while the
+    # rss and arxiv collectors resolved a language for the same arena. Use the
+    # shared resolver, which prefers the declared `langs` value and falls back to
+    # content detection exactly as the other platforms do.
+    declared = ""
+    if isinstance(record.get("langs"), list) and record["langs"]:
+        declared = str(record["langs"][0] or "")
+    from ..language import resolve_language
+
+    language, language_method = resolve_language(text, declared=declared)
     return NormalizedRecord(
         document_id=uri,
         platform="bluesky",
@@ -204,11 +215,7 @@ def _map_post(
         timestamp=created_at,
         source_url=uri,
         text=text,
-        language=(
-            (record.get("langs") or [""])[0]
-            if isinstance(record.get("langs"), list)
-            else ""
-        ),
+        language=language,
         engagement={
             "like_count": post.get("likeCount"),
             "reply_count": post.get("replyCount"),
@@ -227,6 +234,7 @@ def _map_post(
                 "at_uri": uri,
                 "cid": cid,
                 "web_url": web_url,
+                "language_method": language_method,
                 "raw_item": post,
             },
         ),

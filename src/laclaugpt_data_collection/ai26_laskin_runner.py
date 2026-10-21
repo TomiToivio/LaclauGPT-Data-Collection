@@ -25,6 +25,7 @@ from .collectors.rss import RSSCollector
 from .collectors.youtube import YouTubeCollector
 from .config import Settings
 from .distributed_capture import DistributedCaptureSink
+from .language import unlabelled_language_warning
 from .models import CollectionProvenance, NormalizedRecord
 from .plugins import RetryPolicy
 from .realtime import RealtimePolicy, parse_source_time, unparsed_source_time_warning
@@ -490,6 +491,12 @@ def run_phase1_laskin(
             if unparsed_time_warning:
                 source_warnings = [*source_warnings, unparsed_time_warning]
             warnings.extend(source_warnings)
+            # #294: a missing language tag is a metadata-quality report, not a
+            # source-health failure, so it goes into the cycle warnings without
+            # changing this job's outcome status.
+            language_warning = unlabelled_language_warning(records)
+            if language_warning:
+                warnings.append(language_warning)
             collected += len(records)
             outcome.update(
                 status="warning" if source_warnings else "ok",
