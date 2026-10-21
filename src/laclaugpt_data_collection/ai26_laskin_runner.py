@@ -388,16 +388,19 @@ def run_phase1_laskin(
     # No reservation is needed when the manifest has no eligible jobs.
     non_browser_reserve = min(limit // 2, max_jobs * per_source_limit) if all_jobs else 0
     rss_limit = limit - non_browser_reserve
+    # Never fetch more feeds than this tick can persist. Rotate by the actual
+    # window size, not the old configured window, so no feed is silently skipped.
+    rss_max_feeds = min(max_feeds, max(1, rss_limit // per_source_limit)) if rss_limit else 0
     rss = run_phase1_rss(
         settings,
         study_config=study_config,
         source_manifest=source_manifest,
         collection_id=routed,
         worker_id=worker_id,
-        max_feeds=max_feeds,
+        max_feeds=rss_max_feeds,
         per_feed_limit=per_source_limit,
         limit=rss_limit,
-        rotation=rotation * max_feeds,
+        rotation=rotation * rss_max_feeds,
     )
     remaining = max(limit - int(rss.get("records_synced", 0)), 0)
     created = int(rss.get("records_new", 0))
