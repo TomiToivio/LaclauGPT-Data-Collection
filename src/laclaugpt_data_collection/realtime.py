@@ -89,13 +89,6 @@ def parse_source_time(value: object) -> datetime | None:
         try:
             dt = datetime.fromisoformat(iso_text)
         except ValueError:
-            # ETUI emits weekday-prefixed US numeric dates, not RFC 822 dates (#295).
-            # Treat these source-local timestamps as UTC, consistent with other
-            # source timestamps lacking an explicit offset.
-            numeric = re.fullmatch(r'(?:[A-Za-z]{3},\s*)?(\d{1,2}/\d{1,2}/\d{4})\s*-\s*(\d{1,2}:\d{2})', text)
-            if numeric:
-                dt = datetime.strptime(' '.join(numeric.groups()), '%m/%d/%Y %H:%M')
-                return dt.replace(tzinfo=UTC)
             try:
                 dt = parsedate_to_datetime(text)
             except (TypeError, ValueError, OverflowError):
