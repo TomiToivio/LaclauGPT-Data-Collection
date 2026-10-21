@@ -1,6 +1,5 @@
 """Regression checks for AI26 issue #293 and ETUI issue #295."""
 from datetime import UTC, datetime
-from unittest.mock import patch
 
 from laclaugpt_data_collection.realtime import parse_source_time
 
