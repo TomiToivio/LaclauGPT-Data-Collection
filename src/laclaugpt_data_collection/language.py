@@ -119,3 +119,30 @@ def unlabelled_language_warning(records: Iterable[Any]) -> str | None:
     if _NO_DETECTOR in reasons:
         message = f"{message} -- {_DETECTOR_HINT}"
     return message
+
+
+def apply_declared_language(record: object, declared: str) -> str:
+    """Fill an EMPTY ``source.language`` from a manifest-row declaration (#294).
+
+    A row-level ``language`` is a statement about the source, not an observation
+    of one item, so it may only fill a blank: a platform value (Bluesky ``langs``,
+    a feed's ``xml:lang``, arXiv metadata) always wins. That ordering is the whole
+    point -- a declared language that overwrote a per-item observation would make
+    the label look measured when it is asserted.
+
+    Returns the method that was applied, or ``""`` when nothing changed. An invalid
+    tag changes nothing rather than failing a collection cycle.
+    """
+    tag = str(declared or "").strip()
+    if not tag:
+        return ""
+    source = getattr(record, "source", None)
+    if source is None:
+        return ""
+    if str(getattr(source, "language", "") or "").strip():
+        return ""
+    language, method = resolve_language("", declared=tag)
+    if not language:
+        return ""
+    source.language = language
+    return method

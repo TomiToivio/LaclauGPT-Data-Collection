@@ -9,6 +9,15 @@
 # Every feed has an explicitly assigned arena (#265); assignments are sampling
 # provenance, not ideological labels. Disabled feeds retain their sampling
 # intention and use enabled = false, which the RSS loader actually honours.
+#
+# Optional per-row `language = "fi"`: a STATEMENT ABOUT THE SOURCE, used only to
+# fill a record whose platform/feed carried no language (#294). It never
+# overwrites a per-item value -- a feed's xml:lang or Bluesky's `langs` wins -- so
+# a declaration cannot make an asserted label look measured. No row declares one
+# yet: adding one is a sampling/metadata decision for the study owner, and the
+# label is recorded with language_method = "source_metadata" and
+# language_declared_by = "manifest_row" so a declared stratum stays separable
+# from a detected one.
 
 # ---------------------------------------------------------------------------
 # RSS / Atom backbone

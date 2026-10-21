@@ -189,6 +189,11 @@ def _stamp_source_metadata(
     arena = str(feed.get("arena") or "")
     if arena:
         record.source.raw_metadata["arena"] = arena
+    # #294: a row-level `language = "fi"` fills an empty record language; a
+    # value the feed or platform already provided is never overwritten.
+    from .language import apply_declared_language
+
+    language_method = apply_declared_language(record, str(feed.get("language") or ""))
     if record.provenance:
         metadata = record.provenance[-1].metadata
         metadata["collection_id"] = collection_id
@@ -196,6 +201,9 @@ def _stamp_source_metadata(
         metadata["source_name"] = str(feed.get("name") or "")
         if arena:
             metadata["arena"] = arena
+        if language_method:
+            metadata["language_method"] = language_method
+            metadata["language_declared_by"] = "manifest_row"
     record.refresh_human_readable()
     return record
 
