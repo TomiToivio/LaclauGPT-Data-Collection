@@ -92,7 +92,18 @@ def _stubs(tmp_path: Path) -> Path:
 
 
 def _env(tmp_path: Path, bins: Path) -> dict[str, str]:
+    """The wrapper's environment, with the operator's home neutralised.
+
+    ``run_brazil26_localhost_collect.sh`` prepends ``$ROOT/.venv/bin`` and
+    ``$HOME/.local/bin`` to PATH, so a developer who has a real
+    ``laclaugpt-server-rss`` in ``~/.local/bin`` silently out-ranks this fixture's
+    stub and the test measures the operator's install instead of the wrapper. The
+    script is what is under test, so its PATH has to be the fixture's.
+    """
     env = {key: value for key, value in os.environ.items() if not key.startswith("LACLAUGPT_")}
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    env["HOME"] = str(home)
     env["PATH"] = f"{bins}:{env.get('PATH', '')}"
     env["CALL_LOG"] = str(tmp_path / "calls")
     return env
