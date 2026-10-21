@@ -26,4 +26,4 @@ Recommended initial design for review: event-based municipal documents (ordinanc
 2. Regression-test ETUI timestamp parsing; re-ingest original raw records to fill missing published_at rather than fabricate dates.
 3. Compare old/new scholarly query yield and topical precision before approval; document the corpus discontinuity.
 4. Measure parliamentary language nonblank rate by source, with `unknown` preserved. Verify selected new strata independently once the sampling rule is signed off.
-5. Validate on Laskin and only then merge/close the corresponding issues.
+5. Validate on Laskin before closing the corresponding issues. The code/documentation merge does not imply deployment verification.
