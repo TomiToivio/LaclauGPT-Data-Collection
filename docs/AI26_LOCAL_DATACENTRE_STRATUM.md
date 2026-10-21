@@ -73,8 +73,9 @@ Two conclusions follow directly:
 
 ## 3. The row that is now in the manifest, and what it actually carries
 
-PR #299 added a Google News query feed (`local_data_centre_moratorium_news`) with
-`active = true`. The payload shape was measured, and the row now declares what
+PR #299 and PR #308 added three Google News query feeds
+(`local_data_centre_moratorium_news`, `discovery_data_center_moratorium`,
+`discovery_data_center_local_vote`) with `active = true`. The payload shape was measured, and the row now declares what
 that shape means:
 
 ```
