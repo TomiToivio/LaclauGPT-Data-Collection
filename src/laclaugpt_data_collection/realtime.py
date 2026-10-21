@@ -48,6 +48,33 @@ class RealtimePolicy:
         )
 
 
+#: Date formats that real feeds publish and that neither ISO 8601 nor RFC 2822 covers.
+#: The etui feed (issue #295) emits a Drupal-rendered stamp: ``Tue, 10/20/2026 - 17:23``.
+#: Python reports that as a ValueError from both parsers, so every etui record reached the
+#: publication floor with no publication time and could never be dated.
+#:
+#: The ``m/d/Y`` order is the publisher's own convention (10/20/2026 can only be October 20th);
+#: a feed using d/m/Y would be silently misread, so this list is deliberately explicit rather
+#: than "some slash date" and a new publisher must be added here by name.
+_SITE_DATE_FORMATS: tuple[str, ...] = (
+    "%a, %m/%d/%Y - %H:%M",  # "Tue, 10/20/2026 - 17:23" (etui, Drupal)
+    "%a, %m/%d/%Y %H:%M",
+    "%m/%d/%Y - %H:%M",
+    "%a, %d.%m.%Y - %H:%M",  # dotted European variant, day first, stated explicitly
+    "%d.%m.%Y %H:%M",
+)
+
+
+def _parse_site_datetime(text: str) -> datetime | None:
+    """Parse a publisher-specific stamp from ``_SITE_DATE_FORMATS``; None when none matches."""
+    cleaned = " ".join(text.replace("\u2013", "-").replace("\u2014", "-").split())
+    for fmt in _SITE_DATE_FORMATS:
+        try:
+            return datetime.strptime(cleaned, fmt)
+        except ValueError:
+            continue
+    return None
+
 def parse_source_time(value: object) -> datetime | None:
     """Parse ISO or RFC/RSS source time without substituting collection time."""
     if value in (None, ""):
@@ -65,7 +92,12 @@ def parse_source_time(value: object) -> datetime | None:
             try:
                 dt = parsedate_to_datetime(text)
             except (TypeError, ValueError, OverflowError):
-                return None
+                # A publisher stamp that neither parser recognises is not automatically a
+                # missing date: the etui feed's Drupal stamp is a real publication time
+                # (issue #295). Try the named formats before giving up.
+                dt = _parse_site_datetime(text)
+                if dt is None:
+                    return None
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=UTC)
     return dt.astimezone(UTC)
