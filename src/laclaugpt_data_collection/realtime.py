@@ -6,10 +6,11 @@ remote MongoDB/Redis workers can implement the same observable semantics.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
+from typing import Any
 from urllib.parse import urlsplit
 
 from .models import canonicalize_source_url
@@ -133,6 +134,63 @@ def source_publication_time(record: dict) -> datetime | None:
         if parsed is not None:
             return parsed
     return None
+
+
+def _source_mapping(record: Any) -> Mapping[str, Any]:
+    """Read the ``source`` section from a canonical model or a plain mapping."""
+    if isinstance(record, Mapping):
+        source = record.get("source")
+    else:
+        source = getattr(record, "source", None)
+    if isinstance(source, Mapping):
+        return source
+    dumped = getattr(source, "model_dump", None)
+    if not callable(dumped):
+        return {}
+    payload = dumped()
+    return payload if isinstance(payload, Mapping) else {}
+
+
+def unparsed_source_time_counts(records: Iterable[Any]) -> dict[str, int]:
+    """Count records whose source time string no parser accepts, keyed by source.
+
+    #295: a rejected source time is stored as ``handoff.published_at = null``, and
+    the study requires a source publication time for analysis, so such a row can
+    never be analysed. Losing the time silently converts fetchable content into
+    permanently unusable rows, so the failure is counted here and reported by the
+    collection cycle instead of being swallowed.
+
+    Parsing a publisher stamp (#295) and *noticing* an unparsed one are separate
+    duties: the next publisher whose format is unknown must not be able to re-open
+    the silent-ineligibility path this issue describes.
+    """
+    counts: dict[str, int] = {}
+    for record in records:
+        source = _source_mapping(record)
+        raw = str(source.get("created_at") or "").strip()
+        if not raw or parse_source_time(raw) is not None:
+            continue
+        metadata = source.get("raw_metadata")
+        metadata = metadata if isinstance(metadata, Mapping) else {}
+        name = str(metadata.get("source_name") or source.get("platform") or "unnamed")
+        counts[name] = counts.get(name, 0) + 1
+    return counts
+
+
+def unparsed_source_time_warning(records: Iterable[Any]) -> str | None:
+    """Return one counted, source-naming warning for unparseable source times."""
+    counts = unparsed_source_time_counts(records)
+    if not counts:
+        return None
+    total = sum(counts.values())
+    detail = ", ".join(
+        f"{name}={count}"
+        for name, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    )
+    return (
+        f"{total} record(s) with unparseable source publication time "
+        f"(stored with handoff.published_at=null and therefore unanalysable): {detail}"
+    )
 
 
 def analysis_eligibility(record: dict, policy: RealtimePolicy) -> tuple[bool, str]:
