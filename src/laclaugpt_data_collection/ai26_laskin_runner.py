@@ -355,6 +355,25 @@ def _declared_budgets_bind(study_config: str | Path) -> bool:
     return budgets.get("enforce") is True
 
 
+def _rss_window(max_feeds: int, rss_limit: int) -> tuple[int, int]:
+    """How many feeds to poll and how deep, so the window fits the allocation (#293).
+
+    The RSS stage fetched a window it could not store: with 8 feeds at 5 candidates against a
+    20-record allocation, half of every cycle's fetch was discarded and a feed in the tail of the
+    window collected nothing for hours. The budget has to size the window, not the other way
+    round. Depth is derived from the allocation so ``feeds * depth <= rss_limit`` holds by
+    construction: 8 feeds at 2 candidates fills 16 of 20, where 4 feeds at 5 filled 20 and left
+    four feeds unpolled.
+
+    Returns ``(feeds, depth)``.
+    """
+    if rss_limit <= 0:
+        return (0, 0)
+    feeds = min(max(1, max_feeds), rss_limit)
+    depth = max(1, rss_limit // feeds)
+    return (feeds, depth)
+
+
 def run_phase1_laskin(
     settings: Settings,
     *,
@@ -410,7 +429,7 @@ def run_phase1_laskin(
     rss_limit = limit - non_browser_reserve
     # Never fetch more feed candidates than can be persisted in this tick (#293).
     # Preserve the total tick cap and the non-browser reservation.
-    rss_feeds = min(max_feeds, max(1, rss_limit // per_source_limit))
+    rss_feeds, rss_feed_depth = _rss_window(max_feeds, rss_limit)
     rss = run_phase1_rss(
         settings,
         study_config=study_config,
@@ -418,7 +437,7 @@ def run_phase1_laskin(
         collection_id=routed,
         worker_id=worker_id,
         max_feeds=rss_feeds,
-        per_feed_limit=per_source_limit,
+        per_feed_limit=rss_feed_depth,
         limit=rss_limit,
         rotation=rotation * rss_feeds,
     )
