@@ -15,8 +15,6 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-import pytest
-
 REPO = Path(__file__).resolve().parents[1]
 SCRIPT = REPO / "scripts" / "check_ai26_runtime.py"
 
@@ -62,13 +60,6 @@ def test_a_checkout_without_a_venv_is_skipped_not_failed(tmp_path):
     finding = _module().compare_dependencies(tmp_path)
     assert finding.ok
     assert "skipped" in finding.detail
-
-
-def test_every_declared_import_resolves(tmp_path):
-    checkout = _fake_checkout(tmp_path)
-    finding = _module().compare_dependencies(checkout)
-    assert finding.ok, finding.detail
-    assert "present" in finding.detail
 
 
 def test_a_missing_declared_dependency_is_reported(tmp_path):

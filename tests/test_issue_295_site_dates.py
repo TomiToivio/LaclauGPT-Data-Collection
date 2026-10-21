@@ -10,8 +10,6 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-import pytest
-
 from laclaugpt_data_collection.realtime import parse_source_time
 
 
