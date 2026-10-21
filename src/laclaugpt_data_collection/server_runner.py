@@ -205,12 +205,39 @@ def collect_rss_records(
     collection_id: str,
     worker_id: str,
     per_feed_limit: int = 20,
+    record_budget: int | None = None,
+    counts_toward_budget: Any | None = None,
+    diagnostics: dict[str, Any] | None = None,
 ) -> tuple[list[CanonicalRecord], list[str]]:
-    """Collect and annotate RSS records without touching distributed services."""
+    """Collect and annotate RSS records without touching distributed services.
+
+    ``record_budget`` is the number of records the caller can actually store in
+    this cycle (#293). Without it the whole feed window is fetched and the store
+    loop then keeps only the first ``limit`` records, so every feed past that point
+    costs an HTTP request whose records are guaranteed to be discarded -- and a
+    feed in the tail of the window is polled hourly and stored never.
+
+    The fetch therefore stops as soon as ``record_budget`` records that
+    ``counts_toward_budget`` accepts (default: all of them) have been collected.
+    The stop condition is deliberately the *store's* condition, not a raw item
+    count: records the caller will skip for a reason of its own (the AI26
+    publication floor) do not consume the budget, so the retained list is a prefix
+    of what an unbounded fetch produced and the stored set is unchanged. A feed is
+    never skipped while the budget is unfilled, so a short feed cannot starve the
+    later feeds of the window.
+
+    ``diagnostics``, when given, is filled with what the fetch actually did
+    (``feeds_polled``, ``records_fetched``, ``record_budget``, ``stopped_early``)
+    so a cycle report can show the saving instead of inferring it.
+    """
     records: list[CanonicalRecord] = []
     warnings: list[str] = []
+    accepted = 0
+    polled = 0
+    stopped_early = False
     for feed in feeds:
         feed_url = str(feed["feed_url"])
+        polled += 1
         result = RSSCollector(
             [feed_url],
             max_items_per_feed=per_feed_limit,
@@ -218,14 +245,28 @@ def collect_rss_records(
         ).collect()
         warnings.extend(result.warnings)
         for record in result.records:
-            records.append(
-                _stamp_source_metadata(
-                    record,
-                    feed,
-                    collection_id=collection_id,
-                    worker_id=worker_id,
-                )
+            stamped = _stamp_source_metadata(
+                record,
+                feed,
+                collection_id=collection_id,
+                worker_id=worker_id,
             )
+            records.append(stamped)
+            if record_budget is None:
+                continue
+            if counts_toward_budget is not None and not counts_toward_budget(stamped):
+                continue
+            accepted += 1
+            if accepted >= record_budget:
+                stopped_early = True
+                break
+        if stopped_early:
+            break
+    if diagnostics is not None:
+        diagnostics["feeds_polled"] = polled
+        diagnostics["records_fetched"] = len(records)
+        diagnostics["record_budget"] = record_budget
+        diagnostics["stopped_early"] = stopped_early
     return records, warnings
 
 
@@ -347,11 +388,7 @@ def run_phase1_rss(
 ) -> dict[str, Any]:
     """Run one bounded Phase 1 RSS batch through canonical local or distributed storage."""
     from .factory import build_record_store
-    from .realtime import (
-        RealtimePolicy,
-        parse_source_time,
-        unparsed_source_time_warning,
-    )
+    from .realtime import RealtimePolicy, parse_source_time, unparsed_source_time_warning
 
     if max_feeds < 1 or per_feed_limit < 1 or limit < 1:
         raise ValueError("max_feeds, per_feed_limit and limit must be at least 1")
@@ -364,23 +401,7 @@ def run_phase1_rss(
     if rotation is None:
         rotation = int(time.time() // 3600) * max_feeds
 
-    feeds = select_feed_window(
-        load_feed_manifest(source_manifest),
-        max_feeds=max_feeds,
-        rotation=rotation,
-    )
-    records, warnings = collect_rss_records(
-        feeds,
-        collection_id=routed_collection,
-        worker_id=worker_id,
-        per_feed_limit=per_feed_limit,
-    )
-    # #295: a source time the parser rejects is stored as a null
-    # `handoff.published_at`, and the study's
-    # `source_publication_time_required_for_analysis` makes such a row permanently
-    # unanalysable. Report the failure, counted and by source, instead of dropping
-    # it silently. Deliberately a warning rather than an error: the record is still
-    # stored (its text becomes analysable once the date is backfilled).
+    # #295: surface rejected publication dates without failing collection.
     unparsed_time_warning = unparsed_source_time_warning(records)
     if unparsed_time_warning:
         warnings.append(unparsed_time_warning)
@@ -388,6 +409,33 @@ def run_phase1_rss(
     # AI26 has a study-specific realtime publication floor. Brazil26 and other
     # projects must not inherit that policy accidentally.
     policy = RealtimePolicy.ai26() if routed_collection == "ai26" else None
+
+    def before_publication_floor(record: CanonicalRecord) -> bool:
+        """Whether the study floor drops this record before it can be stored."""
+        if policy is None or policy.publication_date_floor is None:
+            return False
+        published = parse_source_time(record.source.created_at)
+        return bool(published and published < policy.publication_date_floor)
+
+    feeds = select_feed_window(
+        load_feed_manifest(source_manifest),
+        max_feeds=max_feeds,
+        rotation=rotation,
+    )
+    # #293: fetch only what this cycle can store. `limit` is the store budget, and
+    # records the study floor will drop do not consume it, so the fetch stops at
+    # exactly the record the store loop would have stopped at: the stored set is
+    # unchanged while the feeds past that point are no longer polled for nothing.
+    fetch: dict[str, Any] = {}
+    records, warnings = collect_rss_records(
+        feeds,
+        collection_id=routed_collection,
+        worker_id=worker_id,
+        per_feed_limit=per_feed_limit,
+        record_budget=limit,
+        counts_toward_budget=lambda record: not before_publication_floor(record),
+        diagnostics=fetch,
+    )
     synced = 0
     created = 0
     skipped_before_floor = 0
@@ -411,13 +459,7 @@ def run_phase1_rss(
         storage_target = type(store).__name__
 
     for record in records:
-        published = parse_source_time(record.source.created_at)
-        if (
-            policy is not None
-            and policy.publication_date_floor
-            and published
-            and published < policy.publication_date_floor
-        ):
+        if before_publication_floor(record):
             skipped_before_floor += 1
             continue
         if synced >= limit:
@@ -454,6 +496,8 @@ def run_phase1_rss(
         "collection_id": routed_collection,
         "worker_id": worker_id,
         "feeds_considered": len(feeds),
+        "feeds_polled": int(fetch.get("feeds_polled", len(feeds))),
+        "fetch_stopped_early": bool(fetch.get("stopped_early", False)),
         "feed_names": [str(feed.get("name") or "") for feed in feeds],
         "records_collected": len(records),
         "records_synced": synced,

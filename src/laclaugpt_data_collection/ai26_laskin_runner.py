@@ -215,6 +215,16 @@ def _stamp(record: NormalizedRecord, row: dict[str, Any], *, collection_id: str,
         )
         if arena:
             record.provenance[-1].metadata["arena"] = arena
+    # Some institutional Bluesky posts have no declared language (#294).
+    # Infer only from substantive text, preserving unknowns and provenance.
+    if not record.source.language:
+        from .language import resolve_language
+
+        candidate = record.content.text or ""
+        detected, method = resolve_language(candidate)
+        if detected:
+            record.source.language = detected
+            record.source.raw_metadata["language_method"] = method
     record.refresh_human_readable()
     return record
 
@@ -388,16 +398,19 @@ def run_phase1_laskin(
     # No reservation is needed when the manifest has no eligible jobs.
     non_browser_reserve = min(limit // 2, max_jobs * per_source_limit) if all_jobs else 0
     rss_limit = limit - non_browser_reserve
+    # Never fetch more feed candidates than can be persisted in this tick (#293).
+    # Preserve the total tick cap and the non-browser reservation.
+    rss_feeds = min(max_feeds, max(1, rss_limit // per_source_limit))
     rss = run_phase1_rss(
         settings,
         study_config=study_config,
         source_manifest=source_manifest,
         collection_id=routed,
         worker_id=worker_id,
-        max_feeds=max_feeds,
+        max_feeds=rss_feeds,
         per_feed_limit=per_source_limit,
         limit=rss_limit,
-        rotation=rotation * max_feeds,
+        rotation=rotation * rss_feeds,
     )
     remaining = max(limit - int(rss.get("records_synced", 0)), 0)
     created = int(rss.get("records_new", 0))
@@ -472,9 +485,7 @@ def run_phase1_laskin(
                 per_source_limit=per_source_limit,
                 retry_policy=retry_policy,
             )
-            # #295: the non-browser sources are where the one-off web rows with a
-            # missing publication time come from, so the same counted warning the
-            # RSS path emits is attached to this job's outcome.
+            # #295: warn by source when publication timestamps cannot be parsed.
             unparsed_time_warning = unparsed_source_time_warning(records)
             if unparsed_time_warning:
                 source_warnings = [*source_warnings, unparsed_time_warning]

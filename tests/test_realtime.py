@@ -81,3 +81,17 @@ def test_arenas_share_one_collection_id():
     parliament = mark_realtime_metadata({"source_url": "urn:c"}, collection_id="ai26", arena="parliamentary")
     assert {item["collection_id"] for item in (elites, grass, parliament)} == {"ai26"}
     assert {item["arena"] for item in (elites, grass, parliament)} == {"elites", "grassroots", "parliamentary"}
+
+
+def test_etui_numeric_publication_date_is_parseable():
+    from datetime import UTC, datetime
+    from laclaugpt_data_collection.realtime import parse_source_time
+
+    assert parse_source_time("Thu, 10/08/2026 - 13:30") == datetime(
+        2026, 10, 8, 13, 30, tzinfo=UTC
+    )
+    assert parse_source_time("not a source date") is None
+    assert analysis_eligibility(
+        rec("https://etui.org/example", "rss", "Thu, 10/08/2026 - 13:30"),
+        RealtimePolicy.ai26(),
+    ) == (True, "eligible")
