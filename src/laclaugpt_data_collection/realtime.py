@@ -65,7 +65,7 @@ def parse_source_time(value: object) -> datetime | None:
             # ETUI uses an RSS-like date with a numeric month and dash before
             # time (e.g. Thu, 10/08/2026 - 13:30). Parse deterministically as
             # month/day/year, rather than replacing publication time with now.
-            etui = re.fullmatch(r"[A-Za-z]{3},\\s*(\\d{1,2}/\\d{1,2}/\\d{4})\\s*-\\s*(\\d{1,2}:\\d{2})", text)
+            etui = re.fullmatch(r"[A-Za-z]{3},\s*(\d{1,2}/\d{1,2}/\d{4})\s*-\s*(\d{1,2}:\d{2})", text)
             if etui:
                 try:
                     dt = datetime.strptime(f"{etui.group(1)} {etui.group(2)}", "%m/%d/%Y %H:%M")
