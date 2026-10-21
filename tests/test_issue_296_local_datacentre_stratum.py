@@ -2,9 +2,10 @@
 
 No stratum can be chosen by an agent: it needs an inclusion rule the owner sets.
 What this test pins is (a) the mechanism the brief claims exists -- a browser-free
-`web_source` row really is collected as a document -- and (b) that the *open
-decision* cannot go quiet, including the aggregator row PR #299 added to the
-manifest before that decision was taken.
+`web_source` row really is collected as a document -- (b) that the decision cannot go
+quiet, and (c) that the decision taken on 2026-10-21 is honoured by the manifest: two
+bounded topic-query rows in the grassroots arena, each marked as an aggregator, each
+stating in words what the stratum does and does not sample.
 
 If a decision is taken later, update the brief, the manifest and this test in the
 same commit. That is the point: the state of an owner-gated decision should fail
@@ -210,3 +211,118 @@ class TestAggregatorRecordsCarryPublisherProvenance:
         raw = stamped.source.raw_metadata
         assert raw["source_identity"] == "aggregator"
         assert raw["aggregator"]["publisher_name"] == "CBS News"
+
+
+QUERY_PREFIX = "local_data_centre_"
+EXPECTED = {
+    "local_data_centre_moratorium_news": "data center moratorium",
+    "local_data_centre_pause_news": "data center pause",
+}
+
+
+def stratum_rows() -> dict[str, dict]:
+    return {
+        row["name"]: row
+        for row in _manifest()["feed"]
+        if str(row.get("name") or "").startswith(QUERY_PREFIX)
+    }
+
+
+class TestTheStratumIsTwoBoundedQueryRows:
+    def test_the_stratum_is_two_query_rows_not_a_town_list(self) -> None:
+        assert set(stratum_rows()) == set(EXPECTED), (
+            "the authorised decision is two topic queries; a third row (or a "
+            "per-town list) would be a different sampling decision"
+        )
+
+    def test_each_row_is_one_quoted_topic_phrase(self) -> None:
+        from urllib.parse import parse_qs, urlsplit
+
+        for name, phrase in EXPECTED.items():
+            parsed = urlsplit(stratum_rows()[name]["feed_url"])
+            assert parsed.netloc == "news.google.com"
+            assert parsed.path == "/rss/search"
+            assert parse_qs(parsed.query)["q"] == [f'"{phrase}"'], (
+                "a bounded row is one topic phrase; broad OR-lists are what the "
+                "authorised two-query bound replaced"
+            )
+
+    def test_the_rows_land_in_the_grassroots_arena(self) -> None:
+        from laclaugpt_data_collection.corpus_audit import KNOWN_ARENAS
+
+        assert "grassroots" in KNOWN_ARENAS, "the arena vocabulary is the audit's"
+        for name, row in stratum_rows().items():
+            assert row["arena"] == "grassroots", f"{name} must not dilute another arena"
+
+    def test_the_rows_are_bounded_by_priority(self) -> None:
+        for name, row in stratum_rows().items():
+            assert row["priority"] == "P2", (
+                f"{name} is news coverage, not a first-party P1 source; P2 keeps "
+                "it from displacing one in the bounded feed window"
+            )
+            assert row.get("enabled", row.get("active", True)) is not False
+
+
+class TestEachRowStatesTheLimitsOfTheStratum:
+    def test_every_row_states_the_three_limits(self) -> None:
+        for name, row in stratum_rows().items():
+            rationale = str(row.get("sampling_rationale") or "")
+            assert rationale.strip(), f"{name} must record why it is sampled"
+            lowered = rationale.casefold()
+            assert "coverage of the campaigns" in lowered, (
+                f"{name} must say it samples coverage OF the campaigns, not the campaigns"
+            )
+            assert "not the campaigns themselves" in lowered
+            assert "duplication" in lowered, f"{name} must say it carries outlet duplication"
+            assert "topic" in lowered and "ideology" in lowered, (
+                f"{name} must state that inclusion is by topic, never by actor ideology"
+            )
+            assert "headline" in lowered, "a record is a headline, not an article text"
+
+    def test_the_rows_name_their_own_bound(self) -> None:
+        for name, row in stratum_rows().items():
+            rationale = str(row.get("sampling_rationale") or "")
+            assert "two query rows" in rationale, f"{name} must state the group's size"
+            assert "5 records per cycle" in rationale, (
+                f"{name} must state its per-cycle ceiling under per_source_limit=5"
+            )
+
+    def test_no_row_classifies_an_actor_ideologically(self) -> None:
+        banned = ("left-wing", "right-wing", "progressive", "conservative", "partisan")
+        for name, row in stratum_rows().items():
+            text = " ".join(str(value) for value in row.values()).casefold()
+            assert not [word for word in banned if word in text], (
+                f"{name} carries an ideological label; inclusion must be topical"
+            )
+
+
+class TestTheRowsAreCollectable:
+    def test_the_real_loader_accepts_the_query_rows(self) -> None:
+        from laclaugpt_data_collection import server_runner
+
+        feeds = server_runner.load_feed_manifest(MANIFEST)
+        loaded = {feed["name"]: feed for feed in feeds if feed["name"] in EXPECTED}
+        assert set(loaded) == set(EXPECTED), "the production loader must not drop the stratum"
+        for name, feed in loaded.items():
+            assert feed["arena"] == "grassroots"
+            assert feed["feed_url"].startswith("https://news.google.com/rss/search?")
+            assert feed["source_identity"] == "aggregator", (
+                "an aggregator row that does not declare its identity reads as a "
+                "publisher feed"
+            )
+
+    def test_the_stratum_is_reachable_by_the_bounded_window(self) -> None:
+        """#293's rotation must actually reach these rows, not park them at the tail."""
+        from laclaugpt_data_collection import server_runner
+
+        feeds = server_runner.load_feed_manifest(MANIFEST)
+        window, step = 4, 4
+        cycles = -(-len(feeds) // step)
+        polled = [
+            feed["name"]
+            for cycle in range(cycles)
+            for feed in server_runner.select_feed_window(
+                feeds, max_feeds=window, rotation=cycle * step
+            )
+        ]
+        assert set(EXPECTED) <= set(polled), "a full pass must poll the stratum"

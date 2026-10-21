@@ -469,24 +469,63 @@ priority = "P2"
 active = true
 last_verified = "2026-10-08"
 
-# A topic-based media-observation stratum for municipal data-centre campaigns (#296).
-# This samples NEWS COVERAGE, not first-party municipal/campaign documents.
-# Inclusion is geographic/topic-driven, not an ideological classification.
+# ---------------------------------------------------------------------------
+# Local data-centre conflict: a bounded news-query layer (#296)
 #
-# source_identity = "aggregator" is not decoration: this feed's items link at
-# news.google.com/<token>, the publisher appears only in the item's <source>
-# element, and the payload is a headline (measured 2026-10-21, #296). The
-# declaration makes the collection stamp `source_identity` and an `aggregator`
-# block (provider + publisher url/name) on every record, so no reader mistakes the
-# aggregator's domain for the publisher's. A row without it is read as a publisher
-# feed, which is what every other feed in this manifest is.
+# Sampling decision 2026-10-21 (option 3 of #296, authorised by the study owner).
+# The arena's datacentre group is a NATIONAL ADVOCACY layer (Foxglove Legal, No
+# Desert Data Center Coalition, EFF / Creative Commons / Food and Water Watch) and
+# carried no municipal campaign: 0 records for Danville, Gilchrist, Hayward or
+# "walkout" in an 1835-record store that already held 68 "data center/centre"
+# records. The moratorium/pause wave is where the demand becomes an institutional
+# decision, so it is sampled here, by topic, as news coverage.
+#
+# What this stratum is and is not:
+#  * It samples coverage OF the campaigns, not the campaigns themselves. A council
+#    resolution is one document with one text; a rally reported by four outlets is
+#    one event with four texts.
+#  * It carries outlet duplication by construction (Google News aggregates).
+#  * Inclusion is by topic, never by actor ideology: no town, campaign or outlet is
+#    classified by its presumed position.
+#  * Records carry a headline, timestamp and publisher only: `source_url` is a
+#    news.google.com token, not the publisher's article, and the publisher domain
+#    arrives in the feed's <source url=...> element. `source_identity =
+#    "aggregator"` is what makes that resolution explicit: the collector stamps the
+#    identity and an `aggregator` block (provider plus publisher url/name) on every
+#    record, so no reader mistakes the aggregator's domain for the publisher's. A
+#    row without the declaration is read as a publisher feed, which is what every
+#    other feed in this manifest is.
+#  * Bounded by construction: TWO query rows, not a per-town list and not ten
+#    queries. (#308 had merged two `discovery_data_center_*` rows; the first was
+#    this same moratorium query under a different encoding and the second an
+#    OR-list inside a query, so both are consolidated here, one query per topic,
+#    with the limits above written into each row.) Measured live 2026-10-21: 102
+#    and 100 items. With per_source_limit=5 and the #293 rotation this stratum
+#    contributes at most 10 records per cycle and appears once per full manifest
+#    pass.
+# Municipal ordinance/resolution collection (option 1) remains a separate future
+# decision: it needs a pre-declared jurisdiction list and is not attempted here.
+# ---------------------------------------------------------------------------
+
 [[feed]]
 name = "local_data_centre_moratorium_news"
-feed_url = "https://news.google.com/rss/search?q=%22data+center%22+%28moratorium+OR+ordinance+OR+zoning+OR+protest%29&hl=en-US&gl=US&ceid=US:en"
+feed_url = "https://news.google.com/rss/search?q=%22data+center+moratorium%22&hl=en-US&gl=US&ceid=US:en"
 homepage = "https://news.google.com/"
 arena = "grassroots"
-source_family = "local data-centre conflict / municipal media coverage"
-sampling_rationale = "Topic-based US English-language news discovery of local zoning, ordinances, moratoriums, and protests related to data centres. News coverage only, NOT first-party local campaign speech. Broad geography avoids cherry-picking municipalities; results remain subject to relevance and duplicate audits. Sampling inclusion is not a position or ideology label."
+source_family = "local data-centre conflict / moratorium wave / news coverage of campaigns"
+sampling_rationale = "Sampling decision 2026-10-21 (#296, option 3): a topic-query layer for the LOCAL data-centre moratorium wave, which the national-advocacy datacentre group cannot see. This samples COVERAGE OF the campaigns, not the campaigns themselves: a record is a headline, a timestamp and a publisher, so it is evidence that a conflict was reported, not first-party campaign or municipal speech. It carries outlet duplication by construction: one rally reported by four outlets is four records. Inclusion is by TOPIC -- the phrase 'data center moratorium' -- never by actor ideology; no town, campaign or outlet is classified by its presumed position. Bounded: one of exactly two query rows in this group; verified live 2026-10-21 with 102 items (including the Danville/statewide-Virginia pause campaign, the Gilchrist County and Hayward moratorium votes), and with per_source_limit=5 it yields at most 5 records per cycle, polled once per full manifest pass. Priority P2 so it does not displace a first-party P1 source in the bounded window. NOT a substitute for municipal ordinances/resolutions (option 1), which remain a separate decision needing a pre-declared jurisdiction list."
+source_identity = "aggregator"
+aggregator = "google_news"
+priority = "P2"
+active = true
+
+[[feed]]
+name = "local_data_centre_pause_news"
+feed_url = "https://news.google.com/rss/search?q=%22data+center+pause%22&hl=en-US&gl=US&ceid=US:en"
+homepage = "https://news.google.com/"
+arena = "grassroots"
+source_family = "local data-centre conflict / pause wave / news coverage of campaigns"
+sampling_rationale = "Sampling decision 2026-10-21 (#296, option 3): the second and last query row of the local data-centre news layer. The moratorium vocabulary is not the only one the campaigns use -- Virginia Organizing's statewide campaign and Milwaukee's pause are argued as a 'pause' -- so this row covers that phrasing. This samples COVERAGE OF the campaigns, not the campaigns themselves: headline, timestamp and publisher only, never first-party campaign or municipal speech. It carries outlet duplication by construction. Inclusion is by TOPIC -- the phrase 'data center pause' -- never by actor ideology; no town, campaign or outlet is classified by its presumed position. Bounded: one of exactly two query rows in this group, verified live 2026-10-21 with 100 items, at most 5 records per cycle with per_source_limit=5, polled once per full manifest pass. Priority P2 for the same reason as the moratorium row. NOT a substitute for municipal ordinances/resolutions (option 1)."
 source_identity = "aggregator"
 aggregator = "google_news"
 priority = "P2"
@@ -971,34 +1010,6 @@ homepage = "https://www.europarl.europa.eu/news/en/press-room"
 arena = "parliamentary"
 source_family = "EU legislature / first-party parliamentary documents"
 sampling_rationale = "First-party European Parliament press-room stream: the legislature speaking in its own voice about legislation, oversight and plenary decisions. Added for #295, where the parliamentary arena held 40% technical ML papers from a scholarly query and no first-party parliamentary material. Read as institutional position in the policy process, not as a stance. Verified live 2026-10-21: HTTP 200, 20 items."
-priority = "P2"
-
-# ---- #296: municipal data-centre contest is discoverable by event, not enumerable by actor list ----
-# These two rows are an EVENT stream, labelled as such: an item is a lead, its publisher is the
-# actor, resolved before any claim about who is speaking. They do not silently join the actor frame.
-# `source_identity = "aggregator"` is what makes that resolution possible: the item's link is a
-# news.google.com token, so collection stores the publisher (url + name) beside it. A row without
-# the declaration is read as a publisher feed.
-[[feed]]
-name = "discovery_data_center_moratorium"
-feed_url = "https://news.google.com/rss/search?q=%22data%20center%22%20moratorium&hl=en-US&gl=US&ceid=US:en"
-homepage = "https://news.google.com/"
-arena = "grassroots"
-source_family = "QUERY DISCOVERY / municipal data-centre contest (event stream, not an actor)"
-sampling_rationale = "Verified live 2026-10-21: HTTP 200, 102 items; surfaces municipal moratorium contests in jurisdictions not enumerated in advance (New York, Memphis). Admitted as a labelled discovery stratum so the grassroots actor frame is not silently redefined."
-source_identity = "aggregator"
-aggregator = "google_news"
-priority = "P1"
-
-[[feed]]
-name = "discovery_data_center_local_vote"
-feed_url = "https://news.google.com/rss/search?q=%22data%20center%22%20(county%20OR%20council)%20(opposition%20OR%20vote)&hl=en-US&gl=US&ceid=US:en"
-homepage = "https://news.google.com/"
-arena = "grassroots"
-source_family = "QUERY DISCOVERY / municipal data-centre contest (event stream, not an actor)"
-sampling_rationale = "Verified live 2026-10-21: HTTP 200, 100 items; council votes and county decisions. Same status as discovery_data_center_moratorium."
-source_identity = "aggregator"
-aggregator = "google_news"
 priority = "P2"
 
 [[feed]]
