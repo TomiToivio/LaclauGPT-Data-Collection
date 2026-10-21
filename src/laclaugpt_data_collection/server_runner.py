@@ -388,7 +388,11 @@ def run_phase1_rss(
 ) -> dict[str, Any]:
     """Run one bounded Phase 1 RSS batch through canonical local or distributed storage."""
     from .factory import build_record_store
-    from .realtime import RealtimePolicy, parse_source_time
+    from .realtime import (
+        RealtimePolicy,
+        parse_source_time,
+        unparsed_source_time_warning,
+    )
 
     if max_feeds < 1 or per_feed_limit < 1 or limit < 1:
         raise ValueError("max_feeds, per_feed_limit and limit must be at least 1")
@@ -431,6 +435,16 @@ def run_phase1_rss(
         counts_toward_budget=lambda record: not before_publication_floor(record),
         diagnostics=fetch,
     )
+    # #295: a source time the parser rejects is stored as a null
+    # `handoff.published_at`, and the study's
+    # `source_publication_time_required_for_analysis` makes such a row permanently
+    # unanalysable. Report the failure, counted and by source, instead of dropping
+    # it silently. Deliberately a warning rather than an error: the record is still
+    # stored (its text becomes analysable once the date is backfilled).
+    unparsed_time_warning = unparsed_source_time_warning(records)
+    if unparsed_time_warning:
+        warnings.append(unparsed_time_warning)
+
     synced = 0
     created = 0
     skipped_before_floor = 0
