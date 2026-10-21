@@ -359,22 +359,30 @@ def _declared_budgets_bind(study_config: str | Path) -> bool:
     return budgets.get("enforce") is True
 
 
-def _rss_window(max_feeds: int, rss_limit: int) -> tuple[int, int]:
+def _rss_window(
+    max_feeds: int, rss_limit: int, per_source_limit: int = 5
+) -> tuple[int, int]:
     """How many feeds to poll and how deep, so the window fits the allocation (#293).
 
     The RSS stage fetched a window it could not store: with 8 feeds at 5 candidates against a
     20-record allocation, half of every cycle's fetch was discarded and a feed in the tail of the
     window collected nothing for hours. The budget has to size the window, not the other way
-    round. Depth is derived from the allocation so ``feeds * depth <= rss_limit`` holds by
-    construction: 8 feeds at 2 candidates fills 16 of 20, where 4 feeds at 5 filled 20 and left
-    four feeds unpolled.
+    round, so ``feeds * depth <= rss_limit`` holds by construction.
+
+    The feed count shrinks to fit the declared depth; the depth is NOT shrunk to fit the feed
+    count. Depth reduction looks free -- 8 feeds at 2 candidates fills 16 of 20 -- but it changes
+    *which* records a cycle can store: only a feed's two newest items are ever fetched, so a feed
+    publishing three items between two cycles silently loses the middle one forever, and the
+    stored set stops being the prefix of an unbounded fetch that #301 pinned. Four feeds at the
+    declared depth of five store the same 20 records the budget always stored, and the rotation
+    gives the other 28 feeds their turn within a bounded number of cycles.
 
     Returns ``(feeds, depth)``.
     """
     if rss_limit <= 0:
         return (0, 0)
-    feeds = min(max(1, max_feeds), rss_limit)
-    depth = max(1, rss_limit // feeds)
+    depth = max(1, min(per_source_limit, rss_limit))
+    feeds = min(max(1, max_feeds), max(1, rss_limit // depth))
     return (feeds, depth)
 
 
@@ -433,7 +441,7 @@ def run_phase1_laskin(
     rss_limit = limit - non_browser_reserve
     # Never fetch more feed candidates than can be persisted in this tick (#293).
     # Preserve the total tick cap and the non-browser reservation.
-    rss_feeds, rss_feed_depth = _rss_window(max_feeds, rss_limit)
+    rss_feeds, rss_feed_depth = _rss_window(max_feeds, rss_limit, per_source_limit)
     rss = run_phase1_rss(
         settings,
         study_config=study_config,
@@ -606,6 +614,23 @@ def run_phase1_laskin(
         "jobs_deferred": [o["name"] for o in source_outcomes if o["reason"] == "tick_record_limit"],
         "deferred_jobs_tick_limit": deferred_by_tick_limit,
         "rotation": rotation,
+        # #293: what the RSS window actually was and which feeds it polled. The
+        # rotation is a position in the priority-ordered manifest; the window is
+        # `window_size` feeds and advances by the same amount each cycle, so a
+        # full pass takes `cycles_per_pass` cycles. Logged so per-feed cadence is
+        # verifiable from the cycle log instead of inferred from timestamps.
+        "rss_feed_window": {
+            "rotation": int(rss.get("feed_window_rotation", 0) or 0),
+            "window_size": rss_feeds,
+            "window": list(rss.get("feed_names") or []),
+            "polled": list(rss.get("feeds_polled_names") or []),
+            "feeds_in_manifest": int(rss.get("feeds_in_manifest", 0) or 0),
+            "cycles_per_pass": (
+                -(-int(rss.get("feeds_in_manifest", 0) or 0) // rss_feeds)
+                if rss_feeds
+                else 0
+            ),
+        },
         "source_budget_deferrals_are_separate": True,
     }
     return {

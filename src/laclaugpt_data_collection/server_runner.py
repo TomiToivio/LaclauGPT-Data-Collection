@@ -247,10 +247,12 @@ def collect_rss_records(
     warnings: list[str] = []
     accepted = 0
     polled = 0
+    polled_names: list[str] = []
     stopped_early = False
     for feed in feeds:
         feed_url = str(feed["feed_url"])
         polled += 1
+        polled_names.append(str(feed.get("name") or feed_url))
         result = RSSCollector(
             [feed_url],
             max_items_per_feed=per_feed_limit,
@@ -277,6 +279,7 @@ def collect_rss_records(
             break
     if diagnostics is not None:
         diagnostics["feeds_polled"] = polled
+        diagnostics["feeds_polled_names"] = polled_names
         diagnostics["records_fetched"] = len(records)
         diagnostics["record_budget"] = record_budget
         diagnostics["stopped_early"] = stopped_early
@@ -425,8 +428,9 @@ def run_phase1_rss(
         published = parse_source_time(record.source.created_at)
         return bool(published and published < policy.publication_date_floor)
 
+    manifest_feeds = load_feed_manifest(source_manifest)
     feeds = select_feed_window(
-        load_feed_manifest(source_manifest),
+        manifest_feeds,
         max_feeds=max_feeds,
         rotation=rotation,
     )
@@ -518,9 +522,15 @@ def run_phase1_rss(
         "collection_id": routed_collection,
         "worker_id": worker_id,
         "feeds_considered": len(feeds),
+        "feeds_in_manifest": len(manifest_feeds),
+        "feed_window_rotation": rotation,
         "feeds_polled": int(fetch.get("feeds_polled", len(feeds))),
         "fetch_stopped_early": bool(fetch.get("stopped_early", False)),
         "feed_names": [str(feed.get("name") or "") for feed in feeds],
+        # #293: the feeds actually polled this cycle. `feed_names` is the window;
+        # the fetch stops at the record budget, so the two can differ. Logging both
+        # makes per-feed cadence verifiable from the cycle log instead of inferred.
+        "feeds_polled_names": list(fetch.get("feeds_polled_names") or []),
         "records_collected": len(records),
         "records_synced": synced,
         "records_new": created,
