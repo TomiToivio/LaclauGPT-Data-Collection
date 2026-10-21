@@ -206,6 +206,10 @@ def _stamp(record: NormalizedRecord, row: dict[str, Any], *, collection_id: str,
     arena = str(row.get("arena") or "")
     if arena:
         record.source.raw_metadata["arena"] = arena
+    # #296: a row that declares it links at an aggregator says so once, here.
+    from .source_identity import apply_source_identity
+
+    record.source.raw_metadata.update(apply_source_identity(record, row))
     if record.provenance:
         record.provenance[-1].metadata.update(
             {

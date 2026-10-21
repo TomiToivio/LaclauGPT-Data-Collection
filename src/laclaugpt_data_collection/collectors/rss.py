@@ -85,12 +85,28 @@ def _entry_to_record(feed_url: str, entry: Any, *, feed_language: str = "") -> N
         return None
     author = str(getattr(entry, "author", "") or "")
     raw_entry = dict(entry) if hasattr(entry, "items") else {"value": str(entry)}
+    # #296: an aggregator item (Google News and friends) carries the publisher in
+    # the entry's `source` element, and its own link is the aggregator's opaque
+    # token -- not the article. Record the publisher here, where the data is; the
+    # row-level declaration in the manifest says the feed is an aggregator.
+    syndication = getattr(entry, "source", None)
+    publisher_url = publisher_name = ""
+    if hasattr(syndication, "get"):
+        publisher_url = str(syndication.get("href") or "")
+        publisher_name = str(syndication.get("title") or "")
     from ..language import resolve_language
 
     language, language_method = resolve_language(
         "\n\n".join(part for part in (title, summary) if part),
         declared=str(getattr(entry, "language", "") or feed_language),
     )
+    metadata: dict[str, Any] = {
+        "source_publication_time_present": bool(published),
+        "language_method": language_method,
+    }
+    if publisher_url or publisher_name:
+        metadata["publisher_url"] = publisher_url
+        metadata["publisher_name"] = publisher_name
     return NormalizedRecord(
         document_id=document_id,
         platform="rss",
@@ -106,6 +122,6 @@ def _entry_to_record(feed_url: str, entry: Any, *, feed_language: str = "") -> N
             visited_url=feed_url,
             api_url=link,
             transformations=["rss-atom-parse", "map-entry"],
-            metadata={"source_publication_time_present": bool(published), "language_method": language_method},
+            metadata=metadata,
         ),
     )

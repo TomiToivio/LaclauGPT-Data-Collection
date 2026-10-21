@@ -49,23 +49,24 @@ class TestTheMechanismExists:
             assert str(row.get("url") or row.get("homepage") or "").startswith("http")
 
 
-class TestTheOpenDecisionsStayVisible:
-    def test_the_brief_is_not_marked_decided(self) -> None:
-        text = _brief().replace("*", "")
-        assert "Status: two decisions pending" in text
-
-    def test_both_open_decisions_are_named(self) -> None:
+class TestTheDecisionRecord:
+    def test_the_brief_records_both_decisions_as_resolved(self) -> None:
         text = _brief()
-        assert "**D1" in text and "aggregator" in text
-        assert "**D2" in text
+        assert "Status: resolved" in text.replace("*", "")
+        assert "**D1" in text and "**D2" in text
+        assert "how they were resolved" in text
+
+    def test_the_headline_only_cost_is_stated(self) -> None:
+        """The marker does not turn a headline into a council decision."""
+        assert "headline-plus-timestamp" in _brief()
 
     def test_all_four_options_are_enumerated(self) -> None:
         text = _brief()
         for marker in (
             "1. Municipal documents",
             "2. State / utility-commission layer",
-            "3. News-query layer",
-            "4. Declare out of scope",
+            "3. News-discovery layer",
+            "4. Out of scope",
         ):
             assert marker in text, marker
 
@@ -107,10 +108,105 @@ class TestTheAggregatorRowAndItsCaveatTravelTogether:
             "and that the payload is a headline, not article text"
         )
 
-    def test_no_code_claims_to_resolve_aggregator_identity(self) -> None:
-        """D1 is unanswered: nothing may silently pretend the identity is fixed."""
-        source = inspect.getsource(runner._records_for_job)
-        assert "source_identity" not in source, (
-            "the loader grew an aggregator-identity implementation; update the "
-            "brief's D1 from 'open' to 'decided' and pin the new contract here"
+    def test_the_aggregator_row_declares_its_identity(self) -> None:
+        """A row whose items link at an aggregator must say so, not be guessed."""
+        rows = self._aggregator_rows()
+        assert rows, "the tracked plan carries the Google News discovery stratum"
+        for row in rows:
+            assert row.get("source_identity") == "aggregator", row.get("name")
+            assert row.get("aggregator") == "google_news", row.get("name")
+
+    def test_a_publisher_feed_carries_no_aggregator_declaration(self) -> None:
+        for row in _manifest().get("feed", []):
+            if "news.google.com" in str(row.get("feed_url", "")):
+                continue
+            assert not row.get("source_identity"), (
+                f"{row.get('name')} is a publisher feed; the marker must stay meaningful"
+            )
+
+
+class TestAggregatorRecordsCarryPublisherProvenance:
+    """The marker is only useful if the publisher travels with the record."""
+
+    FEED = "https://news.google.com/rss/search?q=x"
+    ENTRY = {
+        "link": "https://news.google.com/rss/articles/CBMiAFBVV95",
+        "title": "Memphis fails to pass 1-year data center moratorium",
+        "summary": "",
+        "published": "Wed, 21 Oct 2026 03:48:00 GMT",
+        "source": {"href": "https://www.cbsnews.com", "title": "CBS News"},
+    }
+
+    def _record(self, **overrides):
+        from types import SimpleNamespace
+
+        from laclaugpt_data_collection.collectors.rss import _entry_to_record
+
+        record = _entry_to_record(
+            self.FEED, SimpleNamespace(**{**self.ENTRY, **overrides})
         )
+        assert record is not None
+        return record
+
+    def test_the_entry_publisher_is_recorded(self) -> None:
+        record = self._record()
+        metadata = record.provenance[-1].metadata
+        assert record.source_url == "https://news.google.com/rss/articles/CBMiAFBVV95"
+        assert metadata["publisher_url"] == "https://www.cbsnews.com"
+        assert metadata["publisher_name"] == "CBS News"
+
+    def test_a_plain_feed_entry_records_no_publisher(self) -> None:
+        metadata = self._record(source=None).provenance[-1].metadata
+        assert "publisher_url" not in metadata and "publisher_name" not in metadata
+
+    def test_the_declaration_stamps_identity_provider_and_publisher(self) -> None:
+        from laclaugpt_data_collection import server_runner
+
+        stamped = server_runner._stamp_source_metadata(
+            self._record(),
+            {
+                "name": "local_data_centre_moratorium_news",
+                "feed_url": self.FEED,
+                "source_identity": "aggregator",
+                "aggregator": "google_news",
+            },
+            collection_id="ai26",
+            worker_id="test",
+        )
+        raw = stamped.source.raw_metadata
+        assert raw["source_identity"] == "aggregator"
+        assert raw["aggregator"] == {
+            "provider": "google_news",
+            "publisher_url": "https://www.cbsnews.com",
+            "publisher_name": "CBS News",
+        }
+
+    def test_a_publisher_row_stamps_no_aggregator_block(self) -> None:
+        from laclaugpt_data_collection import server_runner
+
+        stamped = server_runner._stamp_source_metadata(
+            self._record(source=None),
+            {"name": "guardian_ai", "feed_url": "https://example.invalid/feed"},
+            collection_id="ai26",
+            worker_id="test",
+        )
+        assert "source_identity" not in stamped.source.raw_metadata
+        assert "aggregator" not in stamped.source.raw_metadata
+
+    def test_the_laskin_stamper_stamps_the_same_contract(self) -> None:
+        from laclaugpt_data_collection import ai26_laskin_runner as laskin
+
+        stamped = laskin._stamp(
+            self._record(),
+            {
+                "name": "local_data_centre_moratorium_news",
+                "kind": "web_source",
+                "source_identity": "aggregator",
+                "aggregator": "google_news",
+            },
+            collection_id="ai26",
+            worker_id="test",
+        )
+        raw = stamped.source.raw_metadata
+        assert raw["source_identity"] == "aggregator"
+        assert raw["aggregator"]["publisher_name"] == "CBS News"
