@@ -215,6 +215,16 @@ def _stamp(record: NormalizedRecord, row: dict[str, Any], *, collection_id: str,
         )
         if arena:
             record.provenance[-1].metadata["arena"] = arena
+    # Some institutional Bluesky posts have no declared language (#294).
+    # Infer only from substantive text, preserving unknowns and provenance.
+    if not record.source.language:
+        from .language import resolve_language
+
+        candidate = record.content.text or ""
+        detected, method = resolve_language(candidate)
+        if detected:
+            record.source.language = detected
+            record.source.raw_metadata["language_method"] = method
     record.refresh_human_readable()
     return record
 
