@@ -73,10 +73,11 @@ Two conclusions follow directly:
 
 ## 3. The row that is now in the manifest, and what it actually carries
 
-PR #299 and PR #308 added three Google News query feeds
-(`local_data_centre_moratorium_news`, `discovery_data_center_moratorium`,
-`discovery_data_center_local_vote`) with `active = true`. The payload shape was measured, and the row now declares what
-that shape means:
+PR #299 and PR #308 added three Google News query feeds; the decision below
+consolidates them into exactly two, one per topic phrase
+(`local_data_centre_moratorium_news`, `local_data_centre_pause_news`), both
+`active = true`, `arena = "grassroots"`, `priority = "P2"`. The payload shape was
+measured, and each row declares what that shape means:
 
 ```
 TITLE: Zohran Mamdani Backs Major Expansion of New York's Data Center Moratorium - Gizmodo
@@ -127,14 +128,21 @@ headline-plus-timestamp, so they evidence *that* coverage exists, not what a
 campaign or a council actually said. Analysis must read
 `source_identity == "aggregator"` as discovery, not as an actor document.
 
-**D2 -- which stratum does the grassroots arena carry?** The news-discovery stratum
-(the row merged in PR #299, now marked). The alternatives stay documented:
+**D2 -- which stratum does the grassroots arena carry?** The news-discovery stratum,
+bounded to **two** topic queries -- `"data center moratorium"` and
+`"data center pause"`, US English edition, measured live 2026-10-21 at 102 and 100
+items -- both marked as aggregators and both `P2` so news coverage never displaces a
+first-party `P1` source in the bounded feed window. Inclusion is by **topic**, never
+by actor ideology: no town, campaign or outlet is classified by its presumed
+position. The three rows merged in PRs #299/#308 become these two, so there is one
+query per phrase and no semantically duplicate source. The alternatives stay
+documented:
 
 | option | status |
 |---|---|
 | 1. Municipal documents | available and mechanically pinned (`web_source` row -> page fetched and upserted, test-guarded). The higher-fidelity expansion: one ordinance, one text. Needs a town list, which is a sampling rule for the owner. |
 | 2. State / utility-commission layer | **ruled out on evidence** (see §2): nine institutional endpoints returned 403/404/no connection. |
-| 3. News-discovery layer | **sampled**, marked as aggregator, headline-only. |
+| 3. News-discovery layer | **sampled**, marked as aggregator, headline-only, two topic phrases, `P2`. |
 | 4. Out of scope | superseded by (3); the honest fallback paragraph for §4.1 if the stratum is ever dropped. |
 
 Option 1 is additive when it comes: `source_identity` keeps the two strata
