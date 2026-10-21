@@ -4,10 +4,23 @@ Reimplemented from CyborgAnthropology around the canonical Collection record.
 """
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from ..models import CollectionProvenance, MediaReference, NormalizedRecord
 from .base import CollectionResult
+
+# arXiv's query grammar is field-prefixed (`all:`, `ti:`, `abs:`, `cat:`, ...).
+# The collector used to hard-prefix every query with `all:`, which turns a
+# field-qualified query into the invalid `all:all:(ti:...)`; the API answers that
+# with HTTP 400, so a precision query silently collected nothing (#295). Detect a
+# declared field and leave such a query as written.
+_FIELD_PREFIX = re.compile(
+    r"(?:^|[\s(])"
+    r"(?:all|ti|abs|au|co|jr|rn|id|cat|primary_category|submittedDate|lastUpdatedDate)"
+    r"\s*:",
+    re.IGNORECASE,
+)
 
 
 def _paper_snapshot(paper: Any) -> dict[str, Any]:
@@ -117,7 +130,11 @@ class ArxivCollector:
         return value
 
     def _query(self) -> str:
-        query = f"all:{self.query}"
+        query = self.query.strip()
+        # A query that names its own field is already scoped; prefixing it would
+        # produce `all:all:(...)`, which arXiv rejects with HTTP 400 (#295).
+        if not _FIELD_PREFIX.search(query):
+            query = f"all:{query}"
         if self.categories:
             query += " AND (" + " OR ".join(f"cat:{cat}" for cat in self.categories) + ")"
         return query

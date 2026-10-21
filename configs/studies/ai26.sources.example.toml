@@ -930,9 +930,27 @@ priority = "P1"
 [[scholarly_query]]
 name = "ai_governance"
 services = ["arxiv", "openalex", "semantic_scholar"]
-query = '(ti:"artificial intelligence" OR ti:"AI governance" OR ti:"AI Act") AND (ti:governance OR ti:regulation OR ti:policy OR ti:accountability OR ti:legislation)'
-# Conservative title-field governance sampling (#295); removes broad abstract
-# matches on generic ML "evaluation"/"audit". Does not classify ideology.
+query = '(ti:"AI governance" OR ti:"AI regulation" OR ti:"AI Act" OR ti:"algorithmic accountability" OR ti:"AI audit")'
+# Sampling decision 2026-10-21, authorised by the study owner (#295). Option 1 of
+# the issue, measured against the live arXiv API rather than chosen on taste:
+#   old  all:artificial intelligence AND (governance OR regulation OR audit OR
+#        evaluation OR liability OR standards) -> 254,783 results; 8,327 in the
+#        2026-09-18..10-21 store window; 0/60 of the newest titles were
+#        governance material; the 129 stored records were ~all ML/CV/robotics.
+#   opt3 the same query minus `evaluation`/`audit` -> 249,905 (-1.9%): no fix.
+#   opt2 cat:cs.CY plus governance terms -> 2,592; ~22 clear of 55 sampled. It
+#        cannot be expressed in this manifest today: the collector prefixes
+#        `all:` to a query without a field, which turns `cat:` into a text term.
+#   opt1 TITLE-field governance terms -> 336 overall, 10 in the window, 10/10
+#        governance material, 0 of the contaminated 129 survive.
+# Every option keeps 0 of the 129 contaminated records; opt1 is the only one that
+# measures at full precision on a bounded yield. The query is field-qualified on
+# purpose: `arxiv.ArxivCollector` sends a field-qualified query as written and
+# only adds `all:` when no field is declared, so `all:(ti:...)` would have become
+# the invalid `all:all:(...)` (HTTP 400). See
+# docs/ai26-sampling-decision-295-governance-query.md for the full table and the wording
+# of the judgement. Records already stored under the old query are NOT deleted or
+# relabelled here: excluding them from analysis is a documented, separate step.
 arena = "parliamentary"
 priority = "P1"
 
