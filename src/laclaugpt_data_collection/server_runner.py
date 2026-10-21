@@ -402,11 +402,6 @@ def run_phase1_rss(
     if rotation is None:
         rotation = int(time.time() // 3600) * max_feeds
 
-    # #295: surface rejected publication dates without failing collection.
-    unparsed_time_warning = unparsed_source_time_warning(records)
-    if unparsed_time_warning:
-        warnings.append(unparsed_time_warning)
-
     # AI26 has a study-specific realtime publication floor. Brazil26 and other
     # projects must not inherit that policy accidentally.
     policy = RealtimePolicy.ai26() if routed_collection == "ai26" else None
@@ -437,6 +432,11 @@ def run_phase1_rss(
         counts_toward_budget=lambda record: not before_publication_floor(record),
         diagnostics=fetch,
     )
+    # #295: surface rejected publication dates without failing collection.
+    unparsed_time_warning = unparsed_source_time_warning(records)
+    if unparsed_time_warning:
+        warnings.append(unparsed_time_warning)
+
     # #294: a record stored without `source.language` cannot be used in the
     # language-stratified sample the paper promises, and until now the cycle said
     # nothing when a tag was lost. Report it, counted and by source. A warning,

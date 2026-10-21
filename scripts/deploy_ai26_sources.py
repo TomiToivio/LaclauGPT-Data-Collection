@@ -13,7 +13,6 @@ import tomllib
 from datetime import datetime, timezone
 from pathlib import Path
 
-
 KINDS = ("feed", "web_source", "x_account", "bluesky_account", "mastodon_account", "arxiv_query")
 
 
