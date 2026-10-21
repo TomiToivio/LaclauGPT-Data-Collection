@@ -139,6 +139,7 @@ def audit_records(
     publication_floor: str = "",
     configured_sources: Iterable[str] | None = None,
     deferred_platforms: Iterable[str] | None = None,
+    arena_languages: dict[str, Iterable[str]] | None = None,
 ) -> dict[str, Any]:
     """Summarise coverage and concentration over canonical records.
 
@@ -217,6 +218,41 @@ def audit_records(
         for arena in KNOWN_ARENAS
     }
 
+    # #294: a language-stratified arena cannot be reported on when none of its
+    # records carry a language, and a store-wide "N without language" total hides
+    # exactly that: the empty arena is diluted by arenas that do label. So the
+    # cross-tab is per arena, and when the study declares an arena's language scope
+    # the report says how many records actually fall inside it. `checked: False`
+    # keeps "no scope passed" from reading as an all-clear.
+    declared_scope: dict[str, list[str]] = {
+        arena: [str(tag).strip().lower() for tag in tags if str(tag).strip()]
+        for arena, tags in (arena_languages or {}).items()
+        if isinstance(tags, Iterable) and not isinstance(tags, str)
+    }
+    arena_language: dict[str, dict[str, Any]] = {}
+    for arena in sorted(arena_counts):
+        subset = [r for r in materialized if (record_arena(r) or _BLANK) == arena]
+        counts = Counter(record_language(r) or _BLANK for r in subset)
+        declared = declared_scope.get(arena, [])
+        labelled = sum(
+            count
+            for language, count in counts.items()
+            if language not in (_BLANK, _UNKNOWN)
+        )
+        arena_language[arena] = {
+            "records": len(subset),
+            "counts": dict(sorted(counts.items())),
+            "labelled": labelled,
+            "unlabelled": counts.get(_BLANK, 0) + counts.get(_UNKNOWN, 0),
+            "declared_languages": declared,
+            "declared_scope_checked": bool(declared),
+            "records_in_declared_scope": (
+                sum(count for language, count in counts.items() if language in declared)
+                if declared
+                else None
+            ),
+        }
+
     return {
         "total": total,
         "denominator": {
@@ -244,6 +280,14 @@ def audit_records(
         "by_language": {
             "counts": {k: v for k, v in language_counts.items()},
             "unlabelled": language_counts.get(_BLANK, 0),
+        },
+        "by_arena_language": {
+            "arenas": arena_language,
+            "declared_scope_checked": bool(declared_scope),
+            "note": (
+                "per-arena language cross-tab; a stratified arena with 0 labelled "
+                "records cannot demonstrate the stratification the study promises"
+            ),
         },
         "by_source": {"ranked": ranked_sources},
         "by_author": {
@@ -284,13 +328,25 @@ def audit_summary(report: dict[str, Any]) -> str:
         )
     else:
         configured_clause = "configured-source check not run (pass --configured-sources)"
+    # #294: name an arena whose whole stratum carries no language, rather than
+    # folding it into a store-wide total diluted by labelled arenas.
+    silent_arenas = [
+        arena
+        for arena, entry in (report.get("by_arena_language") or {}).get("arenas", {}).items()
+        if entry.get("declared_scope_checked") and entry.get("labelled") == 0 and entry.get("records")
+    ]
+    language_clause = f"{report['by_language']['unlabelled']} without language"
+    if silent_arenas:
+        language_clause += (
+            f" ({', '.join(sorted(silent_arenas))} arena has 0 labelled records)"
+        )
     return (
         f"corpus audit: {report['total']} records | "
         f"grassroots {report['by_arena']['shares'].get('grassroots', 0.0):.1%}, "
         f"unknown-arena {report['by_arena']['unknown']} | "
         f"top-{report['concentration']['top_n']} share "
         f"{report['concentration']['top_n_share']:.1%} | "
-        f"{report['by_language']['unlabelled']} without language | "
+        f"{language_clause} | "
         f"{configured_clause} | "
         + (
             f"{len(report['by_platform']['empty_and_expected'])} declared platform(s) empty "

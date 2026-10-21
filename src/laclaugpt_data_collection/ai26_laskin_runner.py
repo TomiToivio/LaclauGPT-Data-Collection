@@ -216,6 +216,15 @@ def _stamp(record: NormalizedRecord, row: dict[str, Any], *, collection_id: str,
         )
         if arena:
             record.provenance[-1].metadata["arena"] = arena
+    # #294: a row-level `language = "fi"` fills an empty record language. It is
+    # recorded as a DECLARATION (language_declared_by=manifest_row), never mixed
+    # with an observed or detected tag, so the strata stay separable in analysis.
+    from .language import apply_declared_language
+
+    language_method = apply_declared_language(record, str(row.get("language") or ""))
+    if language_method and record.provenance:
+        record.provenance[-1].metadata["language_method"] = language_method
+        record.provenance[-1].metadata["language_declared_by"] = "manifest_row"
     # Some institutional Bluesky posts have no declared language (#294).
     # Infer only from substantive text, preserving unknowns and provenance.
     if not record.source.language:

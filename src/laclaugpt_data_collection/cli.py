@@ -106,6 +106,7 @@ def _corpus_audit(args: argparse.Namespace) -> int:
             if line.strip()
         ]
     deferred: list[str] = []
+    arena_languages: dict[str, list[str]] = {}
     if args.study_config:
         import yaml as _yaml
 
@@ -115,12 +116,18 @@ def _corpus_audit(args: argparse.Namespace) -> int:
                 deferred.extend(
                     str(p) for p in (stage.get("deferred") or []) if isinstance(p, str)
                 )
+        # #294: the arena language scope the study declares is what the corpus
+        # must be able to demonstrate; pass it so an unlabelled arena is named.
+        for arena, spec in (study.get("arenas") or {}).items():
+            if isinstance(spec, dict) and isinstance(spec.get("languages"), list):
+                arena_languages[str(arena)] = [str(tag) for tag in spec["languages"]]
     report = audit_records(
         records,
         top_n=args.top_n,
         publication_floor=args.publication_floor or "",
         configured_sources=configured,
         deferred_platforms=deferred,
+        arena_languages=arena_languages,
     )
     print(json.dumps(report, indent=2, sort_keys=True))
     print(audit_summary(report), file=sys.stderr)
