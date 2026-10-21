@@ -27,7 +27,7 @@ from .config import Settings
 from .distributed_capture import DistributedCaptureSink
 from .models import CollectionProvenance, NormalizedRecord
 from .plugins import RetryPolicy
-from .realtime import RealtimePolicy, parse_source_time
+from .realtime import RealtimePolicy, parse_source_time, unparsed_source_time_warning
 from .server_runner import run_phase1_rss
 from .web_fetch import fetch_web_child
 
@@ -485,6 +485,10 @@ def run_phase1_laskin(
                 per_source_limit=per_source_limit,
                 retry_policy=retry_policy,
             )
+            # #295: warn by source when publication timestamps cannot be parsed.
+            unparsed_time_warning = unparsed_source_time_warning(records)
+            if unparsed_time_warning:
+                source_warnings = [*source_warnings, unparsed_time_warning]
             warnings.extend(source_warnings)
             collected += len(records)
             outcome.update(

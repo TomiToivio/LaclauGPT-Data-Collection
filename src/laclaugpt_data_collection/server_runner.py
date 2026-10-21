@@ -388,7 +388,7 @@ def run_phase1_rss(
 ) -> dict[str, Any]:
     """Run one bounded Phase 1 RSS batch through canonical local or distributed storage."""
     from .factory import build_record_store
-    from .realtime import RealtimePolicy, parse_source_time
+    from .realtime import RealtimePolicy, parse_source_time, unparsed_source_time_warning
 
     if max_feeds < 1 or per_feed_limit < 1 or limit < 1:
         raise ValueError("max_feeds, per_feed_limit and limit must be at least 1")
@@ -400,6 +400,11 @@ def run_phase1_rss(
         )
     if rotation is None:
         rotation = int(time.time() // 3600) * max_feeds
+
+    # #295: surface rejected publication dates without failing collection.
+    unparsed_time_warning = unparsed_source_time_warning(records)
+    if unparsed_time_warning:
+        warnings.append(unparsed_time_warning)
 
     # AI26 has a study-specific realtime publication floor. Brazil26 and other
     # projects must not inherit that policy accidentally.
