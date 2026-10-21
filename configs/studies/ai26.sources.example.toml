@@ -907,7 +907,9 @@ priority = "P1"
 [[scholarly_query]]
 name = "ai_governance"
 services = ["arxiv", "openalex", "semantic_scholar"]
-query = "artificial intelligence AND (governance OR regulation OR audit OR evaluation OR liability OR standards)"
+query = '(ti:"artificial intelligence" OR ti:"AI governance" OR ti:"AI Act") AND (ti:governance OR ti:regulation OR ti:policy OR ti:accountability OR ti:legislation)'
+# Conservative title-field governance sampling (#295); removes broad abstract
+# matches on generic ML "evaluation"/"audit". Does not classify ideology.
 arena = "parliamentary"
 priority = "P1"
 
