@@ -85,6 +85,7 @@ def test_arenas_share_one_collection_id():
 
 def test_etui_numeric_publication_date_is_parseable():
     from datetime import UTC, datetime
+
     from laclaugpt_data_collection.realtime import parse_source_time
 
     assert parse_source_time("Thu, 10/08/2026 - 13:30") == datetime(
