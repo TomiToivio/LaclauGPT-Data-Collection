@@ -17,7 +17,7 @@ from typing import Any
 
 from .capture_server import CaptureServer
 from .config import Settings
-from .distributed_capture import DistributedCaptureSink
+from .distributed_capture import DistributedCaptureSink, HollowRecordError
 from .distributed_media_runner import MediaRunLockedError, run_distributed_media
 from .store import utc_stamp
 from .study import load_config
@@ -76,6 +76,7 @@ class JsonlDistributedMirror:
         self._thread: threading.Thread | None = None
         self.last_error = ""
         self.synced_total = 0
+        self.hollow_refused = 0
 
     def _load_offsets(self) -> dict[str, int]:
         try:
@@ -103,6 +104,7 @@ class JsonlDistributedMirror:
 
     def scan_once(self) -> dict[str, int]:
         scanned = synced = 0
+        hollow = 0
         if not self.normalized_dir.is_dir():
             return {"scanned": 0, "synced": 0}
 
@@ -133,12 +135,23 @@ class JsonlDistributedMirror:
                             f"AI26 mirror refuses collection_id={collection_id!r} in {path.name}"
                         )
                     record["collection_id"] = PROJECT_ID
-                    self.sink.ingest(record)
+                    try:
+                        self.sink.ingest(record)
+                    except HollowRecordError:
+                        self.hollow_refused += 1
+                        # #322: the local canonical file can hold skeleton rows
+                        # (URL only, no text/payload/time). Mirroring them inflates
+                        # every published denominator and cannot be repaired later,
+                        # so they are refused here and counted instead.
+                        hollow += 1
+                        self._offsets[key] = handle.tell()
+                        self._save_offsets()
+                        continue
                     synced += 1
                     self.synced_total += 1
                     self._offsets[key] = handle.tell()
                     self._save_offsets()
-        return {"scanned": scanned, "synced": synced}
+        return {"scanned": scanned, "synced": synced, "hollow": hollow}
 
     def _run(self) -> None:
         while not self._stop.is_set():
@@ -200,7 +213,14 @@ def run_backend(
         flush=True,
     )
 
-    mirror.scan_once()
+    scan = mirror.scan_once()
+    if scan.get("hollow"):
+        print(
+            "distributed mirror: refused "
+            f"{scan['hollow']} hollow canonical row(s) (no text, no payload, no "
+            "publication time) — see issue #322",
+            flush=True,
+        )
     server = CaptureServer(
         study_config,
         data_root,
@@ -229,6 +249,7 @@ def run_backend(
                 "stats": dict(server.stats),
                 "seen_total": server.store.seen_count(),
                 "distributed_synced_total": mirror.synced_total,
+                "distributed_hollow_refused_total": mirror.hollow_refused,
                 "distributed_last_error": mirror.last_error,
             }
         )

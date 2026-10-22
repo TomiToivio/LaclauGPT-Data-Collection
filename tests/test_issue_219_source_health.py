@@ -65,7 +65,11 @@ def test_blocked_source_marks_tick_partial_and_continues(monkeypatch, tmp_path: 
             host_validator=lambda url: True,
         )
 
-    monkeypatch.setattr(runner, "fetch_web_child", fetch)
+    # #321: the fetch seam moved into the discovery module the runner delegates to.
+    import laclaugpt_data_collection.web_source_discovery as discovery
+
+    monkeypatch.setattr(discovery, "fetch_web_child", fetch)
+    monkeypatch.setattr(discovery, "_fetch_html", lambda *a, **k: "")
     result = run_tick(monkeypatch, tmp_path, [
         {"kind": "web_source", "name": "synthetic_union", "priority": "P1",
          "url": "https://example.invalid/ai"},

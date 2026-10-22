@@ -18,6 +18,29 @@ from .models import CanonicalRecord, CollectionProvenance
 from .storage.remote import MongoRecordStore, RedisCoordinator, S3ObjectStore
 
 
+class HollowRecordError(ValueError):
+    """A record that carries no text, no payload and no publication time (#322).
+
+    On 2026-10-22 the mirror replayed 1 703 such rows from a local canonical file
+    into the shared store: real X URLs with an empty ``content.text``, a null
+    ``raw_capture.payload``, a blank ``source.platform`` and no ``created_at``.
+    They are excluded from analysis but inflate every denominator that does not
+    filter on ``handoff.status``, and they cannot be repaired later because the
+    text was never persisted. A row with nothing to resolve is not "retained but
+    unresolved" -- it is a write that should fail loudly instead.
+    """
+
+    reason = "hollow_record"
+
+
+def is_hollow(record: CanonicalRecord) -> bool:
+    """True when all three of text, raw payload and publication time are absent."""
+    has_text = bool((record.content.text or "").strip())
+    has_payload = record.raw_capture.payload is not None
+    has_time = record.source.created_at is not None
+    return not (has_text or has_payload or has_time)
+
+
 class DistributedCaptureSink:
     """Mirror one canonical collection record into the shared distributed plane."""
 
@@ -146,6 +169,11 @@ class DistributedCaptureSink:
             if key in CanonicalRecord.model_fields
         }
         record = CanonicalRecord.model_validate(canonical_data)
+        if is_hollow(record):
+            raise HollowRecordError(
+                "refusing to store a hollow record: no content.text, no "
+                f"raw_capture.payload and no source.created_at for {record.source_url}"
+            )
         raw_ref = self._raw_object(record)
 
         if not record.provenance:

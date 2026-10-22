@@ -229,8 +229,9 @@ def test_issue_170_legacy_web_source_uses_fake_rss_fallback(monkeypatch) -> None
                 ]
             )
 
+    # #321: the feed route lives in the discovery module now, so that is the seam.
     monkeypatch.setattr(
-        "laclaugpt_data_collection.ai26_laskin_runner.RSSCollector",
+        "laclaugpt_data_collection.web_source_discovery.RSSCollector",
         OneItemRSSCollector,
     )
 

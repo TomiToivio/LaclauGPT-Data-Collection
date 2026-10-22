@@ -21,16 +21,15 @@ import yaml
 from .collectors.arxiv import ArxivCollector
 from .collectors.bluesky import BlueskyCollector
 from .collectors.mastodon import MastodonCollectionError, MastodonCollector
-from .collectors.rss import RSSCollector
 from .collectors.youtube import YouTubeCollector
 from .config import Settings
 from .distributed_capture import DistributedCaptureSink
 from .language import unlabelled_language_warning
-from .models import CollectionProvenance, NormalizedRecord
+from .models import NormalizedRecord
 from .plugins import RetryPolicy
 from .realtime import RealtimePolicy, parse_source_time, unparsed_source_time_warning
 from .server_runner import run_phase1_rss
-from .web_fetch import fetch_web_child
+from .web_source_discovery import WebSourceError, collect_web_source
 
 _BROWSER_ONLY_TABLES = {"x_account", "browser_source", "instagram_account", "tiktok_account"}
 _WEB_SOURCE_FEED_FALLBACKS = {
@@ -288,32 +287,24 @@ def _records_for_job(
         url = str(row.get("homepage") or row.get("url") or "").strip()
         if not url:
             raise SourceJobError("missing_web_url")
-        fallback_feed = _WEB_SOURCE_FEED_FALLBACKS.get(url.rstrip("/"))
-        if fallback_feed:
-            result = RSSCollector(
-                [fallback_feed], max_items_per_feed=per_source_limit
-            ).collect()
-            return [
-                _stamp(r, row, collection_id=collection_id, worker_id=worker_id)
-                for r in result.records
-            ], list(result.warnings)
-        parent = NormalizedRecord(
-            document_id=url,
-            platform="web",
-            source_url=url,
-            text="",
-            raw_payload={},
-            collection_provenance=CollectionProvenance(module="ai26-laskin-web-seed"),
-        )
-        outcome = fetch_web_child(
-            url,
-            parent,
-            collection_id=collection_id,
-            arena=str(row.get("arena") or ""),
-        )
-        if outcome.record is None:
-            raise SourceJobError("web_fetch_failed", status_code=outcome.status_code)
-        return [_stamp(outcome.record, row, collection_id=collection_id, worker_id=worker_id)], []
+        # #321: a homepage used to contribute exactly one undated snapshot, which the
+        # handoff excludes, so the elite blog layer never reached the analysis corpus.
+        # Verified fallback feed first, then the feed the page advertises, then its
+        # dated article links; the snapshot survives only as a last resort.
+        try:
+            records, warnings = collect_web_source(
+                url,
+                fallback_feed=_WEB_SOURCE_FEED_FALLBACKS.get(url.rstrip("/")),
+                per_source_limit=per_source_limit,
+                collection_id=collection_id,
+                arena=str(row.get("arena") or ""),
+            )
+        except WebSourceError as exc:
+            raise SourceJobError(exc.reason, status_code=exc.status_code) from exc
+        return [
+            _stamp(record, row, collection_id=collection_id, worker_id=worker_id)
+            for record in records
+        ], warnings
 
     if kind == "mastodon_account":
         acct = str(row.get("acct") or "").strip().removeprefix("@")

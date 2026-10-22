@@ -30,8 +30,13 @@ from .realtime import extract_external_urls
 
 _TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.I | re.S)
 _TAG_RE = re.compile(r"<[^>]+>")
-_PUBLISHED_RE = re.compile(
-    r"(?:article:published_time|datePublished)[^>]+content=[\"']([^\"']+)", re.I
+#: Publication time, in the shapes public pages actually use: OpenGraph/meta,
+#: JSON-LD, and a bare <time datetime>. The article route of #321 is worthless
+#: without these -- an undated child is excluded from the analysis corpus.
+_PUBLISHED_PATTERNS = (
+    re.compile(r"(?:article:published_time|datePublished)[^>]+content=[\"']([^\"']+)", re.I),
+    re.compile(r"\"datePublished\"\s*:\s*\"([^\"]+)\"", re.I),
+    re.compile(r"<time[^>]+datetime=[\"']([^\"']+)[\"']", re.I),
 )
 _ALLOWED_TYPES = (
     "text/html",
@@ -97,8 +102,11 @@ def _title(value: str) -> str | None:
 
 
 def _published(value: str) -> str | None:
-    match = _PUBLISHED_RE.search(value)
-    return match.group(1).strip() if match else None
+    for pattern in _PUBLISHED_PATTERNS:
+        match = pattern.search(value)
+        if match:
+            return match.group(1).strip()
+    return None
 
 
 def fetch_web_child(

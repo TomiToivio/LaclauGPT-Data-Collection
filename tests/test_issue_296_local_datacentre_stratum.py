@@ -18,6 +18,7 @@ import tomllib
 from pathlib import Path
 
 from laclaugpt_data_collection import ai26_laskin_runner as runner
+from laclaugpt_data_collection import web_source_discovery as discovery
 
 REPO = Path(__file__).resolve().parents[1]
 BRIEF = REPO / "docs" / "AI26_LOCAL_DATACENTRE_STRATUM.md"
@@ -40,7 +41,10 @@ class TestTheMechanismExists:
     def test_a_web_source_row_is_fetched_as_a_document(self) -> None:
         source = inspect.getsource(runner._records_for_job)
         assert 'kind == "web_source"' in source
-        assert "fetch_web_child" in source
+        # #321: the row is no longer fetched inline; it goes through the discovery
+        # route, which fetches the homepage and/or its dated articles.
+        assert "collect_web_source" in source
+        assert "fetch_web_child" in inspect.getsource(discovery)
 
     def test_web_source_rows_are_declared_with_a_url(self) -> None:
         """The brief's proposed row shape must match what the loader reads."""
