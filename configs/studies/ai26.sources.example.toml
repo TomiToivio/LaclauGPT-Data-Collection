@@ -609,6 +609,8 @@ arena = "grassroots"
 source_family = "labour / creative work / generative AI"
 sampling_rationale = "Labour and creative-rights conflict around generative AI and automation."
 priority = "P1"
+enabled = false
+inactive_reason = "Retired for #219: the page returns HTTP 403 to every fetch (85 logged cycles, zero records, and the site's other news paths 403 too), and the 200-returning rss.xml is stale at 2024-08-15, predating the AI26 publication floor. The sampling intention is kept and served by the union's own Bluesky account (see [[bluesky_account]] sagaftra.org), which is first-party, current, and carries the AI-contract material."
 
 [[web_source]]
 name = "eu_ai_policy"
@@ -892,6 +894,15 @@ priority = "P1"
 
 # Creator-rights sources explicitly declared in ai26.example.yaml (#266).
 # These are institutional sampling anchors, not ideological actor labels.
+[[bluesky_account]]
+name = "SAG-AFTRA"
+handle = "sagaftra.org"
+profile_url = "https://bsky.app/profile/sagaftra.org"
+arena = "grassroots"
+source_family = "labour / creative work / generative AI"
+sampling_rationale = "First-party US screen-actors union account: AI protections in the TV/Theatrical and 2026 TV Animation agreements, consent and likeness, and bargaining positions. Substituted for the bot-blocked sagaftra.org web page under #219 after the web row returned HTTP 403 in every cycle with zero records; this is the same actor speaking in its own voice on a collectable platform, not a different sampling frame. Verified live 2026-10-22: public API returns 30 recent posts, newest that day, including the 2026 TV Animation AI-protection line. Institutional position, not an ideological classification."
+priority = "P1"
+
 [[bluesky_account]]
 name = "Writers Guild of America West"
 handle = "wgawest.bsky.social"
