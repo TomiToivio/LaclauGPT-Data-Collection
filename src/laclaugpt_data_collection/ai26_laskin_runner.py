@@ -24,7 +24,7 @@ from .collectors.mastodon import MastodonCollectionError, MastodonCollector
 from .collectors.rss import RSSCollector
 from .collectors.youtube import YouTubeCollector
 from .config import Settings
-from .distributed_capture import DistributedCaptureSink
+from .distributed_capture import DistributedCaptureSink, HollowRecordError
 from .language import unlabelled_language_warning
 from .models import CanonicalRecord, CollectionProvenance, NormalizedRecord
 from .plugins import RetryPolicy
@@ -620,6 +620,15 @@ def run_phase1_laskin(
                 http_status=exc.status_code,
             )
             errors.append(f"{row.get('kind')}:{row.get('name','unnamed')}: {exc.reason}")
+        except HollowRecordError as exc:
+            # #322: the sink refused a capture that would have carried no text, no raw
+            # payload/ref and no media. Report the refusal against the configured source
+            # and URL, so a hollow capture is a visible source error rather than a silent
+            # skip -- and rather than a success it cannot back up.
+            outcome.update(status="error", reason=exc.reason)
+            errors.append(
+                f"{row.get('kind')}:{row.get('name','unnamed')}: {exc.reason}: {exc.source_url}"
+            )
         except Exception as exc:  # noqa: BLE001
             outcome.update(status="error", reason="collection_or_ingest_failed")
             errors.append(f"{row.get('kind')}:{row.get('name','unnamed')}: {str(exc)[:180]}")
