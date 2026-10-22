@@ -159,6 +159,32 @@ bash scripts/install_cron_brazil26.sh uninstall --yes       # remove only its ow
 Do not edit the crontab by hand for this. Re-running `laclaugpt-brazil26`
 reinstalls the block.
 
+### The installed block follows the checkout, not the remote
+
+`status` is the only trustworthy answer to "is the 30-minute cycle really
+running?", because the block is installed **from a checkout and keeps pointing at
+it**. A checkout that predates the `*/30` change keeps producing a `*/15` block, and
+`status` reports `media_cadence: stale 15-minute entry present` / `health: degraded`
+rather than pretending the schedule is current:
+
+```bash
+git -C /path/to/checkout log --oneline -1      # is this checkout on main?
+bash scripts/install_cron_brazil26.sh status   # cadence, mode, workers, log sizes
+bash scripts/install_cron_brazil26.sh install  # rewrite the block from this checkout
+```
+
+On 2026-10-22 this was exactly the state of the live workstation: the checkout sat
+on an old issue branch, so the installed block was still the local-first `*/15`
+one. Bringing the checkout to `main` and re-running `install` rewrote it to `*/30`
+(`health: ok`), and a second `install` was a byte-identical no-op — the installer is
+idempotent, so re-running it is the supported repair.
+
+Media mode is chosen at install time: the default is local-first
+(`filesystem`/`csv`); `LACLAUGPT_BRAZIL26_MEDIA_MODE=allas` selects the CSC
+Allas + MongoDB wrapper instead. The distributed wrapper refuses to run when the
+private env still says `LACLAUGPT_RECORD_BACKEND=auto`, so that env value has to be
+changed with the mode rather than after it.
+
 ## Continuing existing Brazil26 state
 
 This workflow is deliberately additive. It keeps the existing local normalized

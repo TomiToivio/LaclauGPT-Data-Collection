@@ -131,6 +131,46 @@ Example crontab, placeholders only:
 
 The output reports records scanned, queued, attempted, completed, failed, skipped and MongoDB refresh count. Download failures return a non-zero status and remain retryable. If a previous process crashed and left `.distributed-media.lock`, verify no downloader is running before removing that stale lock manually.
 
+## 8b. Operator command: one session, start to stop
+
+`scripts/start_ai26_x_capture.sh` is the single entry point for a capture session.
+It resolves the same private env, study config and data root as the cron wrappers,
+then runs the three steps a researcher would otherwise run by hand.
+
+```bash
+bash scripts/start_ai26_x_capture.sh --dry-run   # resolved plan, touches nothing
+bash scripts/start_ai26_x_capture.sh             # check → backend → /status + /tour
+bash scripts/start_ai26_x_capture.sh status      # study, endpoint, canonical rows
+bash scripts/start_ai26_x_capture.sh stop        # stop the backend it started
+```
+
+What it does, and what it deliberately does not:
+
+- **Preflight first.** `ai26_browser check` must report the AI26 identity and a
+  reachable control plane; otherwise nothing is started and the exit code is 2.
+- **Loopback only.** A non-loopback `--host` is refused before any work, because the
+  capture endpoint is unauthenticated by design.
+- **AI26-only data root.** The default is `$LACLAUGPT_AI26_DATA_ROOT`, else
+  `$LACLAUGPT_DATA_ROOT/ai26` when that exists, else the checkout's `data/`. This
+  matters: the backend scans the data root while it starts, and pointing it at a
+  shared root that holds tens of gigabytes of other studies makes the start look
+  like a hang. Measured on this workstation: >2 min with a 27 GB shared root, ~30 s
+  with the 463 MB AI26 root.
+- **The startup replay is real work.** The backend mirrors every canonical row that
+  has not reached the remote store yet, at roughly 150 ms per record, *before* it
+  binds the port. After a month idle that was ~4 minutes, so the command reports
+  replay progress instead of going quiet (`LACLAUGPT_X_CAPTURE_TIMEOUT` raises the
+  default 600 s wait).
+- **One start at a time.** An flock plus a pid file plus a port check stop a second
+  backend entering the same data root; two of them race on
+  `.ai26-distributed-offsets.json.tmp` and one dies with `FileNotFoundError`.
+- **No scheduling.** It never writes the crontab and never launches Firefox. Issue
+  #258 keeps browser navigation user-controlled; whether X capture ever becomes a
+  scheduled cycle is a sampling decision for the maintainer.
+
+After a capture, `status` reports the study served by the endpoint and the canonical
+rows on disk; the backend log holds the capture counters.
+
 ## 9. End-to-end smoke test
 
 1. Run `ai26_browser check` and require `status: ok`.
