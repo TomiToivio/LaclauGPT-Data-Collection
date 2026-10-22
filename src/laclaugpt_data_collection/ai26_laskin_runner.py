@@ -26,11 +26,12 @@ from .collectors.youtube import YouTubeCollector
 from .config import Settings
 from .distributed_capture import DistributedCaptureSink
 from .language import unlabelled_language_warning
-from .models import CollectionProvenance, NormalizedRecord
+from .models import CanonicalRecord, CollectionProvenance, NormalizedRecord
 from .plugins import RetryPolicy
 from .realtime import RealtimePolicy, parse_source_time, unparsed_source_time_warning
 from .server_runner import run_phase1_rss
-from .web_fetch import fetch_web_child
+from .web_discovery import discover_article_urls, discover_feed_urls
+from .web_fetch import fetch_html_page, fetch_web_child
 
 _BROWSER_ONLY_TABLES = {"x_account", "browser_source", "instagram_account", "tiktok_account"}
 _WEB_SOURCE_FEED_FALLBACKS = {
@@ -198,7 +199,7 @@ def select_job_window(
     return (ordered[shift:] + ordered[:shift])[:max_jobs]
 
 
-def _stamp(record: NormalizedRecord, row: dict[str, Any], *, collection_id: str, worker_id: str):
+def _stamp(record: CanonicalRecord, row: dict[str, Any], *, collection_id: str, worker_id: str):
     record.source.raw_metadata["collection_id"] = collection_id
     record.source.raw_metadata["source_name"] = str(row.get("name") or "")
     record.source.raw_metadata["source_family"] = str(row.get("source_family") or "")
@@ -250,7 +251,7 @@ def _records_for_job(
     worker_id: str,
     per_source_limit: int,
     retry_policy: RetryPolicy | None = None,
-) -> tuple[list[NormalizedRecord], list[str]]:
+) -> tuple[list[CanonicalRecord], list[str]]:
     kind = str(row["kind"])
     if kind == "bluesky_account":
         handle = str(row.get("handle") or "").strip()
@@ -305,6 +306,48 @@ def _records_for_job(
             raw_payload={},
             collection_provenance=CollectionProvenance(module="ai26-laskin-web-seed"),
         )
+
+        # #321: a web_source is a homepage, so the stage has to discover what it
+        # publishes before it can store anything the handoff will accept. Feeds first
+        # (they carry dates and need no per-site knowledge, which is why the hardcoded
+        # fallback map above was the wrong shape), then article links, whose pages
+        # carry article:published_time for the existing fetcher to read. Only when
+        # neither route yields a dated document does the old single-snapshot behaviour
+        # remain, and that snapshot is still excluded downstream rather than guessed at.
+        page = fetch_html_page(url)
+        if page is not None:
+            final_url, html = page
+            feed_urls = discover_feed_urls(html, final_url)[:3]
+            if feed_urls:
+                result = RSSCollector(
+                    feed_urls, max_items_per_feed=per_source_limit
+                ).collect()
+                dated = [
+                    r for r in result.records if getattr(r.source, "created_at", None)
+                ]
+                if dated:
+                    return [
+                        _stamp(r, row, collection_id=collection_id, worker_id=worker_id)
+                        for r in dated
+                    ], list(result.warnings)
+            children: list[CanonicalRecord] = []
+            for candidate in discover_article_urls(
+                html, final_url, limit=per_source_limit
+            ):
+                child = fetch_web_child(
+                    candidate,
+                    parent,
+                    collection_id=collection_id,
+                    arena=str(row.get("arena") or ""),
+                )
+                if child.record is not None and getattr(child.record.source, "created_at", None):
+                    children.append(child.record)
+            if children:
+                return [
+                    _stamp(r, row, collection_id=collection_id, worker_id=worker_id)
+                    for r in children
+                ], []
+
         outcome = fetch_web_child(
             url,
             parent,
