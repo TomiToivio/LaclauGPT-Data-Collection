@@ -35,15 +35,15 @@ Keep this repository limited to data collection: source/browser/network capture,
 
 ## Historical implementation foundation
 
-The hand-coded implementation under `laclaugpt/` is retained as the historical Phase 0 foundation. The guidance below is archaeology/maintenance context only; it does not define new work on `main`, which is the current AI26 pipeline.
+The hand-coded implementation under `laclaugpt/` is retained as the historical implementation foundation. The guidance below is archaeology/maintenance context only; it does not define new work on `main`, which is the current AI26 pipeline.
 
-Agents MUST inspect `laclaugpt/` first before proposing or implementing Phase 1 work. Existing Phase 1 code outside `laclaugpt/` is a reference implementation and source of isolated functionality, tests, schemas, and interfaces. It is not automatically the canonical architecture.
+Agents MUST inspect `laclaugpt/` first before proposing work on the collection pipeline. Existing newer code outside `laclaugpt/` is a reference implementation and source of isolated functionality, tests, schemas, and interfaces. It is not automatically the canonical architecture.
 
-Phase 1 must be rebuilt incrementally around the working Phase 0 core:
+New collection capability is added incrementally around the working pipeline:
 
 1. Start from the current behavior in `laclaugpt/`.
-2. Restore exactly one explicitly requested Phase 1 capability.
-3. Make the smallest practical change around Phase 0, preferring adapters or wrappers over rewrites.
+2. Add exactly one explicitly requested capability.
+3. Make the smallest practical change around the legacy implementation, preferring adapters or wrappers over rewrites.
 4. Preserve existing Phase 0 behavior unless the task explicitly says otherwise.
 5. Validate that one restoration step.
 6. Stop.
