@@ -30,8 +30,15 @@ from .realtime import extract_external_urls
 
 _TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.I | re.S)
 _TAG_RE = re.compile(r"<[^>]+>")
-_PUBLISHED_RE = re.compile(
-    r"(?:article:published_time|datePublished)[^>]+content=[\"']([^\"']+)", re.I
+#: Publication time in the shapes public pages actually use. The OpenGraph/meta
+#: form is the one most blogs emit; JSON-LD is what Next.js and most CMS themes emit
+#: instead, and a bare <time datetime> is common on hand-built sites. Reading only
+#: the first form made #321's article route yield undated children -- which the
+#: handoff then excludes -- on exactly those pages.
+_PUBLISHED_PATTERNS = (
+    re.compile(r"(?:article:published_time|datePublished)[^>]+content=[\"']([^\"']+)", re.I),
+    re.compile(r"\"datePublished\"\s*:\s*\"([^\"]+)\"", re.I),
+    re.compile(r"<time[^>]+datetime=[\"']([^\"']+)[\"']", re.I),
 )
 _ALLOWED_TYPES = (
     "text/html",
@@ -97,8 +104,11 @@ def _title(value: str) -> str | None:
 
 
 def _published(value: str) -> str | None:
-    match = _PUBLISHED_RE.search(value)
-    return match.group(1).strip() if match else None
+    for pattern in _PUBLISHED_PATTERNS:
+        match = pattern.search(value)
+        if match:
+            return match.group(1).strip()
+    return None
 
 
 def fetch_html_page(
