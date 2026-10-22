@@ -17,7 +17,7 @@ from typing import Any
 
 from .capture_server import CaptureServer
 from .config import Settings
-from .distributed_capture import DistributedCaptureSink
+from .distributed_capture import DistributedCaptureSink, HollowRecordError
 from .distributed_media_runner import MediaRunLockedError, run_distributed_media
 from .store import utc_stamp
 from .study import load_config
@@ -76,6 +76,12 @@ class JsonlDistributedMirror:
         self._thread: threading.Thread | None = None
         self.last_error = ""
         self.synced_total = 0
+        # #322: a refused row must be counted and named, never silently dropped and
+        # never silently written. The mirror replays whatever JSONL is on disk, so a
+        # backlog file of bare source URLs used to become a block of hollow records with
+        # no `source_outcomes` of their own and no cycle claiming them.
+        self.rejected_total = 0
+        self.rejections: list[dict[str, str]] = []
 
     def _load_offsets(self) -> dict[str, int]:
         try:
@@ -102,9 +108,9 @@ class JsonlDistributedMirror:
         tmp.replace(self.state_path)
 
     def scan_once(self) -> dict[str, int]:
-        scanned = synced = 0
+        scanned = synced = rejected = 0
         if not self.normalized_dir.is_dir():
-            return {"scanned": 0, "synced": 0}
+            return {"scanned": 0, "synced": 0, "rejected": 0}
 
         for path in sorted(self.normalized_dir.glob("*.jsonl")):
             key = path.name
@@ -133,12 +139,33 @@ class JsonlDistributedMirror:
                             f"AI26 mirror refuses collection_id={collection_id!r} in {path.name}"
                         )
                     record["collection_id"] = PROJECT_ID
-                    self.sink.ingest(record)
+                    try:
+                        self.sink.ingest(record)
+                    except HollowRecordError as exc:
+                        # Fail closed per row: the row is not persisted, the offset still
+                        # advances (a legacy URL-only line must not wedge capture forever
+                        # -- before this, one bad backlog line made every following
+                        # `scan_once`, including the pre-bind replay, raise) and the
+                        # refusal is recorded against its source file and URL.
+                        rejected += 1
+                        self.rejected_total += 1
+                        self.rejections.append(
+                            {
+                                "source": path.name,
+                                "line": str(line_start),
+                                "source_url": exc.source_url,
+                                "reason": exc.reason,
+                            }
+                        )
+                        del self.rejections[:-50]
+                        self._offsets[key] = handle.tell()
+                        self._save_offsets()
+                        continue
                     synced += 1
                     self.synced_total += 1
                     self._offsets[key] = handle.tell()
                     self._save_offsets()
-        return {"scanned": scanned, "synced": synced}
+        return {"scanned": scanned, "synced": synced, "rejected": rejected}
 
     def _run(self) -> None:
         while not self._stop.is_set():
@@ -229,6 +256,8 @@ def run_backend(
                 "stats": dict(server.stats),
                 "seen_total": server.store.seen_count(),
                 "distributed_synced_total": mirror.synced_total,
+                "distributed_rejected_total": mirror.rejected_total,
+                "distributed_last_rejections": mirror.rejections,
                 "distributed_last_error": mirror.last_error,
             }
         )

@@ -24,14 +24,14 @@ from .collectors.mastodon import MastodonCollectionError, MastodonCollector
 from .collectors.rss import RSSCollector
 from .collectors.youtube import YouTubeCollector
 from .config import Settings
-from .distributed_capture import DistributedCaptureSink
+from .distributed_capture import DistributedCaptureSink, HollowRecordError
 from .language import unlabelled_language_warning
-from .models import CollectionProvenance, NormalizedRecord
+from .models import CanonicalRecord, CollectionProvenance, NormalizedRecord
 from .plugins import RetryPolicy
 from .realtime import RealtimePolicy, parse_source_time, unparsed_source_time_warning
 from .server_runner import run_phase1_rss
-from .web_fetch import fetch_web_child
-from .web_discovery import discover_web_links
+from .web_discovery import discover_article_urls, discover_feed_urls
+from .web_fetch import fetch_html_page, fetch_web_child
 
 _BROWSER_ONLY_TABLES = {"x_account", "browser_source", "instagram_account", "tiktok_account"}
 _WEB_SOURCE_FEED_FALLBACKS = {
@@ -199,7 +199,7 @@ def select_job_window(
     return (ordered[shift:] + ordered[:shift])[:max_jobs]
 
 
-def _stamp(record: NormalizedRecord, row: dict[str, Any], *, collection_id: str, worker_id: str):
+def _stamp(record: CanonicalRecord, row: dict[str, Any], *, collection_id: str, worker_id: str):
     record.source.raw_metadata["collection_id"] = collection_id
     record.source.raw_metadata["source_name"] = str(row.get("name") or "")
     record.source.raw_metadata["source_family"] = str(row.get("source_family") or "")
@@ -251,7 +251,7 @@ def _records_for_job(
     worker_id: str,
     per_source_limit: int,
     retry_policy: RetryPolicy | None = None,
-) -> tuple[list[NormalizedRecord], list[str]]:
+) -> tuple[list[CanonicalRecord], list[str]]:
     kind = str(row["kind"])
     if kind == "bluesky_account":
         handle = str(row.get("handle") or "").strip()
@@ -290,33 +290,14 @@ def _records_for_job(
         if not url:
             raise SourceJobError("missing_web_url")
         fallback_feed = _WEB_SOURCE_FEED_FALLBACKS.get(url.rstrip("/"))
-        feeds: list[str] = [fallback_feed] if fallback_feed else []
-        links: list[str] = []
-        warnings: list[str] = []
-        if not fallback_feed:
-            try:
-                feeds, links = discover_web_links(url, limit=per_source_limit)
-            except Exception as exc:  # visible source failure, not an undated snapshot
-                raise SourceJobError(f"web_discovery_failed:{str(exc)[:150]}") from exc
-        if feeds:
-            try:
-                result = RSSCollector(
-                    feeds, max_items_per_feed=per_source_limit
-                ).collect()
-                records = [
-                    _stamp(r, row, collection_id=collection_id, worker_id=worker_id)
-                    for r in result.records
-                    if r.source.created_at
-                ]
-                warnings.extend(result.warnings)
-                if records:
-                    return records[:per_source_limit], warnings
-            except Exception as exc:
-                warnings.append(f"web_feed_failed:{str(exc)[:150]}")
-        # A hardcoded feed is an authoritative collection route. Without one,
-        # discover linked first-party articles and require publication evidence.
         if fallback_feed:
-            raise SourceJobError("web_feed_no_dated_records")
+            result = RSSCollector(
+                [fallback_feed], max_items_per_feed=per_source_limit
+            ).collect()
+            return [
+                _stamp(r, row, collection_id=collection_id, worker_id=worker_id)
+                for r in result.records
+            ], list(result.warnings)
         parent = NormalizedRecord(
             document_id=url,
             platform="web",
@@ -325,25 +306,57 @@ def _records_for_job(
             raw_payload={},
             collection_provenance=CollectionProvenance(module="ai26-laskin-web-seed"),
         )
-        articles: list[NormalizedRecord] = []
-        for link in links:
-            if len(articles) >= per_source_limit:
-                break
-            outcome = fetch_web_child(
-                link, parent, collection_id=collection_id,
-                arena=str(row.get("arena") or ""),
-            )
-            if outcome.record is None:
-                warnings.append(f"web_article_failed:{link}:{outcome.error}")
-                continue
-            if not outcome.record.source.created_at or not (outcome.record.content.text or "").strip():
-                continue
-            articles.append(_stamp(
-                outcome.record, row, collection_id=collection_id, worker_id=worker_id
-            ))
-        if not articles:
-            raise SourceJobError("web_no_dated_articles")
-        return articles, warnings
+
+        # #321: a web_source is a homepage, so the stage has to discover what it
+        # publishes before it can store anything the handoff will accept. Feeds first
+        # (they carry dates and need no per-site knowledge, which is why the hardcoded
+        # fallback map above was the wrong shape), then article links, whose pages
+        # carry article:published_time for the existing fetcher to read. Only when
+        # neither route yields a dated document does the old single-snapshot behaviour
+        # remain, and that snapshot is still excluded downstream rather than guessed at.
+        page = fetch_html_page(url)
+        if page is not None:
+            final_url, html = page
+            feed_urls = discover_feed_urls(html, final_url)[:3]
+            if feed_urls:
+                result = RSSCollector(
+                    feed_urls, max_items_per_feed=per_source_limit
+                ).collect()
+                dated = [
+                    r for r in result.records if getattr(r.source, "created_at", None)
+                ]
+                if dated:
+                    return [
+                        _stamp(r, row, collection_id=collection_id, worker_id=worker_id)
+                        for r in dated
+                    ], list(result.warnings)
+            children: list[CanonicalRecord] = []
+            for candidate in discover_article_urls(
+                html, final_url, limit=per_source_limit
+            ):
+                child = fetch_web_child(
+                    candidate,
+                    parent,
+                    collection_id=collection_id,
+                    arena=str(row.get("arena") or ""),
+                )
+                if child.record is not None and getattr(child.record.source, "created_at", None):
+                    children.append(child.record)
+            if children:
+                return [
+                    _stamp(r, row, collection_id=collection_id, worker_id=worker_id)
+                    for r in children
+                ], []
+
+        outcome = fetch_web_child(
+            url,
+            parent,
+            collection_id=collection_id,
+            arena=str(row.get("arena") or ""),
+        )
+        if outcome.record is None:
+            raise SourceJobError("web_fetch_failed", status_code=outcome.status_code)
+        return [_stamp(outcome.record, row, collection_id=collection_id, worker_id=worker_id)], []
 
     if kind == "mastodon_account":
         acct = str(row.get("acct") or "").strip().removeprefix("@")
@@ -607,6 +620,15 @@ def run_phase1_laskin(
                 http_status=exc.status_code,
             )
             errors.append(f"{row.get('kind')}:{row.get('name','unnamed')}: {exc.reason}")
+        except HollowRecordError as exc:
+            # #322: the sink refused a capture that would have carried no text, no raw
+            # payload/ref and no media. Report the refusal against the configured source
+            # and URL, so a hollow capture is a visible source error rather than a silent
+            # skip -- and rather than a success it cannot back up.
+            outcome.update(status="error", reason=exc.reason)
+            errors.append(
+                f"{row.get('kind')}:{row.get('name','unnamed')}: {exc.reason}: {exc.source_url}"
+            )
         except Exception as exc:  # noqa: BLE001
             outcome.update(status="error", reason="collection_or_ingest_failed")
             errors.append(f"{row.get('kind')}:{row.get('name','unnamed')}: {str(exc)[:180]}")

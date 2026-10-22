@@ -13,7 +13,8 @@ from pathlib import Path
 from typing import Any
 
 from .config import Settings
-from .distributed_capture import DistributedCaptureSink
+from .distributed_capture import DistributedCaptureSink, HollowRecordError
+from .models import CanonicalRecord
 
 
 def _identity_token(collection_id: str, source_url: str) -> str:
@@ -57,7 +58,27 @@ def sync_normalized_records(
                         raise ValueError("record has no source_url")
                     collection_id = str(record.get("collection_id") or settings.project_id)
                     token = _identity_token(collection_id, source_url)
-                    if not sink.redis.acquire_once(
+                    # Validate before claiming the dedup key; a failed sync must
+                    # remain retryable after the capture has been repaired.
+                    canonical = CanonicalRecord.model_validate({
+                        k: v for k, v in record.items() if k in CanonicalRecord.model_fields
+                    })
+                    has_evidence = (
+                        bool((canonical.content.text or "").strip())
+                        or canonical.raw_capture.preserved
+                        or bool(canonical.content.media_references)
+                        or bool(canonical.content.file_references)
+                    )
+                    if not has_evidence:
+                        # #322: same typed refusal as the sink, raised before the dedup
+                        # claim so a repaired capture stays retryable, and carrying the
+                        # source and URL into this function's per-line error list.
+                        raise HollowRecordError(
+                            source=str(record.get("source_name") or collection_id),
+                            source_url=source_url,
+                            collection_id=collection_id,
+                        )
+                    if sink.redis is not None and not sink.redis.acquire_once(
                         f"distributed-sync:{settings.run_id}:{token}",
                         ttl_seconds=7 * 24 * 3600,
                     ):

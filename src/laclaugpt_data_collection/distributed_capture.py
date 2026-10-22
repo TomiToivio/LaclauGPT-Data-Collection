@@ -17,6 +17,41 @@ from .handoff import build_handoff
 from .models import CanonicalRecord, CollectionProvenance
 from .storage.remote import MongoRecordStore, RedisCoordinator, S3ObjectStore
 
+HOLLOW_RECORD_REASON = "hollow_record"
+
+
+class HollowRecordError(ValueError):
+    """A capture that carried only a source URL, raised at the persistence boundary.
+
+    Issue #322: 1,703 rows reached `ai26__records` with a real X post URL and nothing
+    else because the writer that accepted them had no way to say no. The evidence rule
+    itself lives at the raise site in :meth:`DistributedCaptureSink.ingest_with_status`,
+    which every writer goes through (Firefox mirror, JSONL sync, Laskin phase 1, browser
+    server).
+
+    Subclassing ``ValueError`` keeps existing callers that treat a refused write as a
+    value error working. The added fields are what make the refusal *reportable*: a
+    caller can name the source it was reading and the URL in its per-source report,
+    instead of surfacing a bare "hollow capture" line that no reader can trace back to
+    a source.
+    """
+
+    def __init__(
+        self, *, source: str = "", source_url: str = "", collection_id: str = ""
+    ) -> None:
+        self.reason = HOLLOW_RECORD_REASON
+        self.source = source or "<unnamed>"
+        self.source_url = source_url
+        self.collection_id = collection_id
+        # The URL goes first and the message stays short on purpose: per-line and
+        # per-source reports truncate the text (180 characters in `distributed-sync`),
+        # and a refusal whose URL was cut off cannot be traced back to the row.
+        super().__init__(
+            f"refusing hollow capture: {source_url or '<no source_url>'} has no text, "
+            "raw payload/ref or media; source_url alone is not a collected record "
+            f"(source {self.source!r}, collection {collection_id or 'unknown'})"
+        )
+
 
 class DistributedCaptureSink:
     """Mirror one canonical collection record into the shared distributed plane."""
@@ -146,15 +181,17 @@ class DistributedCaptureSink:
             if key in CanonicalRecord.model_fields
         }
         record = CanonicalRecord.model_validate(canonical_data)
-        # #322: fail closed before touching S3, MongoDB or Redis. A URL shell
-        # with no usable content or preserved capture is not evidence.
+        # #322: refuse URL-only placeholders before touching S3, Mongo or Redis.
         has_text = bool((record.content.text or "").strip())
-        has_payload = record.raw_capture.payload not in (None, {}, [], "")
-        has_raw_ref = bool(record.raw_capture.ref)
-        if not (has_text or has_payload or has_raw_ref):
-            raise ValueError(
-                "hollow_capture_rejected: no text, raw payload or durable raw reference "
-                f"for {record.source_url}"
+        has_raw = record.raw_capture.preserved
+        has_media = bool(record.content.media_references or record.content.file_references)
+        if not (has_text or has_raw or has_media):
+            raise HollowRecordError(
+                # Name the configured source when the record knows one, otherwise the
+                # collection: a platform-less row has nothing else to identify it by.
+                source=str(record.source.platform or "") or collection_id,
+                source_url=str(record.source_url or ""),
+                collection_id=collection_id,
             )
         raw_ref = self._raw_object(record)
 

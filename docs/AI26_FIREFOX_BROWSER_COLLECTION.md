@@ -110,6 +110,17 @@ During collection:
 
 If a remote service fails temporarily, local capture continues. Restarting the backend resumes mirroring from `.ai26-distributed-offsets.json`.
 
+The mirror refuses a row that carries nothing to keep. A canonical row with no
+`content.text`, no `raw_capture` payload/ref and no media reference cannot be analysed
+or resolved later, so it is not written: it is counted in `rejected` /
+`mirror.rejected_total`, named by source file, offset and URL in `mirror.rejections`,
+and reported as `distributed_rejected_total` / `distributed_last_rejections` in the run
+manifest. The offset advances past the refused row, so a legacy URL-only backlog is
+reported once instead of stalling the replay and the backend bind. The same refusal is a
+per-line error in `distributed-sync` and a per-source `error` outcome with reason
+`hollow_record` in the Laskin Phase 1 cycle. Re-capture the source to fill the row in;
+do not expect the store to resolve it.
+
 ## 8. Media/video downloader cron job
 
 Run media independently:

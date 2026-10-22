@@ -7,7 +7,6 @@ the parent record.
 from __future__ import annotations
 
 import ipaddress
-import json
 import re
 import socket
 from dataclasses import dataclass
@@ -98,33 +97,58 @@ def _title(value: str) -> str | None:
 
 
 def _published(value: str) -> str | None:
-    """Find explicitly declared article publication time, not the fetch time."""
     match = _PUBLISHED_RE.search(value)
-    if match:
-        return match.group(1).strip()
-    for tag in re.findall(r"<meta\\b[^>]*>", value, re.I):
-        if re.search(r"(?:article:published_time|datePublished|publish_date)", tag, re.I):
-            match = re.search(r'\\bcontent\\s*=\\s*["\\']([^"\\']+)["\\']', tag, re.I)
-            if match:
-                return match.group(1).strip()
-    for chunk in re.findall(
-        r'<script[^>]+type=["\\']application/ld\\+json["\\'][^>]*>(.*?)</script>',
-        value, re.I | re.S,
-    ):
-        try:
-            root = json.loads(chunk)
-        except (ValueError, TypeError):
-            continue
-        pending = [root]
-        while pending:
-            item = pending.pop()
-            if isinstance(item, list):
-                pending.extend(item)
-            elif isinstance(item, dict):
-                stamp = item.get("datePublished")
-                if isinstance(stamp, str) and stamp.strip():
-                    return stamp.strip()
-                pending.extend(v for v in item.values() if isinstance(v, (dict, list)))
+    return match.group(1).strip() if match else None
+
+
+def fetch_html_page(
+    url: str,
+    *,
+    timeout_seconds: float = 20.0,
+    max_bytes: int = 5_000_000,
+    transport: httpx.BaseTransport | None = None,
+    host_validator: Callable[[str], bool] = _public_host,
+) -> tuple[str, str] | None:
+    """Fetch a page for *discovery* only: ``(final_url, html)`` or ``None``.
+
+    This produces no record on purpose. It exists so the stage can learn which
+    documents a ``web_source`` homepage publishes (#321), and it deliberately shares
+    the same host validation and size limits as :func:`fetch_web_child` so discovery
+    cannot reach anywhere the fetcher could not.
+    """
+    current = canonicalize_source_url(url)
+    if urlsplit(current).scheme not in {"http", "https"}:
+        return None
+    try:
+        with httpx.Client(
+            timeout=timeout_seconds,
+            follow_redirects=False,
+            transport=transport,
+            headers={"User-Agent": "LaclauGPT-Data-Collection/0.1 research fetcher"},
+        ) as client:
+            requested = current
+            seen: set[str] = set()
+            for _ in range(5):
+                if requested in seen or not host_validator(requested):
+                    return None
+                seen.add(requested)
+                response = client.get(requested)
+                location = response.headers.get("location")
+                if response.status_code in {301, 302, 303, 307, 308} and location:
+                    requested = urljoin(requested, location)
+                    current = canonicalize_source_url(requested)
+                    continue
+                if response.status_code >= 400:
+                    return None
+                content_type = response.headers.get("content-type", "").split(";", 1)[0].lower()
+                if "html" not in content_type:
+                    return None
+                body = response.content[: max_bytes + 1]
+                if len(body) > max_bytes:
+                    return None
+                return current, body.decode(response.encoding or "utf-8", errors="replace")
+    except Exception:  # noqa: BLE001 - discovery must never fail collection
+        return None
     return None
 
 
