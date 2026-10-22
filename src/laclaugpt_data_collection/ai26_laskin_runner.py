@@ -31,6 +31,7 @@ from .plugins import RetryPolicy
 from .realtime import RealtimePolicy, parse_source_time, unparsed_source_time_warning
 from .server_runner import run_phase1_rss
 from .web_fetch import fetch_web_child
+from .web_discovery import discover_web_links
 
 _BROWSER_ONLY_TABLES = {"x_account", "browser_source", "instagram_account", "tiktok_account"}
 _WEB_SOURCE_FEED_FALLBACKS = {
@@ -289,14 +290,33 @@ def _records_for_job(
         if not url:
             raise SourceJobError("missing_web_url")
         fallback_feed = _WEB_SOURCE_FEED_FALLBACKS.get(url.rstrip("/"))
+        feeds: list[str] = [fallback_feed] if fallback_feed else []
+        links: list[str] = []
+        warnings: list[str] = []
+        if not fallback_feed:
+            try:
+                feeds, links = discover_web_links(url, limit=per_source_limit)
+            except Exception as exc:  # visible source failure, not an undated snapshot
+                raise SourceJobError(f"web_discovery_failed:{str(exc)[:150]}") from exc
+        if feeds:
+            try:
+                result = RSSCollector(
+                    feeds, max_items_per_feed=per_source_limit
+                ).collect()
+                records = [
+                    _stamp(r, row, collection_id=collection_id, worker_id=worker_id)
+                    for r in result.records
+                    if r.source.created_at
+                ]
+                warnings.extend(result.warnings)
+                if records:
+                    return records[:per_source_limit], warnings
+            except Exception as exc:
+                warnings.append(f"web_feed_failed:{str(exc)[:150]}")
+        # A hardcoded feed is an authoritative collection route. Without one,
+        # discover linked first-party articles and require publication evidence.
         if fallback_feed:
-            result = RSSCollector(
-                [fallback_feed], max_items_per_feed=per_source_limit
-            ).collect()
-            return [
-                _stamp(r, row, collection_id=collection_id, worker_id=worker_id)
-                for r in result.records
-            ], list(result.warnings)
+            raise SourceJobError("web_feed_no_dated_records")
         parent = NormalizedRecord(
             document_id=url,
             platform="web",
@@ -305,15 +325,25 @@ def _records_for_job(
             raw_payload={},
             collection_provenance=CollectionProvenance(module="ai26-laskin-web-seed"),
         )
-        outcome = fetch_web_child(
-            url,
-            parent,
-            collection_id=collection_id,
-            arena=str(row.get("arena") or ""),
-        )
-        if outcome.record is None:
-            raise SourceJobError("web_fetch_failed", status_code=outcome.status_code)
-        return [_stamp(outcome.record, row, collection_id=collection_id, worker_id=worker_id)], []
+        articles: list[NormalizedRecord] = []
+        for link in links:
+            if len(articles) >= per_source_limit:
+                break
+            outcome = fetch_web_child(
+                link, parent, collection_id=collection_id,
+                arena=str(row.get("arena") or ""),
+            )
+            if outcome.record is None:
+                warnings.append(f"web_article_failed:{link}:{outcome.error}")
+                continue
+            if not outcome.record.source.created_at or not (outcome.record.content.text or "").strip():
+                continue
+            articles.append(_stamp(
+                outcome.record, row, collection_id=collection_id, worker_id=worker_id
+            ))
+        if not articles:
+            raise SourceJobError("web_no_dated_articles")
+        return articles, warnings
 
     if kind == "mastodon_account":
         acct = str(row.get("acct") or "").strip().removeprefix("@")
