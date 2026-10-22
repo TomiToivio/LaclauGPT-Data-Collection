@@ -7,6 +7,7 @@ the parent record.
 from __future__ import annotations
 
 import ipaddress
+import json
 import re
 import socket
 from dataclasses import dataclass
@@ -97,8 +98,34 @@ def _title(value: str) -> str | None:
 
 
 def _published(value: str) -> str | None:
+    """Find explicitly declared article publication time, not the fetch time."""
     match = _PUBLISHED_RE.search(value)
-    return match.group(1).strip() if match else None
+    if match:
+        return match.group(1).strip()
+    for tag in re.findall(r"<meta\\b[^>]*>", value, re.I):
+        if re.search(r"(?:article:published_time|datePublished|publish_date)", tag, re.I):
+            match = re.search(r'\\bcontent\\s*=\\s*["\\']([^"\\']+)["\\']', tag, re.I)
+            if match:
+                return match.group(1).strip()
+    for chunk in re.findall(
+        r'<script[^>]+type=["\\']application/ld\\+json["\\'][^>]*>(.*?)</script>',
+        value, re.I | re.S,
+    ):
+        try:
+            root = json.loads(chunk)
+        except (ValueError, TypeError):
+            continue
+        pending = [root]
+        while pending:
+            item = pending.pop()
+            if isinstance(item, list):
+                pending.extend(item)
+            elif isinstance(item, dict):
+                stamp = item.get("datePublished")
+                if isinstance(stamp, str) and stamp.strip():
+                    return stamp.strip()
+                pending.extend(v for v in item.values() if isinstance(v, (dict, list)))
+    return None
 
 
 def fetch_web_child(
