@@ -101,15 +101,15 @@ Analysis, simulation, dashboards, research datasets, operational target lists, c
 > [!IMPORTANT]
 > **Development branch:** `main`. Historical `phase-N` branches are archival/compatibility references, not development stages or synchronization targets.
 
-The current `main` branch is the active repository state. The narrow Phase 0 RSS/Atom path below is retained only as a compatibility baseline and rollback reference while Phase 1 capabilities are restored incrementally:
+The current `main` branch is the active repository state. The earlier narrow RSS/Atom path below is retained only as a compatibility baseline and rollback reference:
 
 ```text
 RSS/Atom feeds -> canonical text records -> MongoDB -> Data Analysis
 ```
 
-The `laclaugpt-server-rss` entry point is now the bounded Phase 1 Laskin RSS worker. It reads `[[feed]]` rows from the source manifest and writes through the same canonical `DistributedCaptureSink` used by browser capture, so unattended RSS and localhost browser records share the project-scoped `<project>__records` collection. The older flat Phase 0 helpers remain available as compatibility code and tests, but they are no longer the Laskin cron path.
+The `laclaugpt-server-rss` entry point is now the bounded Laskin RSS worker. It reads `[[feed]]` rows from the source manifest and writes through the same canonical `DistributedCaptureSink` used by browser capture, so unattended RSS and localhost browser records share the project-scoped `<project>__records` collection. The older flat helpers remain available as compatibility code and tests, but they are no longer the Laskin cron path.
 
-Example Phase 1 invocation:
+Example invocation:
 
 ```bash
 LACLAUGPT_PROJECT_ID=ai26 \
@@ -121,17 +121,17 @@ laclaugpt-server-rss \
   --limit 40
 ```
 
-On Laskin, `scripts/run_ai26_laskin_collect.sh` remains the bounded one-cycle cron wrapper and explicitly refuses browser-enabled runtime configuration. Phase 0 storage adapters remain documented below only for compatibility and rollback work.
+On Laskin, `scripts/run_ai26_laskin_collect.sh` remains the bounded one-cycle cron wrapper and explicitly refuses browser-enabled runtime configuration. Legacy storage adapters remain documented below only for compatibility and rollback work.
 
-### Phase 0 MongoDB boundary (shared with Data Analysis)
+### Legacy MongoDB boundary (shared with Data Analysis)
 
-Phase 0 collection and the Phase 0 analysis core share **one** database and **one** collection name. The collection is derived from the project id:
+The legacy collection path and the legacy analysis core share **one** database and **one** collection name. The collection is derived from the project id:
 
 ```text
 laclaugpt2_<project>_scraper_collection      # e.g. laclaugpt2_ai26_scraper_collection
 ```
 
-This is deliberately **not** the Phase 1 distributed collection naming (`<project>__records`). Phase 1 writes nested `CanonicalRecord` documents; the hand-coded Phase 0 analysis core reads flat documents. `src/laclaugpt_data_collection/phase0_mongo.py` is the explicit Phase 0 adapter between the two and can be retired once Phase 1 is reintroduced step by step.
+This is deliberately **not** the current distributed collection naming (`<project>__records`). The current pipeline writes nested `CanonicalRecord` documents; the hand-coded Phase 0 analysis core reads flat documents. `src/laclaugpt_data_collection/phase0_mongo.py` is the explicit Phase 0 adapter between the two and can be retired once Phase 1 is reintroduced step by step.
 
 The flat document exposes the fields analysis expects:
 
@@ -145,7 +145,7 @@ country, language, site_name, collected_at
 Two properties make the boundary safe to run from cron:
 
 - **Identity.** Documents are upserted on the canonical `source_url` (fragments and tracking parameters such as `utm_*`/`fbclid` stripped), so re-collecting an article updates it instead of creating a duplicate the analysis core would analyse twice.
-- **Minimality.** The Phase 0 path requires MongoDB only. It opens no Redis connection and no S3/Allas connection, and the existing Phase 1 distributed runner is left intact for later restoration.
+- **Minimality.** The legacy path requires MongoDB only. It opens no Redis connection and no S3/Allas connection, and the existing Phase 1 distributed runner is left intact for later restoration.
 
 The boundary is pinned by `tests/test_issue_85_phase0_mongo_contract.py`, which asserts the collection name and required field list against the constants the analysis core uses.
 
