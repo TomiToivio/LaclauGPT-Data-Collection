@@ -12,6 +12,7 @@ import socket
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from html import unescape
+from html.parser import HTMLParser
 from typing import Callable
 from urllib.parse import urljoin, urlsplit
 
@@ -42,6 +43,11 @@ _ALLOWED_TYPES = (
     "application/xhtml+xml",
 )
 
+#: `<link rel="alternate">` MIME types that advertise a syndication feed (#321).
+#: Deliberately only RSS and Atom: the runner collects the advertised document
+#: through `RSSCollector`, and those are the two families it parses.
+_FEED_LINK_TYPES = frozenset({"application/rss+xml", "application/atom+xml"})
+
 
 @dataclass(frozen=True)
 class WebFetchOutcome:
@@ -49,6 +55,11 @@ class WebFetchOutcome:
     record: CanonicalRecord | None
     error: str = ""
     status_code: int | None = None
+    # The decoded document body when the response was HTML, else None. Carried on
+    # the outcome so a caller that has to act on the page itself -- feed discovery
+    # (#321) -- can do so from the ONE fetch this outcome already cost, instead of
+    # requesting the same URL a second time in the same cycle.
+    html: str | None = None
 
 
 def external_urls_for_record(record: CanonicalRecord) -> list[str]:
@@ -99,6 +110,65 @@ def _title(value: str) -> str | None:
 def _published(value: str) -> str | None:
     match = _PUBLISHED_RE.search(value)
     return match.group(1).strip() if match else None
+
+
+class _AlternateLinkParser(HTMLParser):
+    """Collect `<link rel="alternate" type="application/(rss|atom)+xml">` hrefs."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.hrefs: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag.lower() != "link":
+            return
+        data = {key.lower(): (value or "") for key, value in attrs}
+        rel = data.get("rel", "").lower().split()
+        if "alternate" not in rel:
+            return
+        # `type` may carry parameters (`application/rss+xml; charset=utf-8`).
+        content_type = data.get("type", "").split(";", 1)[0].strip().lower()
+        href = data.get("href", "").strip()
+        if content_type in _FEED_LINK_TYPES and href:
+            self.hrefs.append(href)
+
+
+def discover_feed_urls(
+    html: str | None, base_url: str, *, limit: int = 1
+) -> list[str]:
+    """Return absolute feed URLs a page advertises through `<link rel="alternate">`.
+
+    This is the whole of #321's discovery rule: no per-site pattern, no guessing a
+    date format, no HTML heuristics beyond the standards-defined declaration a
+    publisher already made. A relative `href` is resolved against the page's own
+    (post-redirect) URL, because `</feed>` and `feed.xml` are as legal as an
+    absolute URL.
+
+    Bounded by construction: `limit` caps the returned list (the runner collects
+    one feed per source per cycle), unparseable or `None` bodies carry no links,
+    and a non-HTTP(S) scheme is dropped rather than handed to a fetcher.
+    """
+    if not html:
+        return []
+    parser = _AlternateLinkParser()
+    try:
+        parser.feed(html)
+        parser.close()
+    except Exception:  # noqa: BLE001 - malformed markup is a no-feed page, not an error
+        return []
+    found: list[str] = []
+    seen: set[str] = set()
+    for href in parser.hrefs:
+        resolved = urljoin(base_url, href) if base_url else href
+        if urlsplit(resolved).scheme not in {"http", "https"}:
+            continue
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        found.append(resolved)
+        if len(found) >= max(1, limit):
+            break
+    return found
 
 
 def fetch_web_child(
@@ -169,11 +239,15 @@ def fetch_web_child(
     title = None
     published_at = None
     media: list[MediaReference] = []
+    html_body: str | None = None
     if content_type == "application/pdf":
         media.append(MediaReference(kind="pdf", url=current, media_index=0))
     else:
         decoded = body.decode(response.encoding or "utf-8", errors="replace")
         if "html" in content_type:
+            # #321: kept on the outcome so the caller's feed discovery costs no
+            # second request for the same page.
+            html_body = decoded
             title = _title(decoded)
             published_at = _published(decoded)
             text = _html_text(decoded)[:200_000]
@@ -223,4 +297,4 @@ def fetch_web_child(
         ],
     )
     child.refresh_human_readable()
-    return WebFetchOutcome(current, child)
+    return WebFetchOutcome(current, child, html=html_body)

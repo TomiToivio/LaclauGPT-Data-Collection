@@ -30,7 +30,7 @@ from .models import CollectionProvenance, NormalizedRecord
 from .plugins import RetryPolicy
 from .realtime import RealtimePolicy, parse_source_time, unparsed_source_time_warning
 from .server_runner import run_phase1_rss
-from .web_fetch import fetch_web_child
+from .web_fetch import discover_feed_urls, fetch_web_child
 
 _BROWSER_ONLY_TABLES = {"x_account", "browser_source", "instagram_account", "tiktok_account"}
 _WEB_SOURCE_FEED_FALLBACKS = {
@@ -40,6 +40,14 @@ _WEB_SOURCE_FEED_FALLBACKS = {
     # trailing slash because the lookup below rstrips it.
     "https://www.microsoft.com/en-us/ai/blog": "https://www.microsoft.com/en-us/ai/blog/feed/",
 }
+# #321: the map above is an explicit OVERRIDE, not the only route into the corpus.
+# A `web_source` whose homepage advertises `<link rel="alternate" type=
+# "application/(rss|atom)+xml">` is collected through that feed, so its articles
+# arrive with a publication time instead of as one undated snapshot. Discovery
+# costs no extra request: it reads the HTML of the single homepage fetch the
+# snapshot path already performed. The snapshot stays the last resort, and the
+# per-source share (`per_source_limit`) is the cap on how many feed items one
+# `web_source` may take out of a cycle.
 
 _NON_BROWSER_TABLES = (
     "web_source",
@@ -243,6 +251,32 @@ def _stamp(record: NormalizedRecord, row: dict[str, Any], *, collection_id: str,
     return record
 
 
+def _web_source_feed_records(
+    feed_url: str,
+    row: dict[str, Any],
+    *,
+    collection_id: str,
+    worker_id: str,
+    per_source_limit: int,
+) -> tuple[list[NormalizedRecord], list[str]]:
+    """Collect one feed for a `web_source` and cap it at the row's cycle share (#321).
+
+    Both the explicit map override and a discovered feed go through here, so a
+    `web_source` behaves the same whichever route found the feed -- and the same
+    route the `openai_news`/`microsoft_ai_blog` rows already used. The feed's depth
+    and the returned list are both bounded by `per_source_limit`, the share the
+    cycle reserved for one source: a feed publishing more items than that must not
+    consume a neighbouring source's allocation.
+    """
+    limit = max(1, per_source_limit)
+    result = RSSCollector([feed_url], max_items_per_feed=limit).collect()
+    records = [
+        _stamp(record, row, collection_id=collection_id, worker_id=worker_id)
+        for record in result.records
+    ]
+    return records[:limit], list(result.warnings)
+
+
 def _records_for_job(
     row: dict[str, Any],
     *,
@@ -288,15 +322,18 @@ def _records_for_job(
         url = str(row.get("homepage") or row.get("url") or "").strip()
         if not url:
             raise SourceJobError("missing_web_url")
-        fallback_feed = _WEB_SOURCE_FEED_FALLBACKS.get(url.rstrip("/"))
-        if fallback_feed:
-            result = RSSCollector(
-                [fallback_feed], max_items_per_feed=per_source_limit
-            ).collect()
-            return [
-                _stamp(r, row, collection_id=collection_id, worker_id=worker_id)
-                for r in result.records
-            ], list(result.warnings)
+        # #321 step 1: an explicit map entry is an OVERRIDE and wins outright, so the
+        # two rows that work today keep working identically and are not even fetched
+        # as pages.
+        override_feed = _WEB_SOURCE_FEED_FALLBACKS.get(url.rstrip("/"))
+        if override_feed:
+            return _web_source_feed_records(
+                override_feed,
+                row,
+                collection_id=collection_id,
+                worker_id=worker_id,
+                per_source_limit=per_source_limit,
+            )
         parent = NormalizedRecord(
             document_id=url,
             platform="web",
@@ -313,7 +350,38 @@ def _records_for_job(
         )
         if outcome.record is None:
             raise SourceJobError("web_fetch_failed", status_code=outcome.status_code)
-        return [_stamp(outcome.record, row, collection_id=collection_id, worker_id=worker_id)], []
+        # #321 step 2: discover the feed this page advertises and collect THAT through
+        # the same RSS collector, so the articles carry a publication time instead of
+        # one undated page snapshot. The fetch above is the only homepage request this
+        # branch makes either way -- discovery reads the body it already returned, so
+        # a `web_source` still costs exactly one page fetch per cycle, with the same
+        # timeout and retry conventions as before.
+        discovered = discover_feed_urls(outcome.html, outcome.url, limit=1)
+        # Built once, on both paths: a no-feed page and a feed that carried nothing
+        # must produce the SAME single undated record this row produced before #321.
+        snapshot = _stamp(
+            outcome.record, row, collection_id=collection_id, worker_id=worker_id
+        )
+        if not discovered:
+            # No map entry, no advertised feed: today's behaviour, unchanged.
+            return [snapshot], []
+        records, warnings = _web_source_feed_records(
+            discovered[0],
+            row,
+            collection_id=collection_id,
+            worker_id=worker_id,
+            per_source_limit=per_source_limit,
+        )
+        if records:
+            return records, warnings
+        # The advertised feed parsed but carried nothing. Storing the snapshot keeps
+        # the source from going silent for a tick; it is one record, never two, and it
+        # is exactly the undated record this row produced before #321.
+        return [snapshot], [
+            *warnings,
+            f"web_source:{row.get('name', 'unnamed')}: discovered feed {discovered[0]} "
+            "yielded no items; stored the page snapshot instead",
+        ]
 
     if kind == "mastodon_account":
         acct = str(row.get("acct") or "").strip().removeprefix("@")
