@@ -150,6 +150,10 @@ class DistributedCaptureSink:
         has_text = bool((record.content.text or "").strip())
         has_raw = record.raw_capture.preserved
         has_media = bool(record.content.media_references or record.content.file_references)
+        has_source = bool(record.source.platform.strip())
+        if self.settings.project_id.casefold() == "ai26" and not has_source:
+            if not (has_text or has_raw or has_media):
+                raise ValueError("refusing hollow capture: no source evidence")
         if not (has_text or has_raw or has_media):
             raise ValueError(
                 "refusing hollow capture: no text, raw payload/ref or media; "
