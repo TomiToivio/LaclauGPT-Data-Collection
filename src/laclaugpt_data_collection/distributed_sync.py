@@ -63,10 +63,13 @@ def sync_normalized_records(
                     canonical = CanonicalRecord.model_validate({
                         k: v for k, v in record.items() if k in CanonicalRecord.model_fields
                     })
-                    if not ((canonical.content.text or "").strip()
-                            or canonical.raw_capture.preserved
-                            or canonical.content.media_references
-                            or canonical.content.file_references):
+                    has_evidence = (
+                        bool((canonical.content.text or "").strip())
+                        or canonical.raw_capture.preserved
+                        or bool(canonical.content.media_references)
+                        or bool(canonical.content.file_references)
+                    )
+                    if not has_evidence:
                         raise ValueError("refusing hollow capture before deduplication")
                     if sink.redis is not None and not sink.redis.acquire_once(
                         f"distributed-sync:{settings.run_id}:{token}",
