@@ -146,6 +146,16 @@ class DistributedCaptureSink:
             if key in CanonicalRecord.model_fields
         }
         record = CanonicalRecord.model_validate(canonical_data)
+        # #322: fail closed before touching S3, MongoDB or Redis. A URL shell
+        # with no usable content or preserved capture is not evidence.
+        has_text = bool((record.content.text or "").strip())
+        has_payload = record.raw_capture.payload not in (None, {}, [], "")
+        has_raw_ref = bool(record.raw_capture.ref)
+        if not (has_text or has_payload or has_raw_ref):
+            raise ValueError(
+                "hollow_capture_rejected: no text, raw payload or durable raw reference "
+                f"for {record.source_url}"
+            )
         raw_ref = self._raw_object(record)
 
         if not record.provenance:
