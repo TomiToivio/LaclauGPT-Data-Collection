@@ -5,7 +5,7 @@ Collection emits stable, JSON-compatible source records. `source_url` is normali
 Backends may add internal keys, but CSV, JSONL, SQLite, MongoDB-like documents and downstream modules retain the canonical source identity, schema version, nested media references, timestamps and provenance unchanged. Collection owns source provenance and media references; analysis-derived OCR, transcript interpretation and discourse codes belong downstream.
 
 
-## Collection → Analysis Phase 1 contract
+## Collection → Analysis handoff contract
 
 Collection and Analysis define **separate** Pydantic models with the same name
 (`CanonicalRecord`), because each module owns different layers of the research

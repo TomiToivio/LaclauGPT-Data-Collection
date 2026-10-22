@@ -294,7 +294,7 @@ for a manifest that does not enable it. `configs/studies/brazil26.sources.exampl
 declares `enabled_platforms = ["x", "instagram", "tiktok"]`; its institutional
 RSS/YouTube rows are kept as provenance with `enabled = false`.
 
-## Validate before Phase 1 analysis
+## Validate before analysis
 
 Run:
 

@@ -1,6 +1,6 @@
-# AI26 Phase 1 Collection -> Analysis handoff contract
+# AI26 Collection -> Analysis handoff contract
 
-This document pins the authoritative Collection-to-Analysis boundary for the AI26 Phase 1 pipeline.
+This document pins the authoritative Collection-to-Analysis boundary for the AI26 collection pipeline.
 
 ## Authoritative contract
 

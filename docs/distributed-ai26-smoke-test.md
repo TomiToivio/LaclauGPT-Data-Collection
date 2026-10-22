@@ -12,7 +12,7 @@ On the laptop:
 python -m pip install -e '.[distributed]'
 ```
 
-On the Linux server, install the complete Phase 1 non-browser dependency set:
+On the Linux server, install the complete non-browser dependency set:
 
 ```bash
 python -m pip install -e '.[distributed,phase1-non-browser]'

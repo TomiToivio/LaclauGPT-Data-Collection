@@ -107,7 +107,7 @@ The current `main` branch is the active repository state. The earlier narrow RSS
 RSS/Atom feeds -> canonical text records -> MongoDB -> Data Analysis
 ```
 
-The `laclaugpt-server-rss` entry point is now the bounded Laskin RSS worker. It reads `[[feed]]` rows from the source manifest and writes through the same canonical `DistributedCaptureSink` used by browser capture, so unattended RSS and localhost browser records share the project-scoped `<project>__records` collection. The older flat helpers remain available as compatibility code and tests, but they are no longer the Laskin cron path.
+The `laclaugpt-server-rss` entry point is the bounded AI26 Laskin RSS collection worker. It reads `[[feed]]` rows from the source manifest and writes through the same canonical `DistributedCaptureSink` used by browser capture, so unattended RSS and localhost browser records share the project-scoped `<project>__records` collection. The older flat helpers remain available as compatibility code and tests, but they are no longer the Laskin cron path.
 
 Example invocation:
 
@@ -131,7 +131,7 @@ The legacy collection path and the legacy analysis core share **one** database a
 laclaugpt2_<project>_scraper_collection      # e.g. laclaugpt2_ai26_scraper_collection
 ```
 
-This is deliberately **not** the current distributed collection naming (`<project>__records`). The current pipeline writes nested `CanonicalRecord` documents; the hand-coded Phase 0 analysis core reads flat documents. `src/laclaugpt_data_collection/phase0_mongo.py` is the explicit Phase 0 adapter between the two and can be retired once Phase 1 is reintroduced step by step.
+This is deliberately **not** the current distributed collection naming (`<project>__records`). The current pipeline writes nested `CanonicalRecord` documents; the hand-coded legacy analysis core reads flat documents. `src/laclaugpt_data_collection/phase0_mongo.py` is the explicit legacy adapter between the two and can be retired incrementally once the canonical path covers every production source family.
 
 The flat document exposes the fields analysis expects:
 
@@ -145,7 +145,7 @@ country, language, site_name, collected_at
 Two properties make the boundary safe to run from cron:
 
 - **Identity.** Documents are upserted on the canonical `source_url` (fragments and tracking parameters such as `utm_*`/`fbclid` stripped), so re-collecting an article updates it instead of creating a duplicate the analysis core would analyse twice.
-- **Minimality.** The legacy path requires MongoDB only. It opens no Redis connection and no S3/Allas connection, and the existing Phase 1 distributed runner is left intact for later restoration.
+- **Minimality.** The legacy path requires MongoDB only. It opens no Redis connection and no S3/Allas connection, and the existing canonical distributed runner is left intact.
 
 The boundary is pinned by `tests/test_issue_85_phase0_mongo_contract.py`, which asserts the collection name and required field list against the constants the analysis core uses.
 

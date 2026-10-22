@@ -118,7 +118,7 @@ Run one bounded non-browser cycle before relying on cron:
 bash scripts/run_ai26_laskin_collect.sh
 ```
 
-The canonical unattended worker begins with RSS/Atom, using the same bounded AI26 source manifest as the localhost setup. The Phase 1 runner writes through the same `DistributedCaptureSink` as browser collection, so records land in the shared `ai26__records` canonical collection instead of the legacy Phase 0 flat collection. RSS/blog/newsletter collection remains the high-signal, low-friction baseline. Additional canonical non-browser collectors should join this bounded runner rather than creating a second scheduler or schema.
+The canonical unattended worker begins with RSS/Atom, using the same bounded AI26 source manifest as the localhost setup. The collection runner writes through the same `DistributedCaptureSink` as browser collection, so records land in the shared `ai26__records` canonical collection instead of the legacy flat collection. RSS/blog/newsletter collection remains the high-signal, low-friction baseline. Additional canonical non-browser collectors should join this bounded runner rather than creating a second scheduler or schema.
 
 The wrapper uses `flock`, so a second overlapping invocation exits cleanly. Reproduce cron's empty environment exactly with:
 

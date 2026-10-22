@@ -1,6 +1,6 @@
-# Phase 1 arXiv and document collection
+# arXiv and document collection
 
-Issue #110 reactivates scholarly/document acquisition as an isolated Phase 1 source family. Collection remains descriptive: it captures source text, bibliographic/source metadata, provenance and durable references, then hands the canonical record to Data Analysis without analytical interpretation.
+Issue #110 reactivates scholarly/document acquisition as an isolated source family in the current pipeline. Collection remains descriptive: it captures source text, bibliographic/source metadata, provenance and durable references, then hands the canonical record to Data Analysis without analytical interpretation.
 
 ## arXiv
 

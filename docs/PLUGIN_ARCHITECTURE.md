@@ -45,7 +45,7 @@ Collection preserves source facts, source-native relationships, raw payloads or 
 
 `CollectionPlugin.collect(context)` returns the existing `CollectionResult`, whose records are canonical `NormalizedRecord`/`CanonicalRecord` objects. Existing collectors do not need rewrites: `adapt_collector(spec, factory)` wraps the current `Collector.collect()` interface.
 
-The Phase 1 built-in registry includes RSS, Bluesky, Mastodon, Telegram and arXiv. YouTube, browser-assisted sources and other existing collectors can move behind the same adapter incrementally without changing the three-module deployment architecture.
+The built-in registry includes RSS, Bluesky, Mastodon, Telegram and arXiv. YouTube, browser-assisted sources and other existing collectors can move behind the same adapter incrementally without changing the three-module deployment architecture.
 
 Inspect the currently registered declarations without contacting source services:
 
@@ -150,7 +150,7 @@ Plugin code and synthetic/public example configuration may be public. Credential
 
 `CollectionContext.privacy` is copied into collection provenance metadata on every plugin-produced record. Downstream modules can therefore carry the project's privacy/access policy alongside the source record without Collection changing the canonical schema.
 
-## Telegram Phase 1 policy
+## Telegram plugin policy
 
 The Telegram plugin uses Telethon behind the common plugin seam. Public channels use stable `https://t.me/<channel>/<message_id>` identity; non-web/private targets use the stable `telegram:<channel>:<message_id>` URI form. The message ID is also retained as a source-native identifier.
 

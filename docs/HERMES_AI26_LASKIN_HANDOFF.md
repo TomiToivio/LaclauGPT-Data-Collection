@@ -1,6 +1,6 @@
-# Hermes handoff: AI26 Phase 1 Collection on Laskin
+# Hermes handoff: AI26 collection on Laskin
 
-This is the host-execution handoff for issue #169. The repository-side implementation is already present. Hermes should **verify and operate the existing Phase 1 path on Laskin**, not design a second collection architecture.
+This is the host-execution handoff for issue #169. The repository-side implementation is already present. Hermes should **verify and operate the existing AI26 collection path on Laskin**, not design a second collection architecture.
 
 ## Already prepared in Git
 
@@ -111,7 +111,7 @@ The Collection result must leave this repository in the canonical Analysis-ready
 - AI26 handoff contract: `ai26-phase1-handoff-v1`
 - verifier: `python tools/verify_contracts.py`
 
-Then confirm the Analysis-side Phase 1 handoff/worker can see and ingest a newly collected canonical AI26 record unchanged, without a Phase 0 flat-record adapter or study-specific conversion layer. Do not run discourse analysis in this repository.
+Then confirm the Analysis-side handoff/worker can see and ingest a newly collected canonical AI26 record unchanged, without a legacy flat-record adapter or study-specific conversion layer. Do not run discourse analysis in this repository.
 
 ## Defect handling
 
@@ -145,4 +145,4 @@ defect issues:
 STEP 1 PASS | STEP 1 BLOCKED
 ```
 
-Never post private endpoints, credentials, source/account lists, research rows, raw captures, media contents or sensitive paths. This issue certifies Collection Step 1 only, not the overall Phase 1 pipeline.
+Never post private endpoints, credentials, source/account lists, research rows, raw captures, media contents or sensitive paths. This issue certifies Collection Step 1 only, not the overall collection pipeline.
