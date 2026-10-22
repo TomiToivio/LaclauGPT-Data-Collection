@@ -603,14 +603,6 @@ sampling_rationale = "Mobilisation advocating slowing or pausing frontier AI dev
 priority = "P1"
 
 [[web_source]]
-name = "sag_aftra_ai"
-homepage = "https://www.sagaftra.org/contracts-industry-resources/contracts/artificial-intelligence"
-arena = "grassroots"
-source_family = "labour / creative work / generative AI"
-sampling_rationale = "Labour and creative-rights conflict around generative AI and automation."
-priority = "P1"
-
-[[web_source]]
 name = "eu_ai_policy"
 homepage = "https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai"
 arena = "parliamentary"
