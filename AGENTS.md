@@ -44,13 +44,13 @@ New collection capability is added incrementally around the working pipeline:
 1. Start from the current behavior in `laclaugpt/`.
 2. Add exactly one explicitly requested capability.
 3. Make the smallest practical change around the legacy implementation, preferring adapters or wrappers over rewrites.
-4. Preserve existing Phase 0 behavior unless the task explicitly says otherwise.
+4. Preserve existing legacy-core behaviour unless the task explicitly says otherwise.
 5. Validate that one restoration step.
 6. Stop.
 
-Do not perform big-bang restorations, speculative redesigns, architecture cleanups, broad refactors, or migrations unless explicitly requested. Broad requests such as “continue Phase 1”, “modernize”, “refactor”, or “clean up” do not authorize rewriting the Phase 0 core.
+Do not perform big-bang restorations, speculative redesigns, architecture cleanups, broad refactors, or migrations unless explicitly requested. Broad requests such as “continue the next phase”, “modernize”, “refactor”, or “clean up” do not authorize rewriting the legacy core.
 
-When Phase 0 and old Phase 1 code differ, preserve Phase 0 and surface the difference unless the task explicitly instructs otherwise.
+When the legacy core and newer code differ, preserve the legacy behaviour and surface the difference unless the task explicitly instructs otherwise.
 
 ## TOMI-LOCKED invariants
 
@@ -126,7 +126,7 @@ Research notes and agent commentary are interpretations and must not be written 
 
 ## Architecture
 
-Treat `laclaugpt/` as the canonical Phase 0 behavioral foundation. Phase 1 code in `src/laclaugpt_data_collection/` may be reused, adapted, wrapped, or restored around Phase 0 one capability at a time, but must not silently replace it.
+Treat `laclaugpt/` as the canonical legacy behavioural foundation. Code in `src/laclaugpt_data_collection/` may be reused, adapted, wrapped, or restored around it one capability at a time, but must not silently replace it.
 
 Keep browser-extension source under `browser/` with an explicit extraction/transport/storage boundary. Do not make sibling LaclauGPT repositories mandatory Python dependencies. Interoperate through versioned records, files, or configured services.
 

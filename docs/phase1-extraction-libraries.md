@@ -1,6 +1,6 @@
-# Phase 1 collection/extraction library inventory
+# Collection/extraction library inventory
 
-Status: **Phase 1 backlog scaffold. Not active in Phase 0.**
+Status: **Candidate backlog scaffold. Not wired into the current runtime.**
 
 ## Existing baseline
 
@@ -11,7 +11,7 @@ remain the preferred baseline and are not replaced here.
 ## Optional Python adapters
 
 The `phase1-extraction` extra contains readability-lxml, extruct, dateparser, warcio and
-selectolax. Imports are lazy. The new `extraction/` package is not imported by Phase 0 runtime
+selectolax. Imports are lazy. The new `extraction/` package is not imported by the current runtime
 modules. Readability is a fallback, extruct is metadata-only, dateparser normalizes messy source
 dates, warcio supports archival interchange, and selectolax is reserved for later benchmarking.
 
@@ -28,7 +28,7 @@ normal collector execution path.
 
 ## Activation gate
 
-Before Phase 1 activation, benchmark candidate extractors against the existing trafilatura/minet
+Before adopting these adapters, benchmark candidate extractors against the existing trafilatura/minet
 path on representative synthetic/public fixtures. Record extractor name/version in derived-field
 provenance, preserve canonical source URL/timestamp/raw fidelity, and reject any adapter that changes
-Phase 0 defaults or introduces discourse-analysis interpretation.
+current defaults or introduces discourse-analysis interpretation.

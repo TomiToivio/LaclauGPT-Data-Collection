@@ -1,4 +1,4 @@
-# Phase 1 R validation/import utilities
+# R validation/import utilities
 
 These scripts are researcher-side QA tools only. They are not production collection dependencies.
 

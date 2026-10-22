@@ -155,7 +155,7 @@ laclaugpt-server-rss \
   --max-feeds 8 --per-feed-limit 5 --limit 40
 ```
 
-The worker reads the standard `[[feed]]` TOML manifest convention, applies the study's source-publication floor, writes through the same canonical distributed sink as localhost browser capture, and emits the same reference-only events. Both machines therefore upsert into `<project>__records`; the old Phase 0 scraper collection is not part of the Phase 1 cron path.
+The worker reads the standard `[[feed]]` TOML manifest convention, applies the study's source-publication floor, writes through the same canonical distributed sink as localhost browser capture, and emits the same reference-only events. Both machines therefore upsert into `<project>__records`; the legacy flat scraper collection is not part of the current cron path.
 
 ### Bounded feed windows
 

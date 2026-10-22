@@ -1,7 +1,7 @@
-# Phase 1 browser extraction adapters
+# Browser extraction adapters (candidate)
 
 This directory is deliberately disconnected from `browser/firefox/manifest.json` and the
-Phase 0 capture path.
+legacy capture path.
 
 Candidates:
 - `@mozilla/readability`: live-DOM main-content extraction.

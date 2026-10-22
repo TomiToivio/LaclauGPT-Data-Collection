@@ -123,9 +123,9 @@ bash scripts/run_ai26_localhost_collect.sh
 One invocation performs two canonical passes under the same lock and scheduler:
 
 1. RSS/Atom through the mature `laclaugpt-server-rss` worker.
-2. Executable Phase 1 plugins from the same source manifest: bounded Bluesky account collection and arXiv-backed scholarly queries.
+2. Executable plugins from the same source manifest: bounded Bluesky account collection and arXiv-backed scholarly queries.
 
-Both passes use `project_id=ai26` and `collection_id=ai26`, write through the configured canonical record backend, and remain idempotent by canonical source identity. The Phase 1 plugin pass applies the study's `publication_date_floor` (currently `2026-09-01`). Missing publication timestamps are retained but explicitly marked unresolved, matching the public study policy.
+Both passes use `project_id=ai26` and `collection_id=ai26`, write through the configured canonical record backend, and remain idempotent by canonical source identity. The plugin pass applies the study's `publication_date_floor` (currently `2026-09-01`). Missing publication timestamps are retained but explicitly marked unresolved, matching the public study policy.
 
 Source-family labels, arena, priority and machine identity are sampling/collection provenance only. They are not ideology ground truth and must not become Laclaudian or ideological classifications during Collection.
 

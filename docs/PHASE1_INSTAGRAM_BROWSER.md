@@ -1,4 +1,4 @@
-# Phase 1 Instagram browser capture
+# Instagram browser capture
 
 Issue: #132  
 Parent: #111  
@@ -71,7 +71,7 @@ pytest -q
 ```
 
 The first command proves the issue-specific vertical slice. The full suite is the
-Phase 0/RSS and repository regression gate.
+legacy RSS and repository regression gate.
 
 ## Manual Firefox/Instagram smoke
 

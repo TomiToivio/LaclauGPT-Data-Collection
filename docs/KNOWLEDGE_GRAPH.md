@@ -36,7 +36,7 @@ Collection uses existing terms whenever practical:
 - https://laclaugpt.org/ns/ is used only when established vocabularies do not fit.
 
 The JSON-LD context lives at schemas/collection-context.jsonld. Representative
-Phase-0 SHACL shapes live at schemas/collection-shapes.ttl.
+The legacy flat-record SHACL shapes live at schemas/collection-shapes.ttl.
 
 ## Canonical projection
 
@@ -62,13 +62,13 @@ RDFLib and PySHACL are optional. Install the kg extra for Turtle, JSON-LD/N-Quad
 and SHACL validation. Merely importing or running collection code does not require
 them.
 
-## Phase activation
+## Downstream activation
 
-Phase 0 provides design, stable identifiers, export/projection, fixtures and
-validation. Phase 1 analysis can refer to collection objects by semantic_id and add
+The legacy flat-record path provides design, stable identifiers, export/projection,
+fixtures and validation. Analysis can refer to collection objects by semantic_id and add
 source-span/media links. DNA/SNA-specific semantics stay out of Collection; the
-stable actor/source/media identities created here are enough for later Phase-2
-relationships.
+stable actor/source/media identities created here are enough for the research Phase 2
+analyses to build relationships later.
 
 ## Existing-data migration and re-export
 

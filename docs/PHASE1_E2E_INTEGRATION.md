@@ -1,6 +1,6 @@
-# Phase 1 AI26 + Brazil26 end-to-end integration gate
+# AI26 + Brazil26 end-to-end integration gate
 
-Issue #143 is the cross-study integration gate for the Phase 1 pipeline:
+Issue #143 is the cross-study integration gate for the current collection pipeline:
 
 ```text
 Collection -> Analysis -> Visualization
@@ -46,7 +46,7 @@ not hashes of private operational overlays. Live deployments should record the
 real revision/hash values at runtime without printing private configuration or
 secrets into public logs.
 
-## Final Phase 1 topology and ownership
+## Final topology and ownership
 
 | Host/module | AI26 | Brazil26 | Ownership boundary |
 |---|---|---|---|
@@ -73,8 +73,8 @@ all four deployment profiles being present:
 
 At the time this gate was added, #140 and #141 were already integrated while
 #139 and #142 were still deployment work items. The live run should therefore
-be executed only after those profiles are available on the target Phase 1
-branch.
+be executed only after those profiles are available on the target
+deployment.
 
 ## Reproducible live smoke procedure
 

@@ -118,7 +118,7 @@ and reported as `distributed_rejected_total` / `distributed_last_rejections` in 
 manifest. The offset advances past the refused row, so a legacy URL-only backlog is
 reported once instead of stalling the replay and the backend bind. The same refusal is a
 per-line error in `distributed-sync` and a per-source `error` outcome with reason
-`hollow_record` in the Laskin Phase 1 cycle. Re-capture the source to fill the row in;
+`hollow_record` in the Laskin collection cycle. Re-capture the source to fill the row in;
 do not expect the store to resolve it.
 
 ## 8. Media/video downloader cron job

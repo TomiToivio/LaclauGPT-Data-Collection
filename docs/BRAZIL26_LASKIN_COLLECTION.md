@@ -1,6 +1,6 @@
 # Brazil26 collection on Laskin
 
-Brazil26 uses one canonical Phase 1 namespace across localhost and Laskin. Localhost owns all interactive Firefox/browser collection. Laskin runs only bounded non-browser collection and shared media/file processing.
+Brazil26 uses one canonical namespace across localhost and Laskin. Localhost owns all interactive Firefox/browser collection. Laskin runs only bounded non-browser collection and shared media/file processing.
 
 The operational study overlay remains private and is derived from:
 
@@ -52,7 +52,7 @@ The checked-in profile has `browser = "none"` and exposes no Firefox backend.
 bash scripts/run_brazil26_laskin_collect.sh
 ```
 
-The wrapper uses the canonical Phase 1 RSS/non-browser runner, passes `collection_id=brazil26`, applies the configured study/source manifest, and exits after one bounded cycle. Re-running a cycle is idempotent because canonical record identity is scoped by project/collection and canonical source identity.
+The wrapper uses the canonical RSS/non-browser runner, passes `collection_id=brazil26`, applies the configured study/source manifest, and exits after one bounded cycle. Re-running a cycle is idempotent because canonical record identity is scoped by project/collection and canonical source identity.
 
 To reproduce cron's minimal environment:
 

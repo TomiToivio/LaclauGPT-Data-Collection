@@ -1,4 +1,4 @@
-# Brazil26 localhost Phase 1 operations
+# Brazil26 localhost collection operations
 
 Brazil26 uses the same canonical **Collection → Analysis → Visualization** pipeline as AI26. The study identity is always `collection_id=brazil26`; browser and non-browser collectors share `CanonicalRecord` and the general `docs/ANALYSIS_HANDOFF.md` contract.
 
@@ -37,7 +37,7 @@ bash scripts/run_brazil26_localhost_collect.sh
 One invocation uses one lock and one scheduler path for two canonical passes:
 
 1. RSS/Atom through `laclaugpt-server-rss`.
-2. Directly executable Phase 1 plugin rows through `brazil26_localhost_collect`. The current safe addition is YouTube when an approved manifest supplies explicit `video_urls`.
+2. Directly executable plugin rows through `brazil26_localhost_collect`. The current safe addition is YouTube when an approved manifest supplies explicit `video_urls`.
 
 The checked-in `configs/studies/brazil26.sources.example.toml` provides a public-safe institutional baseline. Its YouTube entry names an official channel homepage for sampling provenance only, so the plugin pass skips it. Collection never enumerates or guesses videos from a channel URL. A private approved overlay may add explicit video URLs, which are then collected through the canonical YouTube plugin with `project_id=brazil26` and `collection_id=brazil26`.
 

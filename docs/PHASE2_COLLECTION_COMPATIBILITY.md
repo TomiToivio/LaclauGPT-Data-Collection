@@ -1,16 +1,16 @@
-# Phase 2 Collection compatibility review
+# Collection compatibility review for the research Phase 2 analyses
 
 Issue: #195
 
-Phase 2 adds Discourse Network Analysis (DNA), Social Network Analysis (SNA), and RDF work downstream. Collection remains responsible only for source acquisition, stable identity, raw preservation, source metadata, media references, and collection provenance.
+The research Phase 2 analyses add Discourse Network Analysis (DNA), Social Network Analysis (SNA), and RDF work downstream. Collection remains responsible only for source acquisition, stable identity, raw preservation, source metadata, media references, and collection provenance.
 
 ## Result
 
-The current Collection contract is sufficient for Phase 2. No new DNA/SNA/RDF analysis logic belongs in this repository, and no canonical-schema change is required for the Phase 2 start.
+The current Collection contract is sufficient for those analyses. No new DNA/SNA/RDF analysis logic belongs in this repository, and no canonical-schema change is required to begin them.
 
 The important invariant is that Collection preserves source-native facts so Analysis can later construct analytical statements, observed interaction edges, inferred relations, and RDF resources without pretending that downstream inference came from the collector.
 
-## Phase 2 requirements
+## Requirements for the research Phase 2 analyses
 
 | Requirement | Current support | Notes |
 | --- | --- | --- |
@@ -40,7 +40,7 @@ Source-native interaction information may appear in two places:
 
 For example, the existing legacy X/Twitter adapter preserves source-provided parent/reply, repost, quote, conversation, and referenced-actor identifiers. These are observed source fields, not analytical graph edges.
 
-Not every collector promotes every platform-specific interaction field into the same convenience dictionary. That is not a Phase 2 blocker because the raw payload is retained. A future cross-platform interaction-normalization vocabulary should only be introduced together with the Analysis contract, a schema-version decision, fixtures, and migration tests. It should not be improvised in Collection for Phase 2.
+Not every collector promotes every platform-specific interaction field into the same convenience dictionary. That is not a blocker for those analyses because the raw payload is retained. A future cross-platform interaction-normalization vocabulary should only be introduced together with the Analysis contract, a schema-version decision, fixtures, and migration tests. It should not be improvised in Collection.
 
 ## DATS interoperability
 
@@ -71,17 +71,17 @@ RDF URI minting, triples, ontologies, provenance graphs, and analytical relation
 
 The canonical record does not currently expose a single strongly typed cross-platform interaction object. Platform adapters may promote source-native interaction fields differently.
 
-For Phase 2 this is acceptable because:
+For those analyses this is acceptable because:
 
 - raw payload preservation prevents information loss;
 - existing social-data compatibility code already retains common reply/repost/quote/conversation fields;
 - adding a canonical interaction model now would require synchronized Collection/Analysis schema and fixture changes;
-- Phase 2 can begin by deriving observed interaction records in Analysis from preserved source-native metadata.
+- The analyses can begin by deriving observed interaction records in Analysis from preserved source-native metadata.
 
-If repeated Phase 2 implementation work shows that multiple collectors need the same source-native interaction projection, add it later as a small, versioned, backward-compatible cross-repository contract change.
+If repeated downstream implementation work shows that multiple collectors need the same source-native interaction projection, add it later as a small, versioned, backward-compatible cross-repository contract change.
 
 ## Decision
 
-No collector redesign or new Collection analysis code is required for Phase 2.
+No collector redesign or new Collection analysis code is required for those analyses.
 
 Collection remains an acquisition/provenance layer. DNA, SNA, RDF construction, graph metrics, communities, centrality, Castells/Esposito concepts, and inferred relationships stay downstream.
