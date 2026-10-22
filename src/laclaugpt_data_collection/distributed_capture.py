@@ -146,6 +146,15 @@ class DistributedCaptureSink:
             if key in CanonicalRecord.model_fields
         }
         record = CanonicalRecord.model_validate(canonical_data)
+        # #322: refuse URL-only placeholders before touching S3, Mongo or Redis.
+        has_text = bool((record.content.text or "").strip())
+        has_raw = record.raw_capture.preserved
+        has_media = bool(record.content.media_references or record.content.file_references)
+        if not (has_text or has_raw or has_media):
+            raise ValueError(
+                "refusing hollow capture: no text, raw payload/ref or media; "
+                "source_url alone is not a collected record"
+            )
         raw_ref = self._raw_object(record)
 
         if not record.provenance:
