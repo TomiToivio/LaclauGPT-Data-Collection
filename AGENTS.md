@@ -1,8 +1,12 @@
 ## Development workflow and research phases
 
-`main` is the active development branch. Create short-lived feature/fix branches from `main` and merge validated changes back to `main`. Research phases do not determine Git branch selection, and no `phase-N` branch synchronization is required. Existing phase branches can remain as historical references without being advanced or deleted.
+**Phases describe papers, not software.** "Phase 1–4" names the research programme's papers and their methodology and analyses. Collection, Analysis and Visualization are **one continuously maintained system**: work here is an incremental change to the current collectors and contracts, driven by what the live AI26 deployment observes. Agents must not propose a "Phase 2 pipeline", a migration to a later technical phase, or a replacement architecture merely because a paper advances. See #82 in the umbrella repository.
 
-The programme is currently in **research Phase 1**. Phase 2 is optional and may be skipped. Phases 3 and 4 concern research analyses and results, not distinct coding or pipeline branches. Preserve all existing privacy, scientific-method, locked-paper, and module-boundary constraints.
+`main` is the active development branch. Create short-lived feature/fix branches from `main` and merge validated changes back to `main`. `phase-N` branches are historical snapshots: never development targets, never mirrored from `main`.
+
+The programme is currently working on **research Phase 1** (Paper 1). Paper 2 is optional and may be skipped; Papers 3 and 4 concern further analyses and results produced by the same running system. Preserve all existing privacy, scientific-method, locked-paper, and module-boundary constraints.
+
+The operational priority is the live AI26 deployment: collect real data reliably, normalize it with the current collectors, fix observed faults, improve coverage and quality through ordinary validated changes.
 
 # Agent and Contributor Rules
 
@@ -17,7 +21,7 @@ Keep this repository limited to data collection: source/browser/network capture,
 
 ## AI26 active pipeline scope
 
-**This repository's `main` branch contains the active AI26 implementation (research Phase 1).**
+**This repository's `main` branch contains the active AI26 collection pipeline — the current, continuously maintained implementation.**
 
 - AI26 is the only active/default study in this repository. New code, configuration, tests, examples, documentation, commands and agent work MUST assume AI26 unless Tomi explicitly says otherwise.
 - EP24, Hungary26 and Brazil26 are out of scope here. They will live in separate project repositories. Do not add new EP24/Hungary26/Brazil26 pipelines, codebooks, launchers, dashboards, adapters, deployment documentation or project-specific defaults here.
@@ -25,26 +29,26 @@ Keep this repository limited to data collection: source/browser/network capture,
 - The human-readable publication/researcher-facing versions belong in the legacy EP24 repositories or other project-specific repositories. These three AI26 repositories do **not** need to optimize for human readability right now.
 - Prefer machine-readable canonical records, provenance, evidence, reproducible current-pipeline processing and operational correctness over prose reports, human-readable summaries, researcher workbenches, exhibition views or legacy dashboards.
 - Do not spend issue scope on making outputs friendlier to humans unless Tomi explicitly requests it. Human-in-the-loop scientific validation remains required; this rule is about software/output presentation, not removing human research responsibility.
-- Current pipeline work targets `main`; historical phase branches are not development targets.
+- Current pipeline work targets `main`; historical `phase-N` branches are frozen snapshots and are not development targets.
 
-## Historical implementation foundation
+## Legacy implementation foundation
 
-The hand-coded implementation under `laclaugpt/` is retained as the historical Phase 0 foundation. The guidance below is archaeology/maintenance context only; it does not define new work on `main`, which is the current AI26 pipeline.
+The hand-coded implementation under `laclaugpt/` is the legacy foundation, historically labelled "Phase 0" in the paper trail. Its label is a historical identifier, not a software generation: it names the old hand-coded core, and it keeps that name. The guidance below is archaeology/maintenance context only; it does not define new work on `main`, which is the current AI26 pipeline.
 
-Agents MUST inspect `laclaugpt/` first before proposing or implementing Phase 1 work. Existing Phase 1 code outside `laclaugpt/` is a reference implementation and source of isolated functionality, tests, schemas, and interfaces. It is not automatically the canonical architecture.
+Agents MUST inspect `laclaugpt/` first before proposing or implementing a capability it already contains. Code outside `laclaugpt/` is a reference implementation and source of isolated functionality, tests, schemas, and interfaces. It is not automatically the canonical architecture.
 
-Phase 1 must be rebuilt incrementally around the working Phase 0 core:
+A capability that exists in the legacy core is restored incrementally around it:
 
 1. Start from the current behavior in `laclaugpt/`.
-2. Restore exactly one explicitly requested Phase 1 capability.
-3. Make the smallest practical change around Phase 0, preferring adapters or wrappers over rewrites.
-4. Preserve existing Phase 0 behavior unless the task explicitly says otherwise.
+2. Restore exactly one explicitly requested capability.
+3. Make the smallest practical change around the legacy core, preferring adapters or wrappers over rewrites.
+4. Preserve the legacy core's existing behavior unless the task explicitly says otherwise.
 5. Validate that one restoration step.
 6. Stop.
 
-Do not perform big-bang restorations, speculative redesigns, architecture cleanups, broad refactors, or migrations unless explicitly requested. Broad requests such as “continue Phase 1”, “modernize”, “refactor”, or “clean up” do not authorize rewriting the Phase 0 core.
+Do not perform big-bang restorations, speculative redesigns, architecture cleanups, broad refactors, or migrations unless explicitly requested. Broad requests such as "continue the restoration", "modernize", "refactor", or "clean up" do not authorize rewriting the legacy core.
 
-When Phase 0 and old Phase 1 code differ, preserve Phase 0 and surface the difference unless the task explicitly instructs otherwise.
+When the legacy core and newer code differ, preserve the legacy core and surface the difference unless the task explicitly instructs otherwise.
 
 ## TOMI-LOCKED invariants
 
@@ -56,7 +60,7 @@ Before editing `laclaugpt/` or anything that depends on it, search for `TOMI-LOC
 
 ## AI26 active study
 
-AI26 (`Ideological contestation over AI`) is the active and default study for this module. The current `main` architecture is developed for AI26 Phase 2. Use `configs/studies/ai26.example.yaml` when documenting or testing study-aware collection behavior.
+AI26 (`Ideological contestation over AI`) is the active and default study for this module. The current `main` architecture is developed against the live AI26 deployment. Use `configs/studies/ai26.example.yaml` when documenting or testing study-aware collection behavior.
 
 AI26 example configuration is allowed to contain public methodology: the three paper arenas (AI elites, grassroots mobilisation, parliamentary/electoral politics), public source-family examples, discovery terms, project metadata and secret-free collection/storage policies. These settings are sampling provenance only. Collection MUST NOT infer or assign ideological formations, discourse roles or actor ideology from the source list.
 
@@ -96,7 +100,7 @@ The canonical architecture targets distributed operation:
 - **CSC Allas** for files, media, large artifacts, exports, and S3-compatible object storage.
 - CSC Allas authentication uses `allas-conf`.
 
-Do not add new local-only, SQLite-first, filesystem-only, alternate object-store, alternate queue, or alternate database architectures merely for configurability. Existing legacy modes may remain only where needed for compatibility, but new Phase 2 AI26 work must target MongoDB + Redis + CSC Allas unless Tomi explicitly requests otherwise.
+Do not add new local-only, SQLite-first, filesystem-only, alternate object-store, alternate queue, or alternate database architectures merely for configurability. Existing legacy modes may remain only where needed for compatibility, but new AI26 pipeline work must target MongoDB + Redis + CSC Allas unless Tomi explicitly requests otherwise.
 
 Redis is coordination infrastructure, never the canonical record schema.
 
@@ -120,13 +124,13 @@ Research notes and agent commentary are interpretations and must not be written 
 
 ## Architecture
 
-Treat `laclaugpt/` as the canonical Phase 0 behavioral foundation. Phase 1 code in `src/laclaugpt_data_collection/` may be reused, adapted, wrapped, or restored around Phase 0 one capability at a time, but must not silently replace it.
+Treat `laclaugpt/` as the canonical behavioral foundation of the legacy core. Code in `src/laclaugpt_data_collection/` may be reused, adapted, wrapped, or restored around it one capability at a time, but must not silently replace it.
 
 Keep browser-extension source under `browser/` with an explicit extraction/transport/storage boundary. Do not make sibling LaclauGPT repositories mandatory Python dependencies. Interoperate through versioned records, files, or configured services.
 
 ## Branches and pull requests
 
-Phase 2 work targets `main`, and direct commits to `main` are allowed when Tomi explicitly authorizes them. Otherwise, for tracked issue work, prefer a short-lived branch and pull request for review.
+Current pipeline work targets `main`, and direct commits to `main` are allowed when Tomi explicitly authorizes them. Otherwise, for tracked issue work, prefer a short-lived branch and pull request for review.
 
 When working on a tracked issue, create a branch first and open a pull request for review. Follow the existing naming convention:
 

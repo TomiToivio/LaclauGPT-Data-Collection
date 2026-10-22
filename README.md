@@ -1,7 +1,7 @@
 # LaclauGPT Data Collection
 
 > [!IMPORTANT]
-> **AI26 Phase 2 only.** This repository's `main` branch is the active AI26 Phase 2 implementation. AI26 is the default and only project developed here. EP24, Hungary26 and Brazil26 are moving to separate project repositories. Historical compatibility code may remain, but it is dormant and must not drive new architecture or defaults. Human-readable/project-publication versions belong in the legacy EP24 or other project-specific repositories; this repository currently prioritizes machine-readable canonical data, reproducibility and Phase 2 operation over human-readable reports or legacy dashboards.
+> **AI26 collection pipeline.** This repository's `main` branch is the active, continuously maintained AI26 collection pipeline. AI26 is the default and only study developed here. EP24, Hungary26 and Brazil26 are moving to separate project repositories. Historical compatibility code may remain, but it is dormant and must not drive new architecture or defaults. Human-readable/project-publication versions belong in the legacy EP24 or other project-specific repositories; this repository prioritizes machine-readable canonical data, reproducibility and day-to-day operation of the live deployment over human-readable reports or legacy dashboards. **Phases name papers, not software generations** — see [AGENTS.md](AGENTS.md) and umbrella issue #82.
 
 [![CI](https://github.com/TomiToivio/LaclauGPT-Data-Collection/actions/workflows/ci.yml/badge.svg)](https://github.com/TomiToivio/LaclauGPT-Data-Collection/actions/workflows/ci.yml)
 
@@ -13,7 +13,7 @@
 
 The current flagship research programme is **[LaclauGPT: Ideological contestation over AI](https://github.com/TomiToivio/LaclauGPT/blob/main/paper/PHASE_1_PAPER.md)**. The canonical theoretical and methodological contract is **[THEORY.md](https://github.com/TomiToivio/LaclauGPT/blob/main/THEORY.md)**.
 
-The framework is developed around Ernesto Laclau and Chantal Mouffe's discourse theory and Emilia Palonen's work on populism, polarisation and hegemonic dynamics. The underlying architecture may be reusable, but this repository is operationally scoped to **AI26 Phase 2 only**. Other studies belong in separate repositories.
+The framework is developed around Ernesto Laclau and Chantal Mouffe's discourse theory and Emilia Palonen's work on populism, polarisation and hegemonic dynamics. The underlying architecture may be reusable, but this repository is operationally scoped to the **AI26 pipeline only**. Other studies belong in separate repositories.
 
 > [!WARNING]
 > **Human-in-the-loop academic research only.** LaclauGPT's machine-generated summaries, classifications, discourse-theoretical codes, signifier roles, ideological formations, affects and other interpretations are preliminary analyses that must be verified by a human researcher. They are not ground truth or autonomous scholarly judgement. LaclauGPT is designed for academic research, not autonomous operational, administrative, intelligence, moderation, profiling or policy decisions about people or groups.
@@ -94,12 +94,14 @@ Analysis, simulation, dashboards, research datasets, operational target lists, c
 - Canonical `source_url` or stable URI-like identity across every backend and module handoff.
 - Public-repository hygiene: no research data, target/account lists, browser profiles, cookies, tokens, credentials or real deployment configuration in Git.
 
-## Phase 1 runtime and legacy Phase 0 compatibility
+## Current runtime and legacy compatibility
 
 > [!IMPORTANT]
-> **Current development phase: Phase 2.** All Phase 2 work goes directly to `main`. The `phase-2` branch is a passive mirror of the validated `main` tree. The `phase-1` and `phase-0` branches are preserved historical baselines. New unphased work defaults to Phase 2 on `main`; Phase 3–4 remain isolated until explicitly promoted.
+> `main` is the single development branch and the current AI26 pipeline. `phase-N` branches are preserved historical snapshots, not mirrors and not development targets. Work here is incremental: fix what the live deployment observes, improve coverage, keep the contracts stable.
 
-Phase 1 is now the active repository state. The narrow Phase 0 RSS/Atom path below is retained only as a compatibility baseline and rollback reference while Phase 1 capabilities are restored incrementally:
+The narrow legacy RSS/Atom path below is retained only as a compatibility baseline and rollback reference while capabilities are restored incrementally around the legacy core.
+
+> **Reading the rest of this file.** Where the sections below say "Phase 0" or "Phase 1", they name two coexisting code layers — the hand-coded legacy core and the current distributed pipeline — plus the historical filenames, entry points and adapters that carry those names (`phase0_mongo.py`, `test_issue_85_phase0_mongo_contract.py`, and so on). They are **historical identifiers for code, not software generations**, and they stay for traceability. Neither layer is scheduled for replacement: the pipeline is one continuously maintained system.
 
 ```text
 RSS/Atom feeds -> canonical text records -> MongoDB -> Data Analysis

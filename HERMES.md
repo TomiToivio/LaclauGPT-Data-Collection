@@ -1,22 +1,22 @@
 # HERMES.md
 
-**Active branch policy:** Phase 2 is current. Phase 2 work targets `main` directly; `phase-2` is a passive mirror, while `phase-1` and `phase-0` are preserved historical baselines.
+**Active branch policy:** `main` is the only development branch and work targets it directly. `phase-N` branches are preserved historical snapshots: they are not mirrored, not synchronized and not development targets. Phases name papers, not software generations — see `AGENTS.md` and umbrella issue #82.
 
 Hermes-style agents must follow `AGENTS.md` as the canonical repository contract and `skills/laclaugpt-data-collection/SKILL.md` for the operational skill.
 
 Before changing runtime paths or data handling, also read `docs/RUNTIME_DATA.md`, `docs/PRIVACY.md`, and `docs/DEPLOYMENT_AND_HERMES.md`.
 
-## Phase 0 / Phase 1 restoration rules
+## Legacy core restoration rules
 
-Before any Phase 1 restoration work, inspect `laclaugpt/`.
+Before restoring a capability that the legacy core already contains, inspect `laclaugpt/`.
 
-The hand-coded code in `laclaugpt/` is the Phase 0 foundation. Existing Phase 1 code is reference material. Restore one explicitly requested capability at a time around Phase 0, preserve Phase 0 behavior, prefer wrappers/adapters over rewrites, validate the single step, and stop.
+The hand-coded code in `laclaugpt/` is the legacy foundation, historically labelled "Phase 0" in the paper trail; the label is a historical identifier, not a software generation. Newer code is reference material. Restore one explicitly requested capability at a time around the legacy core, preserve its behavior, prefer wrappers/adapters over rewrites, validate the single step, and stop.
 
 Every `TOMI-LOCKED` marker is a strict invariant unless Tomi explicitly authorizes changing that specific element. This also forbids indirect semantic changes through dependent code, schemas, adapters, tests, configuration, interfaces, or documentation.
 
-Do not interpret broad requests such as “continue Phase 1”, “modernize”, “refactor”, or “clean up” as authorization to redesign the Phase 0 core.
+Do not interpret broad requests such as “continue the restoration”, “modernize”, “refactor”, or “clean up” as authorization to redesign the legacy core.
 
-For new Phase 1 infrastructure, the canonical target is:
+For new pipeline infrastructure, the canonical target is:
 
 - MongoDB for canonical records;
 - Redis for coordination, cache, state, queues, pub/sub, and lightweight runtime coordination;
@@ -40,7 +40,7 @@ When you make a substantive observation, such as a change in a source, an emergi
 
 ## Branches
 
-Phase 2 work may be committed directly to `main` when Tomi explicitly authorizes it. Otherwise, for tracked issue work, prefer the existing `issue-<n>-<short-slug>` branch convention and a pull request for review.
+Current pipeline work may be committed directly to `main` when Tomi explicitly authorizes it. Otherwise, for tracked issue work, prefer the existing `issue-<n>-<short-slug>` branch convention and a pull request for review.
 
 ```bash
 git switch -c issue-<n>-<short-slug>
