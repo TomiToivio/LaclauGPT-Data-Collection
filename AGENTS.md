@@ -1,8 +1,14 @@
+## Research-paper phases and continuous software development (LaclauGPT #82)
+
+**Phases refer only to research papers and scientific programmes, never to software generations.** Collection, Analysis and Visualization are continuously maintained interoperable modules on `main`. Build, fix, test and deploy incrementally in support of real data collection, analysis and visualization. A new paper does not trigger a new pipeline, architecture, branch, dataset or migration. Prioritize operational AI26 evidence, quality, coverage and researcher review over phase-labelled rewrites. Paper-specific theories and methods are expressed in research documents, study configuration and well-scoped extensions; preserve the locked Paper 1 framework.
+
+Historical `phase-N` branches, directories, commands and identifiers are compatibility/archival names, **not** development instructions. Do not rename or remove them solely to modernize terminology. Where older guidance conflicts with this rule, this rule takes precedence. Use short-lived branches from `main`, verify changes, and merge back to `main`.
+
 ## Development workflow and research phases
 
 `main` is the active development branch. Create short-lived feature/fix branches from `main` and merge validated changes back to `main`. Research phases do not determine Git branch selection, and no `phase-N` branch synchronization is required. Existing phase branches can remain as historical references without being advanced or deleted.
 
-The programme is currently in **research Phase 1**. Phase 2 is optional and may be skipped. Phases 3 and 4 concern research analyses and results, not distinct coding or pipeline branches. Preserve all existing privacy, scientific-method, locked-paper, and module-boundary constraints.
+The research papers may be numbered, but software modules are developed continuously; no codebase is currently in a numbered development phase. Preserve all existing privacy, scientific-method, locked-paper, and module-boundary constraints.
 
 # Agent and Contributor Rules
 
@@ -17,7 +23,7 @@ Keep this repository limited to data collection: source/browser/network capture,
 
 ## AI26 active pipeline scope
 
-**This repository's `main` branch contains the active AI26 implementation (research Phase 1).**
+**This repository's `main` branch contains the continuous AI26 implementation.**
 
 - AI26 is the only active/default study in this repository. New code, configuration, tests, examples, documentation, commands and agent work MUST assume AI26 unless Tomi explicitly says otherwise.
 - EP24, Hungary26 and Brazil26 are out of scope here. They will live in separate project repositories. Do not add new EP24/Hungary26/Brazil26 pipelines, codebooks, launchers, dashboards, adapters, deployment documentation or project-specific defaults here.
@@ -56,7 +62,7 @@ Before editing `laclaugpt/` or anything that depends on it, search for `TOMI-LOC
 
 ## AI26 active study
 
-AI26 (`Ideological contestation over AI`) is the active and default study for this module. The current `main` architecture is developed for AI26 Phase 2. Use `configs/studies/ai26.example.yaml` when documenting or testing study-aware collection behavior.
+AI26 (`Ideological contestation over AI`) is the active and default study for this module. The current `main` architecture supports the live AI26 study. Use `configs/studies/ai26.example.yaml` when documenting or testing study-aware collection behavior.
 
 AI26 example configuration is allowed to contain public methodology: the three paper arenas (AI elites, grassroots mobilisation, parliamentary/electoral politics), public source-family examples, discovery terms, project metadata and secret-free collection/storage policies. These settings are sampling provenance only. Collection MUST NOT infer or assign ideological formations, discourse roles or actor ideology from the source list.
 
@@ -96,7 +102,7 @@ The canonical architecture targets distributed operation:
 - **CSC Allas** for files, media, large artifacts, exports, and S3-compatible object storage.
 - CSC Allas authentication uses `allas-conf`.
 
-Do not add new local-only, SQLite-first, filesystem-only, alternate object-store, alternate queue, or alternate database architectures merely for configurability. Existing legacy modes may remain only where needed for compatibility, but new Phase 2 AI26 work must target MongoDB + Redis + CSC Allas unless Tomi explicitly requests otherwise.
+Do not add new local-only, SQLite-first, filesystem-only, alternate object-store, alternate queue, or alternate database architectures merely for configurability. Existing legacy modes may remain only where needed for compatibility, but new AI26 implementation work must target MongoDB + Redis + CSC Allas unless Tomi explicitly requests otherwise.
 
 Redis is coordination infrastructure, never the canonical record schema.
 
@@ -126,7 +132,7 @@ Keep browser-extension source under `browser/` with an explicit extraction/trans
 
 ## Branches and pull requests
 
-Phase 2 work targets `main`, and direct commits to `main` are allowed when Tomi explicitly authorizes them. Otherwise, for tracked issue work, prefer a short-lived branch and pull request for review.
+Current implementation work targets `main`, and direct commits to `main` are allowed when Tomi explicitly authorizes them. Otherwise, for tracked issue work, prefer a short-lived branch and pull request for review.
 
 When working on a tracked issue, create a branch first and open a pull request for review. Follow the existing naming convention:
 
