@@ -14,6 +14,7 @@ from typing import Any
 
 from .config import Settings
 from .distributed_capture import DistributedCaptureSink
+from .models import CanonicalRecord
 
 
 def _identity_token(collection_id: str, source_url: str) -> str:
@@ -57,7 +58,20 @@ def sync_normalized_records(
                         raise ValueError("record has no source_url")
                     collection_id = str(record.get("collection_id") or settings.project_id)
                     token = _identity_token(collection_id, source_url)
-                    if not sink.redis.acquire_once(
+                    # Validate before claiming the dedup key; a failed sync must
+                    # remain retryable after the capture has been repaired.
+                    canonical = CanonicalRecord.model_validate({
+                        k: v for k, v in record.items() if k in CanonicalRecord.model_fields
+                    })
+                    has_evidence = (
+                        bool((canonical.content.text or "").strip())
+                        or canonical.raw_capture.preserved
+                        or bool(canonical.content.media_references)
+                        or bool(canonical.content.file_references)
+                    )
+                    if not has_evidence:
+                        raise ValueError("refusing hollow capture before deduplication")
+                    if sink.redis is not None and not sink.redis.acquire_once(
                         f"distributed-sync:{settings.run_id}:{token}",
                         ttl_seconds=7 * 24 * 3600,
                     ):
