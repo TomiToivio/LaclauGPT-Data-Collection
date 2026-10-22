@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import Settings
-from .distributed_capture import DistributedCaptureSink
+from .distributed_capture import DistributedCaptureSink, HollowRecordError
 from .models import CanonicalRecord
 
 
@@ -70,7 +70,14 @@ def sync_normalized_records(
                         or bool(canonical.content.file_references)
                     )
                     if not has_evidence:
-                        raise ValueError("refusing hollow capture before deduplication")
+                        # #322: same typed refusal as the sink, raised before the dedup
+                        # claim so a repaired capture stays retryable, and carrying the
+                        # source and URL into this function's per-line error list.
+                        raise HollowRecordError(
+                            source=str(record.get("source_name") or collection_id),
+                            source_url=source_url,
+                            collection_id=collection_id,
+                        )
                     if sink.redis is not None and not sink.redis.acquire_once(
                         f"distributed-sync:{settings.run_id}:{token}",
                         ttl_seconds=7 * 24 * 3600,
