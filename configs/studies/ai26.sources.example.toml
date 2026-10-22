@@ -562,6 +562,24 @@ source_family = "frontier AI / safety / capability futures"
 sampling_rationale = "Long-form arguments about capability, benefits, catastrophic risk and pacing."
 priority = "P1"
 
+[[feed]]
+name = "deepmind_blog_rss"
+feed_url = "https://deepmind.google/blog/rss.xml"
+homepage = "https://deepmind.google/blog/"
+arena = "elites"
+source_family = "frontier lab / science / capability / safety"
+sampling_rationale = "First-party Google DeepMind blog items (capability, safety, science and deployment announcements) as dated articles. Added 2026-10-22 because the paired [[web_source]] google_deepmind_blog stores one undated page snapshot, which the analysis handoff excludes for missing publication time, so the frontier-lab layer of the elites arena had no DeepMind material in analysis-grade form. Inclusion is a SAMPLING decision (frontier-lab and industry discourse is the elites arena's first sampling_focus), never an ideological classification of the actor. Verified live 2026-10-22 with the collector's feedparser: HTTP 200, 100 entries, newest 2026-10-15, article links on deepmind.google/blog/."
+priority = "P1"
+
+[[feed]]
+name = "google_ai_blog_rss"
+feed_url = "https://blog.google/technology/ai/rss/"
+homepage = "https://blog.google/technology/ai/"
+arena = "elites"
+source_family = "frontier lab / industry / product and policy"
+sampling_rationale = "First-party Google AI blog items (model releases, product and policy framing). Added 2026-10-22 as a SAMPLING decision for the elites arena's frontier-lab and industry discourse stratum: the corporate layer of Google's AI communication, distinct from the DeepMind research blog. Not an ideological classification. Verified live 2026-10-22 with the collector's feedparser: HTTP 200 after one redirect, 20 entries, newest 2026-10-21."
+priority = "P1"
+
 [[web_source]]
 name = "google_deepmind_blog"
 homepage = "https://deepmind.google/discover/blog/"
