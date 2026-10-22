@@ -885,6 +885,15 @@ priority = "P1"
 # Creator-rights sources explicitly declared in ai26.example.yaml (#266).
 # These are institutional sampling anchors, not ideological actor labels.
 [[bluesky_account]]
+name = "SAG-AFTRA"
+handle = "sagaftra.org"
+profile_url = "https://bsky.app/profile/sagaftra.org"
+arena = "grassroots"
+source_family = "labour / creative work / generative AI"
+sampling_rationale = "First-party US screen-actors union account: AI protections in the TV/Theatrical and 2026 TV Animation agreements, consent and likeness, and bargaining positions. This is the separately-validated substitute #317 required before adding one: the bot-blocked sagaftra.org web page returned HTTP 403 in every cycle with zero records, while this account is the same actor on a collectable platform. Verified 2026-10-22 - public API 30 recent posts, newest that day, including the 2026 TV Animation AI-protection line; and 10 records returned through the live BlueskyCollector. Institutional position, not an ideological classification; the study window rule applies as for every other row."
+priority = "P1"
+
+[[bluesky_account]]
 name = "Writers Guild of America West"
 handle = "wgawest.bsky.social"
 profile_url = "https://bsky.app/profile/wgawest.bsky.social"
