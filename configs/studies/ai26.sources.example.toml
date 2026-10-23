@@ -884,6 +884,29 @@ arena = "grassroots"
 source_family = "data-centre opposition / local and environmental mobilisation"
 priority = "P2"
 
+# 2026-10-23: repairs a measured hole in the grassroots "pause / deployment
+# resistance" stratum. The paired `pause_ai` web_source row has produced ZERO
+# records in the whole study: 5 candidates per cycle, 30 of 30 discarded before
+# the 2026-09-01 publication floor in the 24 h to 2026-10-23, because
+# pauseai.info is an undated SvelteKit site whose anchors are evergreen pages
+# (/about, /action, /ai-takeover), not dated posts. Its own feed is also outside
+# the window (pauseai.info/rss.xml: 121 items, newest 2026-07-06).
+# Verified live 2026-10-23 via the public Bluesky API: 440 posts, 945 followers,
+# newest 2026-10-23T12:08Z, and a live getAuthorFeed response through the same
+# unauthenticated endpoint the collector uses. Inclusion is a SAMPLING decision
+# - "pause/safety mobilisation and opposition to particular AI deployments" is a
+# declared grassroots sampling_focus - and never an ideological classification
+# of the actor; downstream analysis must infer positions from documents, not
+# from source identity.
+[[bluesky_account]]
+name = "PauseAI"
+handle = "pauseai.bsky.social"
+profile_url = "https://bsky.app/profile/pauseai.bsky.social"
+arena = "grassroots"
+source_family = "pause mobilisation / deployment resistance"
+sampling_rationale = "First-party account of the largest explicitly pause-mobilisation organisation: advocacy of slowing or pausing frontier AI development, national-group action, and deployment resistance. Added 2026-10-23 as the collectable substitute for the zero-yield pause_ai web_source row (see comment above); the actor is unchanged, only the reachable platform is. Verified live 2026-10-23 with posts inside the study window."
+priority = "P1"
+
 [[bluesky_account]]
 name = "Electronic Frontier Foundation"
 handle = "eff.org"

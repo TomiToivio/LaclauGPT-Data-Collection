@@ -198,7 +198,8 @@ source_budgets:
     daily_transcript_cap: 8
     download_media: false
   bluesky:
-    # Eight explicit manifest handles after #266, within this soft target.
+    # Nine explicit manifest handles after the 2026-10-23 PauseAI addition
+    # (eight after #266), within this soft target.
     target_accounts: 12
     daily_record_cap: 100
   mastodon:
@@ -329,9 +330,18 @@ groups:
   - id: grassroots_pause_resistance_x
     name: Pause and deployment-resistance mobilisation
     arena: grassroots
-    notes: collective mobilisation around slowing, pausing or resisting particular AI deployments
+    notes: >-
+      collective mobilisation around slowing, pausing or resisting particular AI
+      deployments. The `pause_ai` web_source row for this stratum has produced
+      ZERO records in the whole study (5 candidates per cycle, all discarded
+      before the 2026-09-01 publication floor, because pauseai.info serves
+      evergreen undated pages), so on 2026-10-23 the same actor was added on a
+      collectable platform (Bluesky, verified live: 440 posts, newest
+      2026-10-23T12:08Z). Inclusion is a SAMPLING decision and never an
+      ideological classification of the actor.
     accounts:
       x: [PauseAI]
+      bluesky: [pauseai.bsky.social]
 
   - id: grassroots_rights_digital_civil_liberties
     name: Digital-rights and civil-liberties mobilisation
