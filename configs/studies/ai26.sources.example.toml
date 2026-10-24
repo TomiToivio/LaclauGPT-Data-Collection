@@ -1080,3 +1080,15 @@ arena = "elites"
 source_family = "data-centre industry / developer-side trade press"
 sampling_rationale = "The developer side of the same municipal wave: siting, power and community concessions argued from the industry's position. Verified live 2026-10-21: HTTP 200, 20 items. Added for #296 as the counterpart to the grassroots opposition stratum, not as a neutral record."
 priority = "P2"
+
+# ---- 2026-10-24: the parliamentary arena has almost no Finnish-language or
+# party-political material (corpus audit: 52 of 374 parliamentary records carry
+# a declared-scope language, and only 2 are Finnish) ----
+[[feed]]
+name = "vihreat_press_releases"
+feed_url = "https://www.vihreat.fi/feed/"
+homepage = "https://www.vihreat.fi/"
+arena = "parliamentary"
+source_family = "Finnish party politics / electoral articulation"
+sampling_rationale = "First-party Finnish party stream (Vihreat / Greens) carrying the electoral articulation of AI: 'Ihminen ensin - Vihreat esittaa 14 keinoa tekoalyn riskien hallintaan' (2026-10-16, AI-risk governance demands) and 'Ei datakeskuksia hinnalla milla hyvansa' (2026-09-26, conditions on data-centre siting). Added 2026-10-24 as a SAMPLING decision: the paper's parliamentary arena names party programmes and campaign communications and weights Finland in scope, but the stratum held governance institutions only (Commission, Parliament, OECD, NIST, Valtioneuvosto) and the corpus audit found 2 Finnish-language parliamentary records. This is NOT an ideological classification - a party press release is read as a situated partisan claim, not as ground truth, and the study's position inference happens downstream from documents, not from source identity. Party balance is deliberately NOT settled here: kokoomus.fi/feed, sdp.fi/feed, perussuomalaiset.fi/feed and keskusta.fi/feed were each fetched live in this run, and the first two had no AI item among their 10 most recent entries while the last two returned an empty feed, so none of them was added on an unverified basis; expanding to a full party set is a sampling decision for the study owner (issue opened 2026-10-24). Verified live 2026-10-24: HTTP 200, 10 items, newest 2026-10-06, dated RSS pubDates. NOT all items are AI-related; relevance filtering stays at the analysis stage."
+priority = "P2"
