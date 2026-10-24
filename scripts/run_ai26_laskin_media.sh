@@ -43,9 +43,36 @@ else
 fi
 
 echo "[$(date -Is)] AI26 Laskin media start"
+# Always report a terminal marker, including abnormal exits. The runner returns 1
+# whenever any media object failed (distributed_media_runner.main: `return 0 if
+# result["failed"] == 0 else 1`), so under `set -e` a cycle that downloaded its
+# media normally aborted before the end echo and read as a silently stopped
+# stage. Observed on Laskin: the 2026-10-23T00:30 (failed: 1) and 05:30
+# (failed: 2) cycles both logged a summary and no end marker. This mirrors the
+# collection wrapper (#217): always emit the marker, propagate the status.
+cycle_finished=0
+emit_end_marker() {
+  # $? is captured as the first statement, before any other command can clobber it.
+  local status=$?
+  if [[ "$cycle_finished" -eq 0 ]]; then
+    cycle_finished=1
+    trap - EXIT
+    if [[ "$status" -eq 0 ]]; then
+      echo "[$(date -Is)] AI26 Laskin media end"
+    else
+      echo "[$(date -Is)] AI26 Laskin media end runner_status=$status (media failures recorded; see status above)"
+    fi
+  fi
+}
+trap emit_end_marker EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+set +e
 "${RUN[@]}" \
   --study-config "$STUDY_CONFIG" \
   --data-root "$DATA_ROOT" \
   --workers "${LACLAUGPT_AI26_MEDIA_WORKERS:-2}" \
   --limit "${LACLAUGPT_AI26_MEDIA_LIMIT:-100}"
-echo "[$(date -Is)] AI26 Laskin media end"
+runner_status=$?
+set -e
+exit "$runner_status"
