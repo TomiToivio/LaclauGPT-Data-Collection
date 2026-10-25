@@ -80,12 +80,15 @@ def _corpus_audit(args: argparse.Namespace) -> int:
     from .corpus_audit import audit_records, audit_summary
 
     records: list[dict] = []
+    records_available = 0
+    truncated = False
     if args.records:
         path = _Path(args.records)
         for line in path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if line:
                 records.append(_json.loads(line))
+        records_available = len(records)
     elif args.mongodb_uri:
         # Import inside the branch so the base install needs no pymongo.
         from pymongo import MongoClient
@@ -93,7 +96,16 @@ def _corpus_audit(args: argparse.Namespace) -> int:
         client = MongoClient(args.mongodb_uri, serverSelectionTimeoutMS=5000)
         collection = client[args.mongodb_database][args.mongodb_collection]
         query = {"project_id": args.project} if args.project else {}
-        records = list(collection.find(query, {"_id": 0}).limit(args.limit))
+        # Issue #353: the limit used to be applied inside the read, before the audit
+        # saw anything, so the report could not know it had been clipped -- and every
+        # share it printed was a share of a sample presented as a share of the corpus.
+        # Count the population first, then decide whether the limit binds, and say so.
+        records_available = collection.count_documents(query)
+        cursor = collection.find(query, {"_id": 0})
+        if args.limit is not None:
+            cursor = cursor.limit(args.limit)
+        records = list(cursor)
+        truncated = len(records) < records_available
     else:
         print(json.dumps({"status": "error", "error": "pass --records or --mongodb-uri"}))
         return 2
@@ -129,6 +141,15 @@ def _corpus_audit(args: argparse.Namespace) -> int:
         deferred_platforms=deferred,
         arena_languages=arena_languages,
     )
+    # Issue #353: a share computed over a clipped read is a share of a sample, and the
+    # report must say so rather than presenting it as a corpus share. These fields are
+    # top-level so a consumer cannot read `total` without also seeing the population it
+    # came from.
+    report["records_scanned"] = len(records)
+    report["records_available"] = records_available
+    report["limit"] = args.limit
+    report["truncated"] = truncated
+    report["shares_basis"] = "sample" if truncated else "population"
     print(json.dumps(report, indent=2, sort_keys=True))
     print(audit_summary(report), file=sys.stderr)
     return 0
@@ -209,7 +230,16 @@ def _build_parser() -> argparse.ArgumentParser:
     audit.add_argument("--mongodb-database", default="spectacleScraper")
     audit.add_argument("--mongodb-collection", default="ai26__records")
     audit.add_argument("--project", default="", help="project_id filter")
-    audit.add_argument("--limit", type=int, default=5000)
+    audit.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help=(
+            "sample the first N records; omitted means audit the whole population. "
+            "When set and it binds, the report says truncated: true and the summary "
+            "states that the shares are shares of the sample"
+        ),
+    )
     audit.add_argument("--top-n", type=int, default=3, help="dominance window")
     audit.add_argument("--publication-floor", default="", help="ISO date, e.g. 2026-09-01")
     audit.add_argument(
