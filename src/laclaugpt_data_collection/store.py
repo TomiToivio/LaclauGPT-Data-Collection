@@ -64,7 +64,7 @@ class CollectionStore:
                 url TEXT, local_path TEXT, sha256 TEXT,
                 byte_size INTEGER, mime_type TEXT,
                 status TEXT, failure_reason TEXT, http_status INTEGER,
-                downloaded_at TEXT
+                downloaded_at TEXT, attempts INTEGER NOT NULL DEFAULT 0
             )
             """
         )
@@ -92,6 +92,17 @@ class CollectionStore:
             )
             """
         )
+        # Issue #338: an existing media_index predates the attempt counter. Add it
+        # in place rather than requiring a rebuild -- the collection store is a live
+        # research artefact and must migrate without losing download state.
+        columns = {
+            row[1]
+            for row in self._db.execute("PRAGMA table_info(media_index)").fetchall()
+        }
+        if "attempts" not in columns:
+            self._db.execute(
+                "ALTER TABLE media_index ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0"
+            )
         self._db.commit()
 
     def append_raw(self, platform: str, payload: dict) -> str:
@@ -195,12 +206,13 @@ class CollectionStore:
     def media_known(self, media_key: str) -> dict | None:
         with self._db_lock:
             row = self._db.execute(
-                "SELECT local_path, sha256, status FROM media_index WHERE media_key=?",
+                "SELECT local_path, sha256, status, attempts FROM media_index WHERE media_key=?",
                 (media_key,),
             ).fetchone()
             if not row:
                 return None
-            return {"local_path": row[0], "sha256": row[1], "status": row[2]}
+            return {"local_path": row[0], "sha256": row[1], "status": row[2],
+                    "attempts": int(row[3] or 0)}
 
     def media_states(self, source_id: str, *, collection_id: str | None = None) -> list[dict]:
         """Return durable downloader state for one canonical source.
@@ -255,13 +267,28 @@ class CollectionStore:
         http_status: int | None = None,
     ) -> None:
         with self._db_lock:
+            # Issue #338: count consecutive failures on the object itself, so the
+            # downloader can retire it instead of re-enqueueing it forever.
+            # "running" is written before the fetch and must preserve the count;
+            # a retryable failure increments it; anything else starts clean.
+            previous = self._db.execute(
+                "SELECT attempts, status FROM media_index WHERE media_key=?",
+                (media_key,),
+            ).fetchone()
+            previous_attempts = int(previous[0] or 0) if previous else 0
+            if status == "running":
+                attempts = previous_attempts
+            elif status in {"failed", "dead_letter"}:
+                attempts = previous_attempts + 1
+            else:
+                attempts = 0
             self._db.execute(
                 """
                 INSERT OR REPLACE INTO media_index
                 (media_key, platform, document_id, media_index, url, local_path,
                  sha256, byte_size, mime_type, status, failure_reason, http_status,
-                 downloaded_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 downloaded_at, attempts)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     media_key,
@@ -277,6 +304,7 @@ class CollectionStore:
                     failure_reason,
                     http_status,
                     datetime.now(UTC).isoformat(timespec="seconds"),
+                    attempts,
                 ),
             )
             self._db.commit()

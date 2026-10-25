@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import mimetypes
+import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -22,7 +23,16 @@ from urllib.request import Request, urlopen
 from .store import CollectionStore
 
 USER_AGENT = "Mozilla/5.0 (LaclauGPT collector; research)"
-TERMINAL_MEDIA_STATUSES = {"completed", "ok", "downloaded", "access_restricted"}
+TERMINAL_MEDIA_STATUSES = {"completed", "ok", "downloaded", "access_restricted", "dead_letter"}
+
+#: How many times one media object may fail before it is retired as a dead letter
+#: (issue #338). Without a bound, a permanently broken object is re-enqueued every
+#: cycle forever and the stage stops making progress while looking busy.
+DEFAULT_MAX_MEDIA_ATTEMPTS = 5
+
+#: Statuses that end an object's life. Only ``completed`` is a success; the others
+#: are recorded terminal failures with a reason, which is why they stop retrying.
+TERMINAL_FAILURE_MEDIA_STATUSES = {"access_restricted", "dead_letter"}
 TIKTOK_MEDIA_HOST_SUFFIXES = ("tiktok.com", "tiktokcdn-eu.com")
 
 
@@ -88,11 +98,22 @@ class MediaDownloader:
         workers: int = 4,
         fetcher: Callable[[str], tuple[bytes, str]] | None = None,
         allowed_platforms: frozenset[str] | None = None,
+        max_attempts: int | None = None,
     ) -> None:
         self.store = store
         self.backend = backend or FilesystemBackend(store.media_dir, store.root)
         self.workers = max(1, workers)
         self._fetcher = fetcher
+        # Issue #338: a media object that fails permanently must not be retried
+        # for the lifetime of the study. The bound is an operator setting because
+        # the right value depends on how flaky the media hosts are.
+        if max_attempts is None:
+            raw = os.environ.get("LACLAUGPT_MEDIA_MAX_ATTEMPTS", "")
+            try:
+                max_attempts = int(raw) if raw.strip() else DEFAULT_MAX_MEDIA_ATTEMPTS
+            except ValueError:
+                max_attempts = DEFAULT_MAX_MEDIA_ATTEMPTS
+        self.max_attempts = max(1, int(max_attempts))
         # Issue #233: when set, only media whose record platform is in this set
         # is enqueued. The Brazil26 deployment passes {"x","instagram","tiktok"}
         # so a queued job for a disabled family is skipped at the queue, not
@@ -184,6 +205,7 @@ class MediaDownloader:
         if known and known.get("status") in TERMINAL_MEDIA_STATUSES:
             return {"media_key": job.media_key, "collection_id": job.collection_id,
                     "status": "skipped"}
+        prior_attempts = int((known or {}).get("attempts") or 0)
         # Persist queued/running state before network I/O. The collection id is
         # part of media_key, so simultaneous AI26/Brazil26 jobs never collide.
         self.store.record_media(
@@ -199,7 +221,6 @@ class MediaDownloader:
                 and status in {401, 403}
                 and is_tiktok_media_host(urlparse(job.url).hostname or "")
             )
-            outcome_status = "access_restricted" if session_bound else "failed"
             # urllib errors may embed signed URLs or query parameters. Persist
             # only an HTTP code or exception class, never exception detail.
             reason = (
@@ -207,13 +228,27 @@ class MediaDownloader:
                 else f"HTTP {status}" if status is not None
                 else type(exc).__name__
             )
+            # Issue #338: a permanent failure must end. `access_restricted` is
+            # already terminal (a session-bound TikTok asset will not recover
+            # without a new browser capture), so only a plain failure counts
+            # towards the bound. Retiring the object keeps its last reason on
+            # record and lets a drained stage report attempted=0 instead of
+            # re-failing the same object every hour forever.
+            attempts = prior_attempts + 1
+            if session_bound:
+                outcome_status = "access_restricted"
+            elif attempts >= self.max_attempts:
+                outcome_status = "dead_letter"
+                reason = f"{reason} (gave up after {attempts} attempts)"
+            else:
+                outcome_status = "failed"
             self.store.record_media(
                 job.media_key, job.platform, job.source_id, job.media_index, job.url,
                 None, None, None, "", outcome_status, reason, status,
             )
             return {"media_key": job.media_key, "collection_id": job.collection_id,
                     "status": outcome_status, "error": reason,
-                    "http_status": status}
+                    "http_status": status, "attempts": attempts}
 
         mime = (mime or "application/octet-stream").split(";", 1)[0].strip()
         checksum = hashlib.sha256(body).hexdigest()

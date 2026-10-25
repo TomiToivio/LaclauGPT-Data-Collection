@@ -277,6 +277,11 @@ def _run_local_media_unlocked(
             "attempted": len(results),
             "completed": sum(row.get("status") == "completed" for row in results),
             "failed": sum(row.get("status") == "failed" for row in results),
+            # Issue #338: objects retired after a bounded number of failures. They
+            # are not counted as failures, because they will not be retried -- that
+            # is the point of retiring them, and it is what lets a drained stage
+            # report attempted=0 and exit 0 again.
+            "dead_lettered": sum(row.get("status") == "dead_letter" for row in results),
             "access_restricted": sum(row.get("status") == "access_restricted" for row in results),
             "skipped": max(len(records) - len(jobs), 0),
             "mongo_refreshed": 0,
@@ -393,6 +398,11 @@ def _run_distributed_media_unlocked(
             "attempted": len(results),
             "completed": sum(row.get("status") == "completed" for row in results),
             "failed": sum(row.get("status") == "failed" for row in results),
+            # Issue #338: objects retired after a bounded number of failures. They
+            # are not counted as failures, because they will not be retried -- that
+            # is the point of retiring them, and it is what lets a drained stage
+            # report attempted=0 and exit 0 again.
+            "dead_lettered": sum(row.get("status") == "dead_letter" for row in results),
             "access_restricted": sum(row.get("status") == "access_restricted" for row in results),
             "skipped": max(len(records) - len(jobs), 0),
             "mongo_refreshed": len(touched),
