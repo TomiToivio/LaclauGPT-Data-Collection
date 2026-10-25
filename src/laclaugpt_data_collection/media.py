@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import mimetypes
+import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -22,7 +23,15 @@ from urllib.request import Request, urlopen
 from .store import CollectionStore
 
 USER_AGENT = "Mozilla/5.0 (LaclauGPT collector; research)"
-TERMINAL_MEDIA_STATUSES = {"completed", "ok", "downloaded", "access_restricted"}
+#: Statuses that end a media object's life in the queue. ``dead_letter`` is an object that failed
+#: the bounded number of attempts below; without it a poison object was re-enqueued every cycle
+#: forever (#338).
+TERMINAL_MEDIA_STATUSES = {"completed", "ok", "downloaded", "access_restricted", "dead_letter"}
+
+#: How many attempts a media object gets before it is dead-lettered. Small on purpose: the media
+#: stage runs hourly, and an object that has failed three times at the source will not heal on the
+#: fourth. ``LACLAUGPT_MEDIA_MAX_ATTEMPTS`` overrides it (issue #338).
+DEFAULT_MAX_MEDIA_ATTEMPTS = 3
 TIKTOK_MEDIA_HOST_SUFFIXES = ("tiktok.com", "tiktokcdn-eu.com")
 
 
@@ -88,8 +97,17 @@ class MediaDownloader:
         workers: int = 4,
         fetcher: Callable[[str], tuple[bytes, str]] | None = None,
         allowed_platforms: frozenset[str] | None = None,
+        max_attempts: int | None = None,
     ) -> None:
         self.store = store
+        # Issue #338: a bounded number of attempts, after which the object is dead-lettered with
+        # its reason instead of being retried on every cycle. An explicit argument wins over the
+        # environment, and the environment wins over the default.
+        configured = max_attempts
+        if configured is None:
+            raw = os.environ.get("LACLAUGPT_MEDIA_MAX_ATTEMPTS", "").strip()
+            configured = int(raw) if raw.isdigit() and int(raw) > 0 else DEFAULT_MAX_MEDIA_ATTEMPTS
+        self.max_attempts = max(1, int(configured))
         self.backend = backend or FilesystemBackend(store.media_dir, store.root)
         self.workers = max(1, workers)
         self._fetcher = fetcher
@@ -150,7 +168,9 @@ class MediaDownloader:
                 if media_key in queued:
                     continue
                 known = self.store.media_known(media_key)
-                if known and known.get("status") in TERMINAL_MEDIA_STATUSES:
+                if known and (
+                    known.get("status") in TERMINAL_MEDIA_STATUSES or known.get("terminal")
+                ):
                     continue
                 queued.add(media_key)
                 jobs.append(MediaJob(
@@ -181,14 +201,32 @@ class MediaDownloader:
         # A browser capture may have completed after this job was queued.
         # Avoid replacing durable completed or access-restricted state.
         known = self.store.media_known(job.media_key)
-        if known and known.get("status") in TERMINAL_MEDIA_STATUSES:
+        if known and (
+            known.get("status") in TERMINAL_MEDIA_STATUSES or known.get("terminal")
+        ):
             return {"media_key": job.media_key, "collection_id": job.collection_id,
                     "status": "skipped"}
+        attempts = int((known or {}).get("attempts") or 0)
+        if attempts >= self.max_attempts:
+            # The queue should not have offered this job, but a stale in-memory job list or a
+            # direct run_queue call can still reach here. Close it out instead of downloading.
+            reason = str((known or {}).get("failure_reason") or "no reason recorded")
+            self.store.record_media(
+                job.media_key, job.platform, job.source_id, job.media_index, job.url,
+                None, None, None, "", "dead_letter",
+                f"{reason} (attempt {attempts}/{self.max_attempts})", None,
+                attempts=attempts, terminal=True,
+            )
+            return {"media_key": job.media_key, "collection_id": job.collection_id,
+                    "status": "dead_letter", "error": reason}
         # Persist queued/running state before network I/O. The collection id is
-        # part of media_key, so simultaneous AI26/Brazil26 jobs never collide.
+        # part of media_key, so simultaneous AI26/Brazil26 jobs never collide. The attempt
+        # count is carried across the running write: an INSERT OR REPLACE would otherwise reset
+        # it and the object would never reach its limit.
         self.store.record_media(
             job.media_key, job.platform, job.source_id, job.media_index, job.url,
             None, None, None, "", "running", None, None,
+            attempts=attempts,
         )
         try:
             body, mime = self._fetch(job.url)
@@ -207,13 +245,23 @@ class MediaDownloader:
                 else f"HTTP {status}" if status is not None
                 else type(exc).__name__
             )
+            attempts += 1
+            # Issue #338: ``access_restricted`` is already terminal (a session-bound TikTok object
+            # cannot be fetched again without the browser that captured it). Anything else gets a
+            # bounded number of attempts and is then dead-lettered, so the cycle can report
+            # attempted=0 instead of re-failing the same object every hour.
+            exhausted = not session_bound and attempts >= self.max_attempts
+            if exhausted:
+                outcome_status = "dead_letter"
+                reason = f"{reason} (attempt {attempts}/{self.max_attempts})"
             self.store.record_media(
                 job.media_key, job.platform, job.source_id, job.media_index, job.url,
                 None, None, None, "", outcome_status, reason, status,
+                attempts=attempts, terminal=outcome_status == "dead_letter" or session_bound,
             )
             return {"media_key": job.media_key, "collection_id": job.collection_id,
                     "status": outcome_status, "error": reason,
-                    "http_status": status}
+                    "http_status": status, "attempts": attempts}
 
         mime = (mime or "application/octet-stream").split(";", 1)[0].strip()
         checksum = hashlib.sha256(body).hexdigest()
@@ -224,6 +272,7 @@ class MediaDownloader:
         self.store.record_media(
             job.media_key, job.platform, job.source_id, job.media_index, job.url,
             path, checksum, len(body), mime, "completed", None, 200,
+            attempts=attempts + 1,
         )
         return {
             "media_key": job.media_key,
