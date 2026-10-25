@@ -24,10 +24,34 @@ document does not restate them as new measurements.
   `groups[<group>].accounts.x` in the study config. It is consumed when the browser tour URL list is
   built, and never applied to the records the capture returns.
 
-**This change.** Nothing yet, deliberately: the fix is one function and one migration, and the
-migration is a bulk write over live records.
+**What now exists.** The forward fix is implemented and tested, and the backfill is a script that
+does nothing until it is given ``--apply``.
 
-**The fix, ready to be taken:**
+- `src/laclaugpt_data_collection/attribution.py` is the single answer to "which configured row is
+  this page?" — handle matched case-folded and with or without ``@`` against
+  ``cfg.accounts()``, returning ``account`` (the ``name:handle`` shape the capture server always
+  wrote), ``source_name``, ``arena`` and ``group_id``. An unmatched page returns an empty arena and
+  ``unattributed``: the gap stays visible.
+- The capture server passes those four fields in the record metadata, so every new X record is born
+  with its arena, and `_fetch_web_children` (`capture_server.py:390`) inherits a real value. An X page
+  whose handle is in no group now increments ``stats["x_unattributed"]``, so thegap is a number in
+  the run report rather than a silent property of the corpus.
+- `normalise()` writes ``source.raw_metadata["arena"]``, ``["group_id"]`` and ``["source_name"]`` —
+  the fields the corpus audit counts by, and the exact key child inheritance reads.
+- `scripts/backfill_ai26_arena.py` fills the existing blanks from the same mapping, matched by
+  ``source.author``, writing the top-level ``arena`` plus the two metadata fields when absent.
+  **Dry run by default**; ``--apply`` is required and the runbook's ask-first rule applies to running
+  it.
+- 11 tests in `tests/test_issue_336_capture_attribution.py` pin the lookup (handle forms, platform
+  mismatch, unknown handle) and the record (`arena`, `group_id`, `source_name` present on a matched
+  capture, absent on an unmatched one).
+
+**Still not backfilled:** the external-link children. A child carries no handle; its arena came from
+its parent, and the stored child keeps no parent handle to re-derive it from. New children are fixed
+by the forward change; the existing ones need the parent relation, which is a decision — the same
+status as #337's.
+
+**The mechanism, for reference:**
 
 1. *Forward.* When the capture server builds records for `platform == "x"`, resolve the posting
    handle against the study config's `groups[].accounts.x` and write

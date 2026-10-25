@@ -22,6 +22,7 @@ from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from . import __version__
+from .attribution import attribution_for
 from .capture import BrowserCapture
 from .collectors.platforms import PARSERS, tiktok_extras
 from .media import CaptureTimeMediaHandoff, is_tiktok_media_host
@@ -337,7 +338,14 @@ class Handler(BaseHTTPRequestHandler):
             return 0
 
         payload = _decode_platform_body(body)
-        account = self._account_for(platform, platform_url)
+        attributed = attribution_for(self.server.cfg.accounts(), platform, platform_url)
+        account = attributed["account"]
+        if platform == "x" and not attributed["arena"]:
+            # Issue #336: an X page whose handle is in no group would otherwise be stored with a
+            # blank arena, which silently removes the record from the stratified sample. It is
+            # counted here so the gap is a number in the run report, not a property of the corpus.
+            with self.server.lock:
+                self.server.stats["x_unattributed"] = self.server.stats.get("x_unattributed", 0) + 1
         meta = {
             "captured_at": captured_at,
             "collector_version": COLLECTOR_VERSION,
@@ -349,6 +357,9 @@ class Handler(BaseHTTPRequestHandler):
             "project_id": self.server.project_id,
             "collection_id": self.server.project_id,
             "account": account,
+            "source_name": attributed["source_name"],
+            "arena": attributed["arena"],
+            "group_id": attributed["group_id"],
         }
 
         with self.server.lock:
@@ -449,20 +460,8 @@ class Handler(BaseHTTPRequestHandler):
         return records
 
     def _account_for(self, platform: str, platform_url: str) -> str:
-        try:
-            segments = [
-                segment.lstrip("@").casefold()
-                for segment in urlparse(platform_url).path.split("/")
-                if segment
-            ]
-        except ValueError:
-            segments = []
-        for row in self.server.cfg.accounts():
-            if row["platform"] != platform:
-                continue
-            if str(row["handle"]).casefold() in segments:
-                return f"{row['name']}:{row['handle']}"
-        return "unattributed"
+        """``"name:handle"`` for the configured account behind this page, else ``"unattributed"``."""
+        return attribution_for(self.server.cfg.accounts(), platform, platform_url)["account"]
 
 
 def main(argv: list[str] | None = None) -> int:
