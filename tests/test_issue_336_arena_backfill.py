@@ -46,7 +46,7 @@ def test_only_known_x_and_consistent_authors_repair():
                       "raw_metadata": {"source_platform_url": "https://x.com/OpenAI"}}}
     assert resolve_record(row, mapping) == ("elites", "labs")
     assert resolve_record({"source": {**row["source"], "platform": "web"}}, mapping) is None
-    assert resolve_record({"source": {**row["source"], "author": "Other"}}, mapping) == ("elites", "labs")
+    assert resolve_record({"source": {**row["source"], "author": "Other"}}, mapping) is None
     assert resolve_record({"source": {**row["source"], "author": "https://x.com/UnionAI"}}, mapping) is None
 
 
