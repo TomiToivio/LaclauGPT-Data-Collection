@@ -1108,3 +1108,94 @@ arena = "elites"
 source_family = "European frontier lab / open-weights industry discourse"
 sampling_rationale = "First-party Mistral AI blog: a European frontier lab whose releases are explicitly framed around open weights, sovereign/EU capacity, multilingual models and efficiency ('Mistral Large 4' 2026-10-06, 'Voxtral 3' 2026-10-20, 'Mistral and Mozilla are bringing open, private and multilingual AI to your web browser' 2026-09-16, 'Mistral Advances AI for Engineering with NVIDIA' 2026-10-21). Added 2026-10-25 as a SAMPLING decision for the elites arena's first sampling focus (frontier-lab and industry discourse) and its open-source/open-weights focus, and for the EU region the paper weights in scope. Inclusion is NOT an ideological classification: a company blog is read as a situated corporate articulation, not as ground truth. It also offsets a measured imbalance rather than a presumed one: the arena's first-party lab layer was ~88 records against ~800 from critical-AI and rationalist sources, because most labs publish only on feed-less newsrooms. Verified live 2026-10-25 with the collector's feedparser: HTTP 200, 92 entries, newest 2026-10-21, dated pubDates, no bozo. NOT all items are AI-related; relevance filtering stays at the analysis stage."
 priority = "P2"
+
+# ---- 2026-10-25: full Finnish party set in the parliamentary arena. The study
+# owner ruled that the stratum carries the major-party set on principle, so the
+# zeros become a finding about who is not speaking rather than an absence in the
+# sample frame. ----
+[[feed]]
+name = "kokoomus_press_releases"
+feed_url = "https://www.kokoomus.fi/feed/"
+homepage = "https://www.kokoomus.fi/"
+arena = "parliamentary"
+source_family = "Finnish party politics / electoral articulation"
+sampling_rationale = "First-party Finnish party stream (Kokoomus / National Coalition). Added 2026-10-25 under the study owner's ruling that the parliamentary arena carries the full major-party set rather than only parties currently publishing AI-relevant material: the zeros are the finding. A party press release is a situated partisan claim, not ground truth, and nothing is inferred about a party's position from its identity. Verified live 2026-10-25: HTTP 200, 10 items, newest 2026-10-16, dated pubDates. NOT all items are AI-related; relevance filtering stays at the analysis stage."
+priority = "P2"
+
+# ---- 2026-10-25: full Finnish party set in the parliamentary arena. The study
+# owner ruled that the stratum carries the major-party set on principle, so the
+# zeros become a finding about who is not speaking rather than an absence in the
+# sample frame. ----
+[[feed]]
+name = "sdp_press_releases"
+feed_url = "https://sdp.fi/feed/"
+homepage = "https://sdp.fi/"
+arena = "parliamentary"
+source_family = "Finnish party politics / electoral articulation"
+sampling_rationale = "First-party Finnish party stream (SDP / Social Democratic Party). Added 2026-10-25 under the study owner's ruling that the parliamentary arena carries the full major-party set rather than only parties currently publishing AI-relevant material: the zeros are the finding. A party press release is a situated partisan claim, not ground truth, and nothing is inferred about a party's position from its identity. Verified live 2026-10-25: HTTP 200, 10 items, newest 2026-10-24, dated pubDates. NOT all items are AI-related; relevance filtering stays at the analysis stage."
+priority = "P2"
+
+# ---- 2026-10-25: full Finnish party set in the parliamentary arena. The study
+# owner ruled that the stratum carries the major-party set on principle, so the
+# zeros become a finding about who is not speaking rather than an absence in the
+# sample frame. ----
+[[feed]]
+name = "vasemmistoliitto_press_releases"
+feed_url = "https://vasemmisto.fi/feed/"
+homepage = "https://vasemmisto.fi/"
+arena = "parliamentary"
+source_family = "Finnish party politics / electoral articulation"
+sampling_rationale = "First-party Finnish party stream (Vasemmistoliitto / Left Alliance). Added 2026-10-25 under the study owner's ruling that the parliamentary arena carries the full major-party set rather than only parties currently publishing AI-relevant material: the zeros are the finding. A party press release is a situated partisan claim, not ground truth, and nothing is inferred about a party's position from its identity. Verified live 2026-10-25: HTTP 200, 10 items, newest 2026-10-23, dated pubDates. NOT all items are AI-related; relevance filtering stays at the analysis stage."
+priority = "P2"
+
+# ---- 2026-10-25: full Finnish party set in the parliamentary arena. The study
+# owner ruled that the stratum carries the major-party set on principle, so the
+# zeros become a finding about who is not speaking rather than an absence in the
+# sample frame. ----
+[[feed]]
+name = "rkp_press_releases"
+feed_url = "https://www.sfp.fi/feed/"
+homepage = "https://www.sfp.fi/"
+arena = "parliamentary"
+source_family = "Finnish party politics / electoral articulation"
+sampling_rationale = "First-party Finnish party stream (RKP / Swedish People's Party). Added 2026-10-25 under the study owner's ruling that the parliamentary arena carries the full major-party set rather than only parties currently publishing AI-relevant material: the zeros are the finding. A party press release is a situated partisan claim, not ground truth, and nothing is inferred about a party's position from its identity. Verified live 2026-10-25: HTTP 200, 50 items, newest 2026-10-23, dated pubDates. sfp.fi and rkp.fi serve the same feed; the Swedish-language domain is recorded here. NOT all items are AI-related; relevance filtering stays at the analysis stage."
+priority = "P2"
+
+# ---- 2026-10-25: full Finnish party set in the parliamentary arena. The study
+# owner ruled that the stratum carries the major-party set on principle, so the
+# zeros become a finding about who is not speaking rather than an absence in the
+# sample frame. ----
+[[feed]]
+name = "perussuomalaiset_press_releases"
+feed_url = "https://www.perussuomalaiset.fi/feed/"
+homepage = "https://www.perussuomalaiset.fi/"
+arena = "parliamentary"
+source_family = "Finnish party politics / electoral articulation"
+sampling_rationale = "First-party Finnish party stream (Perussuomalaiset / Finns Party). Added 2026-10-25 under the study owner's ruling that the parliamentary arena carries the full major-party set rather than only parties currently publishing AI-relevant material: the zeros are the finding. A party press release is a situated partisan claim, not ground truth, and nothing is inferred about a party's position from its identity. Verified live 2026-10-25: HTTP 200 but the feed contains 0 items. This is a REACHABILITY fact (the party exposes no working RSS), NOT evidence that the party is silent about AI. The row is kept because the study owner ruled the stratum should carry the full party set, so a non-producing member is visible as a named gap rather than an absent one. NOT all items are AI-related; relevance filtering stays at the analysis stage."
+priority = "P2"
+
+# ---- 2026-10-25: full Finnish party set in the parliamentary arena. The study
+# owner ruled that the stratum carries the major-party set on principle, so the
+# zeros become a finding about who is not speaking rather than an absence in the
+# sample frame. ----
+[[feed]]
+name = "keskusta_press_releases"
+feed_url = "https://keskusta.fi/feed/"
+homepage = "https://keskusta.fi/"
+arena = "parliamentary"
+source_family = "Finnish party politics / electoral articulation"
+sampling_rationale = "First-party Finnish party stream (Keskusta / Centre Party). Added 2026-10-25 under the study owner's ruling that the parliamentary arena carries the full major-party set rather than only parties currently publishing AI-relevant material: the zeros are the finding. A party press release is a situated partisan claim, not ground truth, and nothing is inferred about a party's position from its identity. Verified live 2026-10-25: HTTP 200 but the feed contains 0 items. As with perussuomalaiset_press_releases this is a reachability fact, not a silence finding; the row is kept so the gap is named rather than implied. NOT all items are AI-related; relevance filtering stays at the analysis stage."
+priority = "P2"
+
+# ---- 2026-10-25: full Finnish party set in the parliamentary arena. The study
+# owner ruled that the stratum carries the major-party set on principle, so the
+# zeros become a finding about who is not speaking rather than an absence in the
+# sample frame. ----
+[[feed]]
+name = "kd_press_releases"
+feed_url = "https://www.kd.fi/feed/"
+homepage = "https://www.kd.fi/"
+arena = "parliamentary"
+source_family = "Finnish party politics / electoral articulation"
+sampling_rationale = "First-party Finnish party stream (KD / Christian Democrats). Added 2026-10-25 under the study owner's ruling that the parliamentary arena carries the full major-party set rather than only parties currently publishing AI-relevant material: the zeros are the finding. A party press release is a situated partisan claim, not ground truth, and nothing is inferred about a party's position from its identity. Verified live 2026-10-25: HTTP 200 but the feed contains 0 items. As with the other empty feeds this is a reachability fact, not a silence finding; the row is kept so the gap is named rather than implied. NOT all items are AI-related; relevance filtering stays at the analysis stage."
+priority = "P2"
