@@ -92,7 +92,24 @@ class CollectionStore:
             )
             """
         )
+        self._migrate_media_index()
         self._db.commit()
+
+    def _migrate_media_index(self) -> None:
+        """Add the attempt-tracking columns an older database does not have (issue #338).
+
+        Additive and idempotent by design: ``CREATE TABLE IF NOT EXISTS`` above does nothing to a
+        table that already exists, so a database written by an earlier version would otherwise
+        never gain the columns the retry policy reads. ``ALTER TABLE ... ADD COLUMN`` never
+        rewrites a row and never drops one, so this is safe to run on the live index.
+        """
+        existing = {row[1] for row in self._db.execute("PRAGMA table_info(media_index)")}
+        if "attempts" not in existing:
+            self._db.execute(
+                "ALTER TABLE media_index ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0"
+            )
+        if "last_attempt_at" not in existing:
+            self._db.execute("ALTER TABLE media_index ADD COLUMN last_attempt_at TEXT")
 
     def append_raw(self, platform: str, payload: dict) -> str:
         day = datetime.now(UTC).strftime("%Y%m%d")
@@ -195,12 +212,67 @@ class CollectionStore:
     def media_known(self, media_key: str) -> dict | None:
         with self._db_lock:
             row = self._db.execute(
-                "SELECT local_path, sha256, status FROM media_index WHERE media_key=?",
+                "SELECT local_path, sha256, status, attempts, last_attempt_at "
+                "FROM media_index WHERE media_key=?",
                 (media_key,),
             ).fetchone()
             if not row:
                 return None
-            return {"local_path": row[0], "sha256": row[1], "status": row[2]}
+            return {
+                "local_path": row[0],
+                "sha256": row[1],
+                "status": row[2],
+                "attempts": int(row[3] or 0),
+                "last_attempt_at": row[4],
+            }
+
+    def record_media_failure(
+        self,
+        media_key: str,
+        platform: str,
+        document_id: str,
+        media_index: int,
+        url: str,
+        status: str,
+        failure_reason: str | None,
+        http_status: int | None,
+    ) -> int:
+        """Persist one failed attempt and return the object's consecutive attempt count.
+
+        Issue #338: the media index used to be written with ``INSERT OR REPLACE``, which threw
+        away the previous row — including any notion of how often this object had already failed.
+        Without that number there is no bounded policy: an object that fails permanently is
+        re-enqueued every cycle forever, and a cycle whose whole backlog is poison reports
+        ``attempted=2 completed=0 failed=2`` indefinitely.
+
+        The count is incremented in the database rather than read-then-written in Python, so two
+        workers racing on the same key still produce a monotonic count.
+        """
+        now = datetime.now(UTC).isoformat(timespec="seconds")
+        with self._db_lock:
+            self._db.execute(
+                """
+                INSERT INTO media_index
+                    (media_key, platform, document_id, media_index, url, local_path, sha256,
+                     byte_size, mime_type, status, failure_reason, http_status, downloaded_at,
+                     attempts, last_attempt_at)
+                VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, '', ?, ?, ?, ?, 1, ?)
+                ON CONFLICT(media_key) DO UPDATE SET
+                    status = excluded.status,
+                    failure_reason = excluded.failure_reason,
+                    http_status = excluded.http_status,
+                    downloaded_at = excluded.downloaded_at,
+                    attempts = COALESCE(media_index.attempts, 0) + 1,
+                    last_attempt_at = excluded.last_attempt_at
+                """,
+                (media_key, platform, document_id, media_index, url, status,
+                 failure_reason, http_status, now, now),
+            )
+            row = self._db.execute(
+                "SELECT attempts FROM media_index WHERE media_key=?", (media_key,)
+            ).fetchone()
+            self._db.commit()
+        return int(row[0]) if row and row[0] is not None else 1
 
     def media_states(self, source_id: str, *, collection_id: str | None = None) -> list[dict]:
         """Return durable downloader state for one canonical source.
@@ -255,13 +327,31 @@ class CollectionStore:
         http_status: int | None = None,
     ) -> None:
         with self._db_lock:
+            # An upsert rather than INSERT OR REPLACE: REPLACE deletes the row and inserts a new
+            # one, so every column it does not name — including the attempt count added for
+            # issue #338 — silently reverts to its default. The downloader writes "running" at the
+            # start of every attempt, which would have reset the budget on each try and made the
+            # limit unreachable. Naming the columns keeps that state intact.
             self._db.execute(
                 """
-                INSERT OR REPLACE INTO media_index
+                INSERT INTO media_index
                 (media_key, platform, document_id, media_index, url, local_path,
                  sha256, byte_size, mime_type, status, failure_reason, http_status,
                  downloaded_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(media_key) DO UPDATE SET
+                    platform = excluded.platform,
+                    document_id = excluded.document_id,
+                    media_index = excluded.media_index,
+                    url = excluded.url,
+                    local_path = excluded.local_path,
+                    sha256 = excluded.sha256,
+                    byte_size = excluded.byte_size,
+                    mime_type = excluded.mime_type,
+                    status = excluded.status,
+                    failure_reason = excluded.failure_reason,
+                    http_status = excluded.http_status,
+                    downloaded_at = excluded.downloaded_at
                 """,
                 (
                     media_key,

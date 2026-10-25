@@ -22,7 +22,21 @@ from urllib.request import Request, urlopen
 from .store import CollectionStore
 
 USER_AGENT = "Mozilla/5.0 (LaclauGPT collector; research)"
-TERMINAL_MEDIA_STATUSES = {"completed", "ok", "downloaded", "access_restricted"}
+#: ``dead_lettered`` is terminal: the object has failed its whole attempt budget and is no longer
+#: re-enqueued (issue #338). It is a distinct status from ``access_restricted``, which means the
+#: host refuses this collector rather than that the object is broken.
+TERMINAL_MEDIA_STATUSES = {"completed", "ok", "downloaded", "access_restricted", "dead_lettered"}
+
+#: How many consecutive failures an object gets before it is dead-lettered. Five hourly cycles is
+#: enough to ride out a transient host outage (a 502 across a deploy, a DNS blip) without letting a
+#: genuinely broken object occupy a cron slot for the rest of the study.
+MAX_MEDIA_ATTEMPTS = 5
+#: Retries are *not* delayed. ``test_failed_download_is_retried_on_next_run`` and the two
+#: ``remains_retryable`` tests in ``tests/test_issue_188_*`` encode "a failure stays retryable on the
+#: next run" as a deliberate contract, and a backoff gate reverses it. The attempt budget is what
+#: bounds the loop: an object is dead-lettered on its fifth failure, so it costs at most five
+#: hourly cycles — enough to ride out a transient outage, bounded for a broken object.
+RETRY_BACKOFF = "none"
 TIKTOK_MEDIA_HOST_SUFFIXES = ("tiktok.com", "tiktokcdn-eu.com")
 
 
@@ -207,12 +221,22 @@ class MediaDownloader:
                 else f"HTTP {status}" if status is not None
                 else type(exc).__name__
             )
-            self.store.record_media(
+            attempts = self.store.record_media_failure(
                 job.media_key, job.platform, job.source_id, job.media_index, job.url,
-                None, None, None, "", outcome_status, reason, status,
+                outcome_status, reason, status,
             )
+            # Issue #338: a bounded budget, so a permanently broken object reaches a terminal
+            # state instead of occupying a cron slot for the rest of the study. The last reason is
+            # kept on the row, so the dead letter still says *why* it died.
+            if attempts >= MAX_MEDIA_ATTEMPTS:
+                outcome_status = "dead_lettered"
+                reason = f"{reason} (gave up after {attempts} attempts)"
+                self.store.record_media(
+                    job.media_key, job.platform, job.source_id, job.media_index, job.url,
+                    None, None, None, "", outcome_status, reason, status,
+                )
             return {"media_key": job.media_key, "collection_id": job.collection_id,
-                    "status": outcome_status, "error": reason,
+                    "status": outcome_status, "error": reason, "attempts": attempts,
                     "http_status": status}
 
         mime = (mime or "application/octet-stream").split(";", 1)[0].strip()
