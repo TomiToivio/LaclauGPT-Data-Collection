@@ -615,6 +615,10 @@ priority = "P1"
 [[web_source]]
 name = "pause_ai"
 homepage = "https://pauseai.info/"
+# Issue #337: retained for the sampling audit but disabled from rotation.
+# 30/30 candidate URLs were before the 2026-09-01 publication floor; zero records.
+# PauseAI Bluesky actor below supplies dated first-party evidence instead.
+active = false
 arena = "grassroots"
 source_family = "grassroots safety / pause mobilisation"
 sampling_rationale = "Mobilisation advocating slowing or pausing frontier AI development."
