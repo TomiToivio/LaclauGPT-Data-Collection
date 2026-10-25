@@ -65,6 +65,8 @@ def resolve_record(row: dict, mapping: dict[str, tuple[str, str]]) -> tuple[str,
         author_text = str(src.get("author") or "").strip().lstrip("@").casefold()
         author = author_text if author_text in mapping else ""
     candidates = [x for x in (target, author) if x]
+    if str(src.get("author") or "").strip() and not author:
+        return None
     if len(set(candidates)) > 1:
         return None
     key = candidates[0] if candidates else ""
@@ -103,12 +105,11 @@ def main() -> None:
         if resolved is None:
             outcomes["unresolved"] += 1
             continue
-        arena, group_id = resolved
+        arena, _group_id = resolved
         eligible += 1
         outcomes[f"eligible:{arena}"] += 1
         if args.apply:
-            updates = {"source.raw_metadata.arena": arena,
-                       "source.raw_metadata.source_name": group_id}
+            updates = {"source.raw_metadata.arena": arena}
             if (row.get("handoff") or {}).get("status") == "ready":
                 updates["handoff.arena"] = arena
             # Compare-and-set: do not overwrite another worker's new arena.
