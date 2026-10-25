@@ -117,6 +117,27 @@ def _decode_platform_body(body: Any) -> Any:
     return json.loads(text)
 
 
+def capture_meta_for_account(account_row: dict[str, Any] | None) -> dict[str, str]:
+    """The capture-envelope fields the study config declares for an account.
+
+    Issue #336: the config maps every handle to an arena, but only the composed
+    ``name:handle`` string used to be carried forward, so the actor→arena
+    relation was discarded exactly when the record was created. Returning the
+    declared fields separately keeps the mapping authoritative -- nothing here is
+    inferred, and a row that declares nothing contributes nothing.
+    """
+    if not account_row:
+        return {}
+    fields: dict[str, str] = {}
+    arena = str(account_row.get("arena") or "").strip()
+    if arena:
+        fields["arena"] = arena
+    source_name = str(account_row.get("name") or "").strip()
+    if source_name:
+        fields["source_name"] = source_name
+    return fields
+
+
 class CaptureServer(ThreadingHTTPServer):
     """HTTP endpoints: /capture, /ping, /tour and /status."""
 
@@ -337,7 +358,12 @@ class Handler(BaseHTTPRequestHandler):
             return 0
 
         payload = _decode_platform_body(body)
-        account = self._account_for(platform, platform_url)
+        account_row = self._account_row(platform, platform_url)
+        account = (
+            f"{account_row['name']}:{account_row['handle']}"
+            if account_row is not None
+            else "unattributed"
+        )
         meta = {
             "captured_at": captured_at,
             "collector_version": COLLECTOR_VERSION,
@@ -350,6 +376,12 @@ class Handler(BaseHTTPRequestHandler):
             "collection_id": self.server.project_id,
             "account": account,
         }
+        # Issue #336: carry the study's own actor→arena mapping into the record.
+        # Before this, a browser-captured X post recorded its author but not the
+        # arena the config declares for that handle, so 100% of X records -- and
+        # every external-link child that inherits their arena -- were blank, and
+        # could not enter the paper's arena stratification at all.
+        meta.update(capture_meta_for_account(account_row))
 
         with self.server.lock:
             raw_ref = self.server.store.append_raw(platform, {
@@ -448,7 +480,14 @@ class Handler(BaseHTTPRequestHandler):
             records.append(record.model_dump(mode="json"))
         return records
 
-    def _account_for(self, platform: str, platform_url: str) -> str:
+    def _account_row(self, platform: str, platform_url: str) -> dict[str, Any] | None:
+        """Return the configured account row this capture belongs to, if any.
+
+        Issue #336: the caller needs the whole row, not just its name. The study
+        config already maps every handle to an arena, but only the composed
+        ``name:handle`` string was carried forward, so the actor→arena relation
+        was discarded at exactly the moment the record was created.
+        """
         try:
             segments = [
                 segment.lstrip("@").casefold()
@@ -461,8 +500,14 @@ class Handler(BaseHTTPRequestHandler):
             if row["platform"] != platform:
                 continue
             if str(row["handle"]).casefold() in segments:
-                return f"{row['name']}:{row['handle']}"
-        return "unattributed"
+                return row
+        return None
+
+    def _account_for(self, platform: str, platform_url: str) -> str:
+        row = self._account_row(platform, platform_url)
+        if row is None:
+            return "unattributed"
+        return f"{row['name']}:{row['handle']}"
 
 
 def main(argv: list[str] | None = None) -> int:
