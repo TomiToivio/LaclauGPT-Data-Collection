@@ -117,6 +117,9 @@ def normalise(
     arena = str(metadata.get("arena") or "").strip()
     if arena:
         record.source.raw_metadata["arena"] = arena
+    group_id = str(metadata.get("group_id") or "").strip()
+    if group_id:
+        record.source.raw_metadata["group_id"] = group_id
     source_name = str(metadata.get("source_name") or "").strip()
     if source_name:
         record.source.raw_metadata["source_name"] = source_name

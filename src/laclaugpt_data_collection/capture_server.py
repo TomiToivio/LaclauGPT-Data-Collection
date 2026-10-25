@@ -22,6 +22,7 @@ from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from . import __version__
+from .attribution import match_account
 from .capture import BrowserCapture
 from .collectors.platforms import PARSERS, tiktok_extras
 from .media import CaptureTimeMediaHandoff, is_tiktok_media_host
@@ -132,6 +133,9 @@ def capture_meta_for_account(account_row: dict[str, Any] | None) -> dict[str, st
     arena = str(account_row.get("arena") or "").strip()
     if arena:
         fields["arena"] = arena
+    group_id = str(account_row.get("group_id") or "").strip()
+    if group_id:
+        fields["group_id"] = group_id
     source_name = str(account_row.get("name") or "").strip()
     if source_name:
         fields["source_name"] = source_name
@@ -168,6 +172,7 @@ class CaptureServer(ThreadingHTTPServer):
             "media_captures": 0,
             "media_linked": 0,
             "media_rejected": 0,
+            "x_unattributed": 0,
         }
         self.run_id = utc_stamp()
         self.project_id = project_id.strip()
@@ -382,6 +387,9 @@ class Handler(BaseHTTPRequestHandler):
         # every external-link child that inherits their arena -- were blank, and
         # could not enter the paper's arena stratification at all.
         meta.update(capture_meta_for_account(account_row))
+        if platform == "x" and not meta.get("arena"):
+            with self.server.lock:
+                self.server.stats["x_unattributed"] += 1
 
         with self.server.lock:
             raw_ref = self.server.store.append_raw(platform, {
@@ -481,27 +489,9 @@ class Handler(BaseHTTPRequestHandler):
         return records
 
     def _account_row(self, platform: str, platform_url: str) -> dict[str, Any] | None:
-        """Return the configured account row this capture belongs to, if any.
-
-        Issue #336: the caller needs the whole row, not just its name. The study
-        config already maps every handle to an arena, but only the composed
-        ``name:handle`` string was carried forward, so the actor→arena relation
-        was discarded at exactly the moment the record was created.
-        """
-        try:
-            segments = [
-                segment.lstrip("@").casefold()
-                for segment in urlparse(platform_url).path.split("/")
-                if segment
-            ]
-        except ValueError:
-            segments = []
-        for row in self.server.cfg.accounts():
-            if row["platform"] != platform:
-                continue
-            if str(row["handle"]).casefold() in segments:
-                return row
-        return None
+        """Resolve the configured source row through the shared attribution lookup."""
+        row = match_account(self.server.cfg.accounts(), platform, platform_url)
+        return dict(row) if row is not None else None
 
     def _account_for(self, platform: str, platform_url: str) -> str:
         row = self._account_row(platform, platform_url)
