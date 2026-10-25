@@ -106,22 +106,23 @@ def normalise(
         raw_content_type=raw_content_type,
         collection_provenance=provenance,
     )
-    # Issue #336: the capture knows which configured source and arena the page belongs to; the
-    # record is where that relation has to survive, because the analysis layer reads it from
-    # `source.raw_metadata.arena` — and so does external-link child inheritance in the capture
-    # server. An absent attribution writes nothing, so a gap stays visible instead of guessed.
-    if metadata.get("arena"):
-        record.source.raw_metadata["arena"] = str(metadata["arena"])
-    if metadata.get("group_id"):
-        record.source.raw_metadata["group_id"] = str(metadata["group_id"])
-    if metadata.get("source_name"):
-        # The corpus audit counts per-source material by `source.raw_metadata.source_name`, and the
-        # browser path never wrote it: the source's own label now travels on the record.
-        record.source.raw_metadata.setdefault("source_name", str(metadata["source_name"]))
-
     external_urls = _split_list(mapped.get("urls"))
     if external_urls:
         record.source.raw_metadata["external_urls"] = external_urls
+    # Issue #336: the capture envelope already knows the actor's arena because the
+    # study config declares it per handle. Carry it onto the record, so the
+    # actor->arena relation the paper stratifies over is not lost at capture time.
+    # `source_name` goes with it: without it a browser-captured record had an
+    # author but no attributable source.
+    arena = str(metadata.get("arena") or "").strip()
+    if arena:
+        record.source.raw_metadata["arena"] = arena
+    group_id = str(metadata.get("group_id") or "").strip()
+    if group_id:
+        record.source.raw_metadata["group_id"] = group_id
+    source_name = str(metadata.get("source_name") or "").strip()
+    if source_name:
+        record.source.raw_metadata["source_name"] = source_name
     if platform == "instagram" and mapped.get("relationship_type"):
         record.source.raw_metadata["native_relationship_type"] = str(mapped["relationship_type"])
     return record

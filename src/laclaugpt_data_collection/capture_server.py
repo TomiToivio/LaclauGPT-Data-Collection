@@ -22,7 +22,7 @@ from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from . import __version__
-from .attribution import attribution_for
+from .attribution import match_account
 from .capture import BrowserCapture
 from .collectors.platforms import PARSERS, tiktok_extras
 from .media import CaptureTimeMediaHandoff, is_tiktok_media_host
@@ -118,6 +118,30 @@ def _decode_platform_body(body: Any) -> Any:
     return json.loads(text)
 
 
+def capture_meta_for_account(account_row: dict[str, Any] | None) -> dict[str, str]:
+    """The capture-envelope fields the study config declares for an account.
+
+    Issue #336: the config maps every handle to an arena, but only the composed
+    ``name:handle`` string used to be carried forward, so the actor→arena
+    relation was discarded exactly when the record was created. Returning the
+    declared fields separately keeps the mapping authoritative -- nothing here is
+    inferred, and a row that declares nothing contributes nothing.
+    """
+    if not account_row:
+        return {}
+    fields: dict[str, str] = {}
+    arena = str(account_row.get("arena") or "").strip()
+    if arena:
+        fields["arena"] = arena
+    group_id = str(account_row.get("group_id") or "").strip()
+    if group_id:
+        fields["group_id"] = group_id
+    source_name = str(account_row.get("name") or "").strip()
+    if source_name:
+        fields["source_name"] = source_name
+    return fields
+
+
 class CaptureServer(ThreadingHTTPServer):
     """HTTP endpoints: /capture, /ping, /tour and /status."""
 
@@ -148,6 +172,7 @@ class CaptureServer(ThreadingHTTPServer):
             "media_captures": 0,
             "media_linked": 0,
             "media_rejected": 0,
+            "x_unattributed": 0,
         }
         self.run_id = utc_stamp()
         self.project_id = project_id.strip()
@@ -338,14 +363,12 @@ class Handler(BaseHTTPRequestHandler):
             return 0
 
         payload = _decode_platform_body(body)
-        attributed = attribution_for(self.server.cfg.accounts(), platform, platform_url)
-        account = attributed["account"]
-        if platform == "x" and not attributed["arena"]:
-            # Issue #336: an X page whose handle is in no group would otherwise be stored with a
-            # blank arena, which silently removes the record from the stratified sample. It is
-            # counted here so the gap is a number in the run report, not a property of the corpus.
-            with self.server.lock:
-                self.server.stats["x_unattributed"] = self.server.stats.get("x_unattributed", 0) + 1
+        account_row = self._account_row(platform, platform_url)
+        account = (
+            f"{account_row['name']}:{account_row['handle']}"
+            if account_row is not None
+            else "unattributed"
+        )
         meta = {
             "captured_at": captured_at,
             "collector_version": COLLECTOR_VERSION,
@@ -357,10 +380,16 @@ class Handler(BaseHTTPRequestHandler):
             "project_id": self.server.project_id,
             "collection_id": self.server.project_id,
             "account": account,
-            "source_name": attributed["source_name"],
-            "arena": attributed["arena"],
-            "group_id": attributed["group_id"],
         }
+        # Issue #336: carry the study's own actor→arena mapping into the record.
+        # Before this, a browser-captured X post recorded its author but not the
+        # arena the config declares for that handle, so 100% of X records -- and
+        # every external-link child that inherits their arena -- were blank, and
+        # could not enter the paper's arena stratification at all.
+        meta.update(capture_meta_for_account(account_row))
+        if platform == "x" and not meta.get("arena"):
+            with self.server.lock:
+                self.server.stats["x_unattributed"] += 1
 
         with self.server.lock:
             raw_ref = self.server.store.append_raw(platform, {
@@ -459,9 +488,16 @@ class Handler(BaseHTTPRequestHandler):
             records.append(record.model_dump(mode="json"))
         return records
 
+    def _account_row(self, platform: str, platform_url: str) -> dict[str, Any] | None:
+        """Resolve the configured source row through the shared attribution lookup."""
+        row = match_account(self.server.cfg.accounts(), platform, platform_url)
+        return dict(row) if row is not None else None
+
     def _account_for(self, platform: str, platform_url: str) -> str:
-        """``"name:handle"`` for the configured account behind this page, else ``"unattributed"``."""
-        return attribution_for(self.server.cfg.accounts(), platform, platform_url)["account"]
+        row = self._account_row(platform, platform_url)
+        if row is None:
+            return "unattributed"
+        return f"{row['name']}:{row['handle']}"
 
 
 def main(argv: list[str] | None = None) -> int:

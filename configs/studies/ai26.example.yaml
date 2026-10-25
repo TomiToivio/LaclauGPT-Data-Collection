@@ -40,6 +40,28 @@ arenas:
     # inactive rows stay in the manifest; do not re-activate them to satisfy this
     # list (re-activating is a sampling decision, not a declaration fix).
     platforms: [rss, web, x, bluesky, mastodon, scholarly]
+    # Issue #342 (decided by the study owner, 2026-10-25): this arena's FIRST
+    # declared sampling focus is "frontier-lab and industry discourse", but the
+    # first-party frontier-lab layer is a small fraction of the arena -- measured
+    # 2026-10-25 as 85 of 1,239 ready records (6.9%) -- while the critical-AI and
+    # rationalist layer dominates. The cause is reachability, not intent: Anthropic,
+    # Meta, xAI and Microsoft publish on JS-rendered newsrooms with no feed at the
+    # documented paths (anthropic.com/rss.xml 404, ai.meta.com/blog/rss 404,
+    # x.ai/news 403, blogs.microsoft.com/ai/feed 410). The top-level
+    # `stage_reachability` block above says which PLATFORMS the Laskin stage reaches;
+    # this says something the platform list cannot express: for this stratum the
+    # reachable platform is the web, and the web stage cannot parse those newsrooms.
+    #
+    # The ruling: the frontier-lab layer of this stratum is BROWSER-ONLY and out of
+    # Phase 1 non-browser scope. A corpus-level claim about lab discourse must NOT be
+    # read as coverage of the labs.
+    stage_reachability:
+      frontier_lab_first_party: browser_only
+      phase1_non_browser_coverage: partial_by_feed_availability
+      measured_2026_10_25: "85 of 1239 ready elites records (6.9%) from lab-ish sources"
+      does_not_imply: >-
+        Coverage of the labs. Read the lab layer as the feeds that exist, not as the
+        industry: a claim about frontier-lab discourse cannot be read off this stratum.
     sampling_focus:
       - frontier-lab and industry discourse
       - accelerationism and techno-optimism
