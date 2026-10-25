@@ -341,7 +341,16 @@ def audit_summary(report: dict[str, Any]) -> str:
             f" ({', '.join(sorted(silent_arenas))} arena has 0 labelled records)"
         )
     return (
-        f"corpus audit: {report['total']} records | "
+        # Issue #353: lead with the truncation, not with the numbers. A summary that
+        # states a share without stating its denominator is the failure this guards.
+        (
+            f"TRUNCATED: auditing {report['records_scanned']} of "
+            f"{report['records_available']} records (--limit {report['limit']}); "
+            "all shares below are shares of that SAMPLE, not of the corpus | "
+            if report.get("truncated")
+            else ""
+        )
+        + f"corpus audit: {report['total']} records | "
         f"grassroots {report['by_arena']['shares'].get('grassroots', 0.0):.1%}, "
         f"unknown-arena {report['by_arena']['unknown']} | "
         f"top-{report['concentration']['top_n']} share "
