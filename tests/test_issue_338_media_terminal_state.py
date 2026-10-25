@@ -174,3 +174,31 @@ def test_an_old_media_index_gains_the_attempt_columns(tmp_path: Path) -> None:
     assert known is not None
     assert known["attempts"] == 0
     assert known["terminal"] is False
+
+
+def test_failed_attempt_counter_survives_running_transition(tmp_path: Path) -> None:
+    """Regression: the pre-download running write must preserve prior failures.
+
+    If writing `running` zeroes `attempts`, repeated HTTP 404s never dead-letter.
+    Inspect the durable state while the second fetch is underway, before failure.
+    """
+    observed_running_attempts: list[int] = []
+    store = CollectionStore(tmp_path / "store")
+    downloader = MediaDownloader(store, max_attempts=3)
+    key = downloader.enqueue_from_records([_record()])[0].media_key
+
+    def fetch(url: str):
+        state = store.media_known(key)
+        assert state is not None
+        assert state["status"] == "running"
+        observed_running_attempts.append(int(state["attempts"]))
+        raise _http_error(404)
+
+    downloader._fetch = fetch
+    for expected in (0, 1, 2):
+        result = _cycle(downloader)
+        assert observed_running_attempts[-1] == expected
+        assert result[0]["status"] == ("dead_letter" if expected == 2 else "failed")
+
+    assert store.media_known(key)["attempts"] == 3
+    assert _cycle(downloader) == []
