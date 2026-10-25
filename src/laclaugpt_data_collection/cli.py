@@ -80,6 +80,9 @@ def _corpus_audit(args: argparse.Namespace) -> int:
     from .corpus_audit import audit_records, audit_summary
 
     records: list[dict] = []
+    # Issue #353: None means "the whole population was read" (the JSONL path); the Mongo
+    # path fills this with the source's own count so a cap cannot be mistaken for the corpus.
+    available: int | None = None
     if args.records:
         path = _Path(args.records)
         for line in path.read_text(encoding="utf-8").splitlines():
@@ -93,7 +96,12 @@ def _corpus_audit(args: argparse.Namespace) -> int:
         client = MongoClient(args.mongodb_uri, serverSelectionTimeoutMS=5000)
         collection = client[args.mongodb_database][args.mongodb_collection]
         query = {"project_id": args.project} if args.project else {}
-        records = list(collection.find(query, {"_id": 0}).limit(args.limit))
+        # Issue #353: count first, so the report knows the population it is a sample of.
+        available = int(collection.count_documents(query))
+        cursor = collection.find(query, {"_id": 0})
+        if args.limit is not None:
+            cursor = cursor.limit(args.limit)
+        records = list(cursor)
     else:
         print(json.dumps({"status": "error", "error": "pass --records or --mongodb-uri"}))
         return 2
@@ -124,6 +132,7 @@ def _corpus_audit(args: argparse.Namespace) -> int:
     report = audit_records(
         records,
         top_n=args.top_n,
+        records_available=available,
         publication_floor=args.publication_floor or "",
         configured_sources=configured,
         deferred_platforms=deferred,
@@ -209,7 +218,10 @@ def _build_parser() -> argparse.ArgumentParser:
     audit.add_argument("--mongodb-database", default="spectacleScraper")
     audit.add_argument("--mongodb-collection", default="ai26__records")
     audit.add_argument("--project", default="", help="project_id filter")
-    audit.add_argument("--limit", type=int, default=5000)
+    # Issue #353: this defaulted to 5000, which silently reported a 5,000-record sample of a
+    # 9,375-record corpus as if it were the corpus. There is no sane binding default for a
+    # read-only audit — a cap must be asked for.
+    audit.add_argument("--limit", type=int, default=None, help="read at most N records (default: all)")
     audit.add_argument("--top-n", type=int, default=3, help="dominance window")
     audit.add_argument("--publication-floor", default="", help="ISO date, e.g. 2026-09-01")
     audit.add_argument(

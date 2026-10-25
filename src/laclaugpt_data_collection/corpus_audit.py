@@ -140,6 +140,7 @@ def audit_records(
     configured_sources: Iterable[str] | None = None,
     deferred_platforms: Iterable[str] | None = None,
     arena_languages: dict[str, Iterable[str]] | None = None,
+    records_available: int | None = None,
 ) -> dict[str, Any]:
     """Summarise coverage and concentration over canonical records.
 
@@ -155,6 +156,14 @@ def audit_records(
     configured_sources:
         Source names/handles the manifest declares, for the
         "configured but unrepresented" check (#207's core finding).
+    records_available:
+        How many records the source holds in total, when the caller read fewer than
+        that (#353). ``None`` means "the caller passed the whole population", which is
+        what the JSONL path does. When it is larger than the number of records handed
+        in, the report says so and marks every share as a share of the *sample*.
+        Without this the report cannot know it was clipped: the percentages are
+        internally consistent, they sum to 1, and they are computed over the wrong
+        population — which is exactly how a 9,375-record corpus was reported as 5,000.
     deferred_platforms:
         Platforms the current collection STAGE cannot reach (issue #207). A
         declared platform that is deferred and empty is reported as `deferred`,
@@ -253,11 +262,31 @@ def audit_records(
             ),
         }
 
+    # Issue #353: the audit can be handed a sample of a larger population, and it must
+    # never present sample shares as corpus shares. ``records_available`` is the caller's
+    # own count; when it is absent the caller is asserting it passed everything.
+    available = total if records_available is None else max(int(records_available), total)
+    truncated = available > total
+
     return {
         "total": total,
+        "population": {
+            "records_scanned": total,
+            "records_available": available,
+            "records_not_scanned": available - total,
+            "truncated": truncated,
+            "note": (
+                "shares are of a SAMPLE: the caller read fewer records than the source holds"
+                if truncated
+                else "shares are of the whole population the caller read"
+            ),
+        },
         "denominator": {
             "records": total,
-            "note": "every share below is count/records; blank and unknown are kept as buckets",
+            "note": (
+                "every share below is count/records; blank and unknown are kept as buckets"
+                + (f" — but records is a SAMPLE of {available}" if truncated else "")
+            ),
         },
         "by_arena": {
             "counts": {k: v for k, v in arena_counts.items()},
@@ -340,7 +369,14 @@ def audit_summary(report: dict[str, Any]) -> str:
         language_clause += (
             f" ({', '.join(sorted(silent_arenas))} arena has 0 labelled records)"
         )
-    return (
+    population_clause = ""
+    population = report.get("population") or {}
+    if population.get("truncated"):
+        population_clause = (
+            f"TRUNCATED SAMPLE: {population['records_scanned']} of "
+            f"{population['records_available']} records scanned, shares are sample shares | "
+        )
+    return population_clause + (
         f"corpus audit: {report['total']} records | "
         f"grassroots {report['by_arena']['shares'].get('grassroots', 0.0):.1%}, "
         f"unknown-arena {report['by_arena']['unknown']} | "
