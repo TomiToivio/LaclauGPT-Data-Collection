@@ -50,19 +50,35 @@ evergreen routes, so the child-fetch path derives no date inside the study windo
 the issue; the mitigation already deployed is the `pauseai.bsky.social` Bluesky account (arena
 `grassroots`, P1), which the repo's own collector returns records for.
 
-**Recommendation: document, do not silently retire.** A source that yields nothing inside the
-window is evidence about the grassroots stratum's web reachability, not a configuration mistake to
-scrub; retiring it also frees its rotation slot for a source that does work. Both are defensible, so
-the decision is recorded here as **owner choice**, with the operational consequence of each:
+**Decision (Tomi, 2026-10-25): keep it and document it as a recorded zero-yield attempt.**
 
-- *Retire*: remove the `[[web_source]]` row from the tracked plan and the deployed manifest; the
-  stratum's first-party web evidence is then the Bluesky account plus whatever web sources remain.
-- *Keep and document*: keep the row, add the reason it yields nothing to the study config's source
-  notes, and stop counting its slot as expected work — a scheduled source that cannot succeed is a
-  permanent zero, not a backlog.
+The non-destructive option, chosen over retiring the row. A source that yields nothing inside the
+window is evidence about the grassroots stratum's web reachability rather than a configuration
+mistake to scrub, and the exclusion is worth more as a stated fact than as a tidier source list.
 
-Either way the `grassroots` stratum should not be described as having web-platform evidence until a
-source actually produces records inside the window.
+The documentation this decision requires **already exists**, which is why nothing new is asserted
+here — it was written when the Bluesky mitigation landed:
+
+- `configs/studies/ai26.sources.example.toml` (the `pause_ai` `[[web_source]]` row and the
+  `pauseai.bsky.social` block that follows it): 5 candidates per cycle, **30 of 30 discarded before
+  the 2026-09-01 publication floor** in the 24 h to 2026-10-23; `pauseai.info` is an undated
+  SvelteKit site whose anchors are evergreen pages (`/about`, `/action`, `/ai-takeover`) rather
+  than dated posts; its own feed is outside the window (`/rss.xml`, 121 items, newest 2026-07-06).
+- `configs/studies/ai26.example.yaml`, the `grassroots_pause_resistance_x` group notes: the same
+  fact stated where the group is declared, with the Bluesky verification (440 posts, newest
+  2026-10-23T12:08Z).
+
+Two consequences that follow from *keeping* it, recorded so the row is not silently counted as
+expected work:
+
+- its rotation slot is a **permanent zero, not a backlog** — a cycle that returns nothing from it
+  is working as configured, not falling behind;
+- the `grassroots` stratum must not be described as having web-platform evidence until a source
+  actually produces records inside the window. The stratum's first-party evidence is the Bluesky
+  account.
+
+Retiring remains available and would mean deleting the row from the tracked plan and the deployed
+manifest; that option is no longer the default.
 
 ## #340 — the Finnish party stratum
 
