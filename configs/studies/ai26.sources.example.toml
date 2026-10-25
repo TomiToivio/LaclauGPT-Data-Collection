@@ -1092,3 +1092,19 @@ arena = "parliamentary"
 source_family = "Finnish party politics / electoral articulation"
 sampling_rationale = "First-party Finnish party stream (Vihreat / Greens) carrying the electoral articulation of AI: 'Ihminen ensin - Vihreat esittaa 14 keinoa tekoalyn riskien hallintaan' (2026-10-16, AI-risk governance demands) and 'Ei datakeskuksia hinnalla milla hyvansa' (2026-09-26, conditions on data-centre siting). Added 2026-10-24 as a SAMPLING decision: the paper's parliamentary arena names party programmes and campaign communications and weights Finland in scope, but the stratum held governance institutions only (Commission, Parliament, OECD, NIST, Valtioneuvosto) and the corpus audit found 2 Finnish-language parliamentary records. This is NOT an ideological classification - a party press release is read as a situated partisan claim, not as ground truth, and the study's position inference happens downstream from documents, not from source identity. Party balance is deliberately NOT settled here: kokoomus.fi/feed, sdp.fi/feed, perussuomalaiset.fi/feed and keskusta.fi/feed were each fetched live in this run, and the first two had no AI item among their 10 most recent entries while the last two returned an empty feed, so none of them was added on an unverified basis; expanding to a full party set is a sampling decision for the study owner (issue opened 2026-10-24). Verified live 2026-10-24: HTTP 200, 10 items, newest 2026-10-06, dated RSS pubDates. NOT all items are AI-related; relevance filtering stays at the analysis stage."
 priority = "P2"
+# ---- 2026-10-25: the elites arena's FIRST declared sampling focus is
+# "frontier-lab and industry discourse", but the first-party frontier-lab layer
+# is thin next to the critical-AI layer (corpus: Anthropic 6 records, DeepMind 7,
+# Google AI 5, Meta 1, Microsoft 3, OpenAI 66, against Bender 308, Gebru 244,
+# LessWrong 279). One verified feed was found; the other labs publish on
+# JS-rendered newsrooms with no feed at the usual paths (anthropic.com/rss.xml
+# 404, ai.meta.com/blog/rss 404, x.ai/news 403, blogs.microsoft.com/ai/feed 410),
+# so closing that gap needs a page-level collector, filed as an issue. ----
+[[feed]]
+name = "mistral_blog"
+feed_url = "https://mistral.ai/news/rss"
+homepage = "https://mistral.ai/news"
+arena = "elites"
+source_family = "European frontier lab / open-weights industry discourse"
+sampling_rationale = "First-party Mistral AI blog: a European frontier lab whose releases are explicitly framed around open weights, sovereign/EU capacity, multilingual models and efficiency ('Mistral Large 4' 2026-10-06, 'Voxtral 3' 2026-10-20, 'Mistral and Mozilla are bringing open, private and multilingual AI to your web browser' 2026-09-16, 'Mistral Advances AI for Engineering with NVIDIA' 2026-10-21). Added 2026-10-25 as a SAMPLING decision for the elites arena's first sampling focus (frontier-lab and industry discourse) and its open-source/open-weights focus, and for the EU region the paper weights in scope. Inclusion is NOT an ideological classification: a company blog is read as a situated corporate articulation, not as ground truth. It also offsets a measured imbalance rather than a presumed one: the arena's first-party lab layer was ~88 records against ~800 from critical-AI and rationalist sources, because most labs publish only on feed-less newsrooms. Verified live 2026-10-25 with the collector's feedparser: HTTP 200, 92 entries, newest 2026-10-21, dated pubDates, no bozo. NOT all items are AI-related; relevance filtering stays at the analysis stage."
+priority = "P2"
