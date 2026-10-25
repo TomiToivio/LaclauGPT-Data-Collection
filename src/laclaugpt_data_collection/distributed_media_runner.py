@@ -215,6 +215,30 @@ def _allowed_platforms(study_config: str | Path, data_root: str | Path) -> froze
     return None
 
 
+def _failure_details(results: list[dict[str, Any]], *, limit: int = 25) -> list[dict[str, Any]]:
+    """Per-object failure reasons for the cycle summary (issue #338).
+
+    The downloader already computes a sanitized ``error`` (an HTTP code or an
+    exception class name, never exception detail or a signed URL) but the cycle
+    summary reduced it to a bare count. That made a poison object impossible to
+    identify from a cron log: two objects failing every hour looked identical to
+    two objects failing once. Carry the reason through, bounded so a wide
+    outage cannot flood the log.
+    """
+    failures = [
+        {
+            "media_key": str(row.get("media_key") or ""),
+            "status": str(row.get("status") or ""),
+            "error": str(row.get("error") or ""),
+            "http_status": row.get("http_status"),
+        }
+        for row in results
+        if row.get("status") in {"failed", "access_restricted"}
+    ]
+    failures.sort(key=lambda row: (row["status"], row["media_key"]))
+    return failures[:limit]
+
+
 def _run_local_media_unlocked(
     settings: Settings,
     *,
@@ -256,6 +280,7 @@ def _run_local_media_unlocked(
             "access_restricted": sum(row.get("status") == "access_restricted" for row in results),
             "skipped": max(len(records) - len(jobs), 0),
             "mongo_refreshed": 0,
+            "failures": _failure_details(results),
         }
     finally:
         store.close()
@@ -373,6 +398,7 @@ def _run_distributed_media_unlocked(
             "mongo_refreshed": len(touched),
             "media_refs_repaired": len(repaired),
             "handoffs_reconciled": handoffs_reconciled,
+            "failures": _failure_details(results),
         }
     finally:
         store.close()
