@@ -64,10 +64,20 @@ class CollectionStore:
                 url TEXT, local_path TEXT, sha256 TEXT,
                 byte_size INTEGER, mime_type TEXT,
                 status TEXT, failure_reason TEXT, http_status INTEGER,
-                downloaded_at TEXT
+                downloaded_at TEXT,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                terminal INTEGER NOT NULL DEFAULT 0
             )
             """
         )
+        # Issue #338: a media object that will never succeed must stop being retried. An
+        # existing database predates the two columns, so they are added in place rather than
+        # requiring a rebuild of state that records live downloads.
+        columns = {row[1] for row in self._db.execute("PRAGMA table_info(media_index)")}
+        for name, ddl in (("attempts", "INTEGER NOT NULL DEFAULT 0"),
+                          ("terminal", "INTEGER NOT NULL DEFAULT 0")):
+            if name not in columns:
+                self._db.execute(f"ALTER TABLE media_index ADD COLUMN {name} {ddl}")
         self._db.execute(
             """
             CREATE TABLE IF NOT EXISTS media_references (
@@ -195,12 +205,20 @@ class CollectionStore:
     def media_known(self, media_key: str) -> dict | None:
         with self._db_lock:
             row = self._db.execute(
-                "SELECT local_path, sha256, status FROM media_index WHERE media_key=?",
+                "SELECT local_path, sha256, status, attempts, terminal, failure_reason "
+                "FROM media_index WHERE media_key=?",
                 (media_key,),
             ).fetchone()
             if not row:
                 return None
-            return {"local_path": row[0], "sha256": row[1], "status": row[2]}
+            return {
+                "local_path": row[0],
+                "sha256": row[1],
+                "status": row[2],
+                "attempts": int(row[3] or 0),
+                "terminal": bool(row[4]),
+                "failure_reason": row[5],
+            }
 
     def media_states(self, source_id: str, *, collection_id: str | None = None) -> list[dict]:
         """Return durable downloader state for one canonical source.
@@ -213,7 +231,8 @@ class CollectionStore:
             rows = self._db.execute(
                 """
                 SELECT media_key, media_index, url, local_path, sha256, byte_size,
-                       mime_type, status, failure_reason, http_status, downloaded_at
+                       mime_type, status, failure_reason, http_status, downloaded_at,
+                       attempts, terminal
                 FROM media_index WHERE document_id=? ORDER BY media_index, media_key
                 """,
                 (source_id,),
@@ -231,6 +250,8 @@ class CollectionStore:
                 "failure_reason": row[8],
                 "http_status": row[9],
                 "downloaded_at": row[10],
+                "attempts": int(row[11] or 0),
+                "terminal": bool(row[12]),
             }
             for row in rows
         ]
@@ -253,6 +274,8 @@ class CollectionStore:
         status: str,
         failure_reason: str | None = None,
         http_status: int | None = None,
+        attempts: int = 0,
+        terminal: bool = False,
     ) -> None:
         with self._db_lock:
             self._db.execute(
@@ -260,8 +283,8 @@ class CollectionStore:
                 INSERT OR REPLACE INTO media_index
                 (media_key, platform, document_id, media_index, url, local_path,
                  sha256, byte_size, mime_type, status, failure_reason, http_status,
-                 downloaded_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 downloaded_at, attempts, terminal)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     media_key,
@@ -277,6 +300,8 @@ class CollectionStore:
                     failure_reason,
                     http_status,
                     datetime.now(UTC).isoformat(timespec="seconds"),
+                    int(attempts),
+                    1 if terminal else 0,
                 ),
             )
             self._db.commit()
