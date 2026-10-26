@@ -125,6 +125,21 @@ def test_known_stale_feeds_are_actually_disabled() -> None:
     """Prevent source publication-floor exclusions from being polled forever."""
     by_name = {row["name"]: row for row in feed_rows()}
     for name in ("marc_andreessen", "yudkowsky_net", "kaifulee_medium",
-                 "public_ai_network", "petterijarvinen", "ada_lovelace", "data_society"):
+                 "public_ai_network", "ada_lovelace", "data_society"):
         assert by_name[name].get("enabled") is False, name
         assert by_name[name].get("inactive_reason"), name
+
+
+def test_reactivated_feed_is_enabled_and_records_the_verification() -> None:
+    """`petterijarvinen` was re-activated on 2026-10-26 after the publisher resumed.
+
+    Its disable condition (#265) was explicitly "re-verify if publisher resumes".
+    Two items dated 2026-10-16 are past the publication floor, so the row must poll
+    again and must carry the date it was last verified -- otherwise the next audit
+    cannot tell a deliberate re-activation from an accidental one.
+    """
+    by_name = {row["name"]: row for row in feed_rows()}
+    row = by_name["petterijarvinen"]
+    assert row.get("enabled") is True
+    assert row.get("last_verified") == "2026-10-26"
+    assert row.get("inactive_reason") is None

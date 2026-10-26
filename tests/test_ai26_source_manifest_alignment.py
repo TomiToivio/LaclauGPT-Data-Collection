@@ -25,7 +25,7 @@ def test_all_feed_rows_have_a_declared_arena():
 def test_inactive_feeds_explain_why_they_are_not_polled():
     manifest, _ = _load()
     for name in ("marc_andreessen", "yudkowsky_net", "kaifulee_medium",
-                 "public_ai_network", "petterijarvinen", "ada_lovelace",
+                 "public_ai_network", "ada_lovelace",
                  "data_society"):
         row = next(row for row in manifest["feed"] if row["name"] == name)
         assert row.get("enabled") is False, name

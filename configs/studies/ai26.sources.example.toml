@@ -224,11 +224,16 @@ name = "petterijarvinen"
 arena = "elites"
 feed_url = "https://www.petterijarvinen.fi/feed/"
 source_family = "finland_public_discourse"
-sampling_rationale = "Petteri Järvinen's blog: high-signal Finnish-language AI public discourse (expert tier)."
+sampling_rationale = "Petteri Järvinen's blog: high-signal Finnish-language AI public discourse (expert tier). Inclusion is a SAMPLING decision because the Phase 1 paper names Finland as a weighted initial region and the elites arena held only 15 Finnish-language records on 2026-10-25, not an ideological classification: the blog is a situated expert voice and relevance is resolved at the analysis stage."
 priority = "P1"
-enabled = false
-inactive_reason = "Newest item 2026-08-03 predates AI26 publication floor 2026-09-01; retain Finnish sampling intention and re-verify if publisher resumes (#265)."
-last_verified = "2026-09-13"
+# Re-activated 2026-10-26 by the 16:00 collection-ledger job. The disable
+# condition (#265) was "re-verify if publisher resumes", and it has: the feed
+# now carries two items dated 2026-10-16, both after the 2026-09-01 publication
+# floor. Verified live with the collector's feedparser: HTTP 200, 10 entries,
+# newest 2026-10-16T12:11Z, dated pubDates. The feed sets a benign feedparser
+# bozo flag (undefined HTML entity) but parses entries cleanly.
+enabled = true
+last_verified = "2026-10-26"
 
 # ---------------------------------------------------------------------------
 # Finnish-language evidence stratum
