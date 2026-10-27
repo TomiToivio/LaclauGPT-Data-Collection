@@ -66,8 +66,76 @@ def digest(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
+def _load_structured(path: Path) -> object | None:
+    """Parse TOML or YAML, or return None when the format is not one of those."""
+    suffix = path.suffix.lower()
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    if suffix == ".toml":
+        import tomllib
+        try:
+            return tomllib.loads(text)
+        except tomllib.TOMLDecodeError:
+            return None
+    if suffix in (".yaml", ".yml"):
+        try:
+            import yaml  # type: ignore[import-untyped]
+        except ModuleNotFoundError:
+            return None
+        try:
+            return yaml.safe_load(text)
+        except yaml.YAMLError:
+            return None
+    return None
+
+
+def _identities(document: object) -> dict[str, dict[str, object]] | None:
+    """Map ``kind:name`` to the entry, for every list of named records in a config document."""
+    if not isinstance(document, dict):
+        return None
+    found: dict[str, dict[str, object]] = {}
+    for key, value in document.items():
+        if not isinstance(value, list):
+            continue
+        for entry in value:
+            if isinstance(entry, dict) and isinstance(entry.get("name"), str):
+                found[f"{key}:{entry['name']}"] = entry
+    return found or None
+
+
+def semantic_drift(tracked: Path, deployed: Path) -> tuple[list[str], list[str], list[str]] | None:
+    """Identity-level comparison: which sources were added, removed, or changed in place.
+
+    Returns ``None`` when either file cannot be parsed -- in that case the byte comparison stands,
+    because a comparison that silently degrades to "no drift" is worse than no comparison.
+    """
+    left = _identities(_load_structured(tracked))
+    right = _identities(_load_structured(deployed))
+    if left is None or right is None:
+        return None
+    added = sorted(set(right) - set(left))
+    removed = sorted(set(left) - set(right))
+    changed = sorted(
+        key for key in set(left) & set(right)
+        if left[key] != right[key]
+    )
+    return added, removed, changed
+
+
 def compare_config(name: str, tracked: Path, deployed: Path) -> Finding:
-    """Compare one tracked config file with the private runtime copy of it."""
+    """Compare one tracked config file with the private runtime copy of it.
+
+    Byte equality is reported when it holds. When it does not, the comparison falls back to the
+    *identities* -- which sources exist -- because a private deployment is allowed to differ in
+    fields such as ``active`` without that being drift. The raw-byte hash is stricter than the deploy
+    tool it guards (the deploy tool's own drift field reports ``in_sync`` at 84/84 planned sources),
+    so a single deliberate private toggle made this line read STALE forever and stopped carrying
+    signal (#359).
+
+    A source that was added or removed is still STALE: that is a coverage change, and it must be seen.
+    """
     if not tracked.is_file():
         return Finding(name, False, f"tracked file is missing: {tracked}")
     tracked_digest = digest(tracked.read_bytes())
@@ -76,6 +144,22 @@ def compare_config(name: str, tracked: Path, deployed: Path) -> Finding:
     deployed_digest = digest(deployed.read_bytes())
     if tracked_digest == deployed_digest:
         return Finding(name, True, f"sha256 {tracked_digest[:12]}")
+
+    drift = semantic_drift(tracked, deployed)
+    if drift is not None:
+        added, removed, changed = drift
+        if not added and not removed:
+            detail = f"same identities, {len(changed)} field difference(s) (private override)"
+            if changed:
+                detail += f": {', '.join(changed[:3])}{'...' if len(changed) > 3 else ''}"
+            return Finding(name, True, detail)
+        parts = []
+        if added:
+            parts.append(f"added {len(added)}: {', '.join(added[:3])}")
+        if removed:
+            parts.append(f"removed {len(removed)}: {', '.join(removed[:3])}")
+        return Finding(name, False, "drift: " + "; ".join(parts))
+
     return Finding(
         name,
         False,
