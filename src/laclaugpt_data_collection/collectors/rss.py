@@ -96,8 +96,15 @@ def _entry_to_record(feed_url: str, entry: Any, *, feed_language: str = "") -> N
         publisher_name = str(syndication.get("title") or "")
     from ..language import resolve_language
 
+    # Prefer full publisher-provided article content to a short RSS excerpt
+    # when detecting language. Preserve source declarations and stored text.
+    parts = getattr(entry, "content", None) or []
+    full_text = "\n\n".join(
+        str(part.get("value") or "") for part in parts if hasattr(part, "get")
+    )
+    excerpt = "\n\n".join(part for part in (title, summary) if part)
     language, language_method = resolve_language(
-        "\n\n".join(part for part in (title, summary) if part),
+        max((excerpt, full_text), key=len),
         declared=str(getattr(entry, "language", "") or feed_language),
     )
     metadata: dict[str, Any] = {
