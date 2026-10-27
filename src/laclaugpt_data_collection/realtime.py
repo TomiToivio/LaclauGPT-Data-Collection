@@ -63,6 +63,11 @@ _SITE_DATE_FORMATS: tuple[str, ...] = (
     "%m/%d/%Y - %H:%M",
     "%a, %d.%m.%Y - %H:%M",  # dotted European variant, day first, stated explicitly
     "%d.%m.%Y %H:%M",
+    # "14 October 2026" -- the European Commission's digital-strategy pages render
+    # their date as ``<time datetime="14 October 2026">``, which ``web_fetch`` picks
+    # up and hands to this parser (#362). The month is spelled, so day-first and
+    # month-first cannot be confused; ``%d`` accepts both "05" and "5".
+    "%d %B %Y",
 )
 
 
