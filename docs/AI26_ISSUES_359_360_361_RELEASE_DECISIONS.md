@@ -14,15 +14,7 @@ The 2026-10-26 Laskin audit found **614 analysis-grade records** assigned to the
 
 The tracked `pause_ai` source is disabled following #347 because five fetched records per cycle all fell below the publication floor. This is a deliberate coverage removal, not a TOML formatting change.
 
-The release owner must approve this **specific** removal, then run on Laskin after checking the active-identity diff:
-
-```bash
-python scripts/deploy_ai26_sources.py
-python scripts/deploy_ai26_sources.py --apply --allow-removals
-python scripts/check_ai26_runtime.py
-```
-
-Do not interpret a merged PR as deployment. The check now tolerates comment-only / ordering-only TOML differences but retains a failing result for an active toggle.
+As verified by merged PR #366 on 2026-10-27, the Laskin deployed copy now has `active = false` for `pause_ai`, and its manifest check reports `ok`. The source identity-based runtime drift check is merged on main. No further removal deployment is needed for this source. Operators should still verify subsequent collection cycles and code checkout freshness separately.
 
 ## Unlabelled analysis-grade material (#361)
 
