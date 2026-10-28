@@ -214,8 +214,11 @@ def _client(endpoint: str | None):
 
 
 def cmd_inventory(args) -> int:
+    state_db = Path(args.state_db) if args.state_db else Path(args.data_root) / "state.sqlite3"
+    if not str(args.data_root):
+        raise SystemExit("error: set $BRAZIL26_ROOT or pass --data-root")
     canonical, files, report = build_manifests(
-        Path(args.state_db), Path(args.data_root), verify_hashes=args.verify)
+        state_db, Path(args.data_root), verify_hashes=args.verify)
     write_csv(Path(args.out) / "brazil26_canonical.csv", CANONICAL_COLUMNS, canonical)
     write_csv(Path(args.out) / "brazil26_files.csv", FILE_COLUMNS, files)
     (Path(args.out) / "inventory.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
@@ -325,23 +328,30 @@ def cmd_validate(args) -> int:
     return 0 if not (missing or extra or size_bad) else 1
 
 
+def _root_default() -> str:
+    """Collection root from the environment, never a hardcoded home directory.
+
+    A machine-specific path in a public repository is both a policy violation and
+    useless to anyone else running this: the root is a property of the host, not
+    of the tool.
+    """
+    return os.environ.get("BRAZIL26_ROOT", "")
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="Brazil26 consolidation and Allas archive (#373)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     inv = sub.add_parser("inventory", help="build canonical CSV + file manifest")
-    inv.add_argument("--state-db", default=None,
-                     help="state.sqlite3 of the collection root (default: <data-root>/state.sqlite3)")
-    inv.add_argument("--data-root", default=os.environ.get("LACLAUGPT_BRAZIL26_DATA_ROOT"),
-                     help="collection root; defaults to $LACLAUGPT_BRAZIL26_DATA_ROOT")
+    inv.add_argument("--state-db", default="", help="default: $BRAZIL26_ROOT/state.sqlite3")
+    inv.add_argument("--data-root", default=_root_default(), help="default: $BRAZIL26_ROOT")
     inv.add_argument("--out", default="out/brazil26")
     inv.add_argument("--verify", action="store_true", help="recompute every SHA-256")
     inv.set_defaults(func=cmd_inventory)
 
     up = sub.add_parser("upload", help="upload distinct files to Allas")
     up.add_argument("--manifest", required=True)
-    up.add_argument("--data-root", default=os.environ.get("LACLAUGPT_BRAZIL26_DATA_ROOT"),
-                    help="collection root; defaults to $LACLAUGPT_BRAZIL26_DATA_ROOT")
+    up.add_argument("--data-root", default=_root_default(), help="default: $BRAZIL26_ROOT")
     up.add_argument("--bucket", default=os.environ.get("LACLAUGPT_S3_BUCKET", ""))
     up.add_argument("--endpoint", default=None)
     up.add_argument("--workers", type=int, default=8)
@@ -357,15 +367,6 @@ def main(argv=None) -> int:
     val.set_defaults(func=cmd_validate)
 
     args = p.parse_args(argv)
-    if args.cmd == "inventory":
-        if not args.data_root:
-            print("error: set --data-root or LACLAUGPT_BRAZIL26_DATA_ROOT", file=sys.stderr)
-            return 2
-        if not args.state_db:
-            args.state_db = str(Path(args.data_root) / "state.sqlite3")
-    if args.cmd == "upload" and not args.data_root:
-        print("error: set --data-root or LACLAUGPT_BRAZIL26_DATA_ROOT", file=sys.stderr)
-        return 2
     if args.cmd in ("upload", "validate") and not args.bucket:
         print("error: set --bucket or LACLAUGPT_S3_BUCKET", file=sys.stderr)
         return 2
