@@ -320,6 +320,7 @@ def dispatch_claim(
     max_jobs: int,
     lease_seconds: int = 1800,
     study_fingerprint: str | None = None,
+    capabilities: Iterable[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Claim work from the shared queue instead of slicing the local manifest (#378).
 
@@ -332,10 +333,49 @@ def dispatch_claim(
         study_fingerprint=study_fingerprint,
     )
     dispatch.reap_expired()
-    claimed = dispatch.claim(
-        worker_id, LASKIN_CAPABILITIES, limit=max_jobs, lease_seconds=lease_seconds
-    )
+    # #378: the caller declares its capabilities. Defaulting to the Laskin set keeps the
+    # original call site honest (a worker that says nothing gets the most restrictive role),
+    # while a localhost can pass LOCALHOST_CAPABILITIES and actually receive browser work.
+    caps = frozenset(capabilities) if capabilities is not None else LASKIN_CAPABILITIES
+    claimed = dispatch.claim(worker_id, caps, limit=max_jobs, lease_seconds=lease_seconds)
     return [{**dict(c.get("payload") or {}), "kind": c["kind"], "_job_id": c["_id"]} for c in claimed]
+
+
+def queue_snapshot(
+    docs: Iterable[Mapping[str, Any]], capabilities: Iterable[str]
+) -> dict[str, Any]:
+    """Summarise the queue for one worker without touching MongoDB.
+
+    Kept pure so the health/status output can be tested with plain dicts. ``browser_backlog``
+    is the number of queued browser jobs no non-browser worker may take; surfacing it is the
+    point — otherwise a localhost looks idle while X work waits for a human session.
+    """
+    caps = {str(c) for c in capabilities}
+    browser_allowed = "browser" in caps
+    by_status: dict[str, int] = {}
+    by_kind: dict[str, int] = {}
+    browser_backlog = 0
+    eligible_pending = 0
+    for doc in docs:
+        status = str(doc.get("status") or "")
+        kind = str(doc.get("kind") or "")
+        if status:
+            by_status[status] = by_status.get(status, 0) + 1
+        if kind:
+            by_kind[kind] = by_kind.get(kind, 0) + 1
+        browser_kind = requires_browser(kind)
+        if browser_kind and status in {PENDING, RUNNING}:
+            browser_backlog += 1
+        if status == PENDING and (browser_allowed or not browser_kind):
+            eligible_pending += 1
+    return {
+        "capabilities": sorted(caps),
+        "by_status": dict(sorted(by_status.items())),
+        "by_kind": dict(sorted(by_kind.items())),
+        "eligible_pending": eligible_pending,
+        "browser_backlog": browser_backlog,
+        "browser_capable": browser_allowed,
+    }
 
 
 def dispatch_finish(
