@@ -60,7 +60,18 @@ laclaugpt-server-rss \
   --per-feed-limit "${LACLAUGPT_RSS_PER_FEED_LIMIT:-6}" \
   --limit "${LACLAUGPT_RSS_BATCH_LIMIT:-120}"
 
+# #378: opt in to the shared queue. Off by default so a host that has not been migrated keeps the
+# audited manifest behaviour unchanged. When on, this worker declares the browser capability (it is
+# a localhost) but still claims only the kinds it can execute; X capture stays with Firefox.
+DISPATCH_ARGS=()
+if [[ "${LACLAUGPT_AI26_DISTRIBUTED_JOBS:-0}" == "1" ]]; then
+  DISPATCH_ARGS=(--dispatch-mongo --dispatch-lease-seconds "${LACLAUGPT_AI26_LEASE_SECONDS:-1800}")
+fi
+
 python -m laclaugpt_data_collection.ai26_localhost_collect \
+  "${DISPATCH_ARGS[@]}" \
+  --worker-id "${LACLAUGPT_AI26_WORKER_ID:-localhost-cron}" \
+  --max-jobs "${LACLAUGPT_AI26_MAX_NON_BROWSER_JOBS:-12}" \
   --source-manifest "$SOURCE_MANIFEST" \
   --study-config "$STUDY_CONFIG" \
   --project-id ai26 \

@@ -170,10 +170,23 @@ class JobLeaseStore:
         *,
         limit: int = 1,
         lease_seconds: int = 900,
+        kinds: Iterable[str] | None = None,
     ) -> list[dict[str, Any]]:
-        """Atomically claim up to ``limit`` jobs this worker is allowed to do."""
+        """Atomically claim up to ``limit`` jobs this worker is allowed to do.
+
+        ``kinds`` is a second, independent restriction: a host may *hold* the browser capability and
+        still not be able to execute a browser job (the WSL localhost drives X through its capture
+        receiver, not through this runner). Declaring the capability and being able to run the kind
+        are different questions, and the query has to answer both.
+        """
         if limit < 1:
             raise ValueError("limit must be at least 1")
+        kind_clause: dict[str, Any] = {}
+        if kinds is not None:
+            allowed = sorted({str(kind) for kind in kinds})
+            if not allowed:
+                return []
+            kind_clause = {"kind": {"$in": allowed}}
         claimed: list[dict[str, Any]] = []
         caps = {str(c) for c in capabilities}
         for _ in range(limit):
@@ -188,6 +201,7 @@ class JobLeaseStore:
                     },
                     {"$expr": {"$lt": ["$attempts", "$max_attempts"]}},
                     capability_filter(caps),
+                    *([kind_clause] if kind_clause else []),
                 ]
             }
             update = {
@@ -320,6 +334,8 @@ def dispatch_claim(
     max_jobs: int,
     lease_seconds: int = 1800,
     study_fingerprint: str | None = None,
+    capabilities: Iterable[str] = LASKIN_CAPABILITIES,
+    executable_kinds: Iterable[str] | None = NON_BROWSER_KINDS,
 ) -> list[dict[str, Any]]:
     """Claim work from the shared queue instead of slicing the local manifest (#378).
 
@@ -333,7 +349,8 @@ def dispatch_claim(
     )
     dispatch.reap_expired()
     claimed = dispatch.claim(
-        worker_id, LASKIN_CAPABILITIES, limit=max_jobs, lease_seconds=lease_seconds
+        worker_id, capabilities, limit=max_jobs, lease_seconds=lease_seconds,
+        kinds=executable_kinds,
     )
     return [{**dict(c.get("payload") or {}), "kind": c["kind"], "_job_id": c["_id"]} for c in claimed]
 

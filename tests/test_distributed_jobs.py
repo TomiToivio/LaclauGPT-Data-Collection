@@ -261,3 +261,52 @@ def test_priority_accepts_manifest_notation(store):
     store.enqueue([{"job_id": "a", "kind": "web_source", "priority": "P1"},
                    {"job_id": "b", "kind": "web_source", "priority": "P3"}])
     assert [c["_id"] for c in store.claim("laskin", LASKIN_CAPABILITIES, limit=2)] == ["a", "b"]
+
+
+# --------------------------------------------------------------------------- #
+# #378 localhost slice: a host may hold the browser capability and still not be
+# able to execute a browser job. The queue must answer both questions.
+# --------------------------------------------------------------------------- #
+
+def test_claim_restricted_to_executable_kinds_never_returns_a_browser_job(store):
+    from laclaugpt_data_collection.distributed_jobs import NON_BROWSER_KINDS
+
+    store.enqueue(jobs(("x1", "x_account", 1), ("w1", "web_source", 1)))
+    claimed = store.claim("localhost", LOCALHOST_CAPABILITIES, limit=5,
+                          kinds=NON_BROWSER_KINDS)
+    assert [job["kind"] for job in claimed] == ["web_source"]
+
+
+def test_claim_with_an_empty_kind_set_claims_nothing(store):
+    store.enqueue(jobs(("w1", "web_source", 1)))
+    assert store.claim("localhost", LOCALHOST_CAPABILITIES, limit=5, kinds=[]) == []
+    # ... and the job is untouched, not consumed by an empty claim
+    assert store.status()["by_status"] == {PENDING: 1}
+
+
+def test_dispatch_claim_is_laskin_safe_by_default(store):
+    """The default must stay the behaviour the Laskin cron relies on."""
+    rows = [{"kind": "x_account", "name": "x1"}, {"kind": "web_source", "name": "w1"}]
+    claimed = dispatch_claim(store, rows, worker_id="laskin", max_jobs=5)
+    assert [job["kind"] for job in claimed] == ["web_source"]
+
+
+def test_dispatch_claim_on_a_browser_host_still_only_takes_runnable_work(store):
+    """A browser-capable host claims its capability, but the runner cannot execute browser kinds."""
+    rows = [{"kind": "x_account", "name": "x1"}, {"kind": "web_source", "name": "w1"}]
+    claimed = dispatch_claim(store, rows, worker_id="blazer", max_jobs=5,
+                             capabilities=LOCALHOST_CAPABILITIES)
+    assert [job["kind"] for job in claimed] == ["web_source"]
+    # the browser job is still pending for the capture path, not parked on a lease
+    pending = store.status()["by_kind"]
+    assert pending.get("x_account") == 1
+
+
+def test_worker_id_names_the_host_not_laskin(monkeypatch):
+    from laclaugpt_data_collection.ai26_laskin_runner import default_worker_id
+
+    monkeypatch.delenv("LACLAUGPT_WORKER_ID", raising=False)
+    monkeypatch.setattr("socket.gethostname", lambda: "BLAZER.local")
+    assert default_worker_id() == "blazer-cron"
+    monkeypatch.setenv("LACLAUGPT_WORKER_ID", "explicit-worker")
+    assert default_worker_id() == "explicit-worker"
