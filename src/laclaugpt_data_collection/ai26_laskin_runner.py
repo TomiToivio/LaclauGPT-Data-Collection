@@ -777,6 +777,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--collection-id", default=None)
     parser.add_argument("--worker-id", default=default_worker_id())
     parser.add_argument("--max-feeds", type=int, default=8)
+
     parser.add_argument("--max-jobs", type=int, default=6)
     parser.add_argument("--per-source-limit", type=int, default=5)
     parser.add_argument("--limit", type=int, default=40)

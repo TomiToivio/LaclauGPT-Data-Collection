@@ -46,8 +46,9 @@ class FakeDispatch:
     def reap_expired(self):
         return 0
 
-    def claim(self, worker_id, capabilities, *, limit=1, lease_seconds=900):
+    def claim(self, worker_id, capabilities, *, limit=1, lease_seconds=900, kinds=None):
         self.capabilities = set(capabilities)
+        self.kinds = None if kinds is None else sorted(kinds)
         return self.claimed[:limit]
 
 
