@@ -17,6 +17,7 @@ from typing import Any
 import yaml
 
 from .collectors.base import CollectionResult
+from .config import Settings
 from .distributed_jobs import (
     JobLeaseStore,
     dispatch_claim,
@@ -24,7 +25,6 @@ from .distributed_jobs import (
     queue_snapshot,
     requires_browser,
 )
-from .config import Settings
 from .factory import build_record_store
 from .models import CanonicalRecord, CollectionProvenance
 from .plugins import CollectionContext, CollectionRunner, PluginRegistry, default_registry
