@@ -330,15 +330,18 @@ def main(argv=None) -> int:
     sub = p.add_subparsers(dest="cmd", required=True)
 
     inv = sub.add_parser("inventory", help="build canonical CSV + file manifest")
-    inv.add_argument("--state-db", default="/home/tomi/laclaugpt-brasil-data/state.sqlite3")
-    inv.add_argument("--data-root", default="/home/tomi/laclaugpt-brasil-data")
+    inv.add_argument("--state-db", default=None,
+                     help="state.sqlite3 of the collection root (default: <data-root>/state.sqlite3)")
+    inv.add_argument("--data-root", default=os.environ.get("LACLAUGPT_BRAZIL26_DATA_ROOT"),
+                     help="collection root; defaults to $LACLAUGPT_BRAZIL26_DATA_ROOT")
     inv.add_argument("--out", default="out/brazil26")
     inv.add_argument("--verify", action="store_true", help="recompute every SHA-256")
     inv.set_defaults(func=cmd_inventory)
 
     up = sub.add_parser("upload", help="upload distinct files to Allas")
     up.add_argument("--manifest", required=True)
-    up.add_argument("--data-root", default="/home/tomi/laclaugpt-brasil-data")
+    up.add_argument("--data-root", default=os.environ.get("LACLAUGPT_BRAZIL26_DATA_ROOT"),
+                    help="collection root; defaults to $LACLAUGPT_BRAZIL26_DATA_ROOT")
     up.add_argument("--bucket", default=os.environ.get("LACLAUGPT_S3_BUCKET", ""))
     up.add_argument("--endpoint", default=None)
     up.add_argument("--workers", type=int, default=8)
@@ -354,6 +357,15 @@ def main(argv=None) -> int:
     val.set_defaults(func=cmd_validate)
 
     args = p.parse_args(argv)
+    if args.cmd == "inventory":
+        if not args.data_root:
+            print("error: set --data-root or LACLAUGPT_BRAZIL26_DATA_ROOT", file=sys.stderr)
+            return 2
+        if not args.state_db:
+            args.state_db = str(Path(args.data_root) / "state.sqlite3")
+    if args.cmd == "upload" and not args.data_root:
+        print("error: set --data-root or LACLAUGPT_BRAZIL26_DATA_ROOT", file=sys.stderr)
+        return 2
     if args.cmd in ("upload", "validate") and not args.bucket:
         print("error: set --bucket or LACLAUGPT_S3_BUCKET", file=sys.stderr)
         return 2

@@ -4,13 +4,13 @@ Every Brazil26 video collected on any host, merged into one deduplicated dataset
 canonical CSV that names each object. The corpus is **not** re-scraped here: this is consolidation of what
 already exists.
 
-## What the corpus is on this host (Laskin, 2026-10-28)
+## What the corpus is on the capture host (2026-10-28)
 
 | source | path | contents |
 |---|---|---|
-| **live capture root** | `/home/tomi/laclaugpt-brasil-data` | 31 GB — `media/` (6,966 files), `media/tiktok_pyktok/`, `normalized/*.jsonl`, `manifests/`, `state.sqlite3` |
-| collection metadata (×3, identical) | `…/KEEP_PRIVATE/collection-data/brazil26` | 477 MB each — `raw/` (9,065 NDJSON), `normalized/`, `manifests/`, `state.sqlite3` |
-| config only | `…/LaclauGPT-Private/collection/brazil26` | 24 KB — no data |
+| **live capture root** | `$BRAZIL26_DATA_ROOT` | 31 GB — `media/` (6,966 files), `media/tiktok_pyktok/`, `normalized/*.jsonl`, `manifests/`, `state.sqlite3` |
+| collection metadata (×3, identical) | `<private-root>/KEEP_PRIVATE/collection-data/brazil26` | 477 MB each — `raw/` (9,065 NDJSON), `normalized/`, `manifests/`, `state.sqlite3` |
+| config only | `<private-root>/collection/brazil26` | 24 KB — no data |
 
 The three `KEEP_PRIVATE` copies are byte-for-byte the same metadata tree; only one needs archiving, and the
 duplication is recorded here rather than silently resolved by deleting a copy.
@@ -34,7 +34,7 @@ Because the key is the hash, the two requirements that usually conflict cannot:
 - two different files can never collide, even if they share a filename or a size;
 - distinct versions stay traceable, because each keeps its own key and its own manifest row.
 
-**Measured on this host:** 7,023 media files → **5,846 distinct objects**, 28.75 GB of unique bytes out of
+**Measured on the capture host:** 7,023 media files → **5,846 distinct objects**, 28.75 GB of unique bytes out of
 31.56 GB total. 1,177 files are byte-identical duplicates within the corpus.
 
 ## Layout in Allas
@@ -58,8 +58,8 @@ carry losslessly stays in `normalized/*.jsonl` and is referenced by `document_id
 ```bash
 # 1. inventory — reads the state DB, writes the CSV pair and inventory.json
 python scripts/brazil26_consolidate.py inventory \
-    --state-db /home/tomi/laclaugpt-brasil-data/state.sqlite3 \
-    --data-root /home/tomi/laclaugpt-brasil-data \
+    --state-db "$BRAZIL26_DATA_ROOT/state.sqlite3" \
+    --data-root "$BRAZIL26_DATA_ROOT" \
     --out out/brazil26            # add --verify to recompute every SHA-256
 
 # 2. upload — idempotent, resumable, safe to interrupt
