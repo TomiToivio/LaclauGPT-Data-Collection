@@ -12,8 +12,6 @@ import json
 import sqlite3
 from pathlib import Path
 
-import pytest
-
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("b26", ROOT / "scripts" / "brazil26_consolidate.py")
 b26 = importlib.util.module_from_spec(spec)
