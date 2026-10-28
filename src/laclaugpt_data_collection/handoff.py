@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import datetime, timedelta
 from typing import Any, Iterable
 
 from .realtime import (
@@ -103,6 +104,46 @@ def media_ready(
     return True, "media_ready"
 
 
+#: A source date may legitimately run slightly ahead of the clock that read it: a
+#: date-only stamp means midnight in the source's timezone, and a feed can publish a
+#: scheduled item. Two days covers both without admitting an event page whose *start
+#: date* was mistaken for a publication date (#369) - those were one and two months out.
+MAX_PUBLICATION_AHEAD = timedelta(days=2)
+
+
+def capture_time(record: dict[str, Any]) -> datetime | None:
+    """When the collector read the record, from provenance or the record itself."""
+    from .realtime import parse_source_time
+
+    for entry in record.get("provenance") or []:
+        metadata = entry.get("metadata") if isinstance(entry, dict) else None
+        if not isinstance(metadata, dict):
+            continue
+        for key in ("captured_at", "collected_at"):
+            parsed = parse_source_time(metadata.get(key))
+            if parsed is not None:
+                return parsed
+    for key in ("collected_at", "captured_at"):
+        parsed = parse_source_time(record.get(key))
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def publication_is_plausible(
+    published: datetime | None, captured: datetime | None
+) -> bool:
+    """A publication time may not be far ahead of its own capture.
+
+    Missing either side is not a defect: unknown stays unknown. This only rejects the
+    impossible, because an event page's start date admitted as a publication date is a
+    future row that the study window will silently accept.
+    """
+    if published is None or captured is None:
+        return True
+    return published <= captured + MAX_PUBLICATION_AHEAD
+
+
 def build_handoff(
     record: dict[str, Any],
     *,
@@ -120,6 +161,11 @@ def build_handoff(
 
     status = "ready"
     reason = "source_ready"
+    if not publication_is_plausible(published, capture_time(record)):
+        # #369: an event listing's start date is not a publication date. Refusing the row
+        # is better than admitting a future record the study window will happily analyse.
+        status = "excluded"
+        reason = "published_after_capture"
     priority = 2
     if collection_id.casefold() == "ai26":
         policy = RealtimePolicy.ai26()
