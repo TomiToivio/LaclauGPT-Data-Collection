@@ -25,7 +25,7 @@ from .collectors.rss import RSSCollector
 from .collectors.youtube import YouTubeCollector
 from .config import Settings
 from .distributed_capture import DistributedCaptureSink, HollowRecordError
-from .distributed_jobs import LASKIN_CAPABILITIES as _QUEUE_LASKIN_CAPABILITIES
+from .distributed_jobs import dispatch_claim, dispatch_finish
 from .language import unlabelled_language_warning
 from .models import CanonicalRecord, CollectionProvenance, NormalizedRecord
 from .plugins import RetryPolicy
@@ -430,87 +430,6 @@ def _rss_window(
     return (feeds, depth)
 
 
-
-
-# -- distributed queue (#378) -------------------------------------------------------------
-#
-# The lease queue and its capability rule already existed and were proven against the
-# shared MongoDB; the live cron did not consume them, so every host still ran its own
-# copy of the manifest. This is the missing half: the queue decides *which* job this
-# tick runs, the manifest still decides *what jobs exist*.
-
-QUEUE_COLLECTION = "ai26_jobs"
-# Laskin never runs Firefox or a browser session, so it declares only this capability.
-# The enforcement itself lives in the claim query (distributed_jobs.capability_filter),
-# not in this flag: a worker without "browser" cannot be handed a browser job at all.
-# Re-exported from the queue module rather than redefined: a second spelling of the
-# capability set is how a worker ends up silently asking for the wrong permissions.
-LASKIN_CAPABILITIES = _QUEUE_LASKIN_CAPABILITIES
-_PRIORITY_TO_INT = {"P1": 1, "P2": 2, "P3": 3}
-
-
-def queue_rows_from_manifest(jobs: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Map manifest rows to queue jobs with a stable, idempotent job id.
-
-    ``kind:name`` rather than a random id is what makes re-enqueueing the same
-    manifest a no-op instead of a second copy of the work.
-    """
-    rows: list[dict[str, Any]] = []
-    for row in jobs:
-        kind = str(row.get("kind") or "")
-        name = str(row.get("name") or "")
-        if not kind or not name:
-            continue
-        raw_priority = row.get("priority", "P2")
-        if isinstance(raw_priority, int):
-            priority = raw_priority
-        else:
-            priority = _PRIORITY_TO_INT.get(str(raw_priority).upper(), 2)
-        rows.append({"job_id": f"{kind}:{name}", "kind": kind, "name": name,
-                     "priority": priority, "payload": dict(row)})
-    return rows
-
-
-def queue_store(settings: Settings, collection_name: str = QUEUE_COLLECTION) -> Any:
-    """Lease store over the shared MongoDB, or None when no URI is configured.
-
-    Returning None rather than raising keeps the wrapper's manifest path working on a
-    host that has no database, which is the fallback the issue asks for.
-    """
-    uri = getattr(settings, "mongodb_uri", "") or ""
-    if not uri:
-        return None
-    from pymongo import MongoClient
-
-    from .distributed_jobs import JobLeaseStore
-
-    client = MongoClient(uri, serverSelectionTimeoutMS=settings.mongodb_connect_timeout_ms)
-    store = JobLeaseStore(client[settings.mongodb_database][collection_name])
-    store.ensure_indexes()
-    return store
-
-
-def claimed_jobs_for_run(
-    leases: list[dict[str, Any]], rows: list[dict[str, Any]]
-) -> tuple[list[dict[str, Any]], list[str]]:
-    """Pair leases back to manifest rows, keeping only jobs this manifest describes.
-
-    A lease whose job is no longer in the manifest is returned in ``orphaned`` so the
-    caller can release it rather than leave it RUNNING until the lease expires.
-    """
-    by_id = {row["job_id"]: row for row in rows}
-    jobs: list[dict[str, Any]] = []
-    orphaned: list[str] = []
-    for lease in leases:
-        job_id = str(lease.get("_id") or "")
-        row = by_id.get(job_id)
-        if row is None:
-            orphaned.append(job_id)
-            continue
-        jobs.append(dict(row["payload"], job_id=job_id, kind=row["kind"], name=row["name"]))
-    return jobs, orphaned
-
-
 def run_phase1_laskin(
     settings: Settings,
     *,
@@ -525,7 +444,8 @@ def run_phase1_laskin(
     rotation: int | None = None,
     tracked_plan: str | Path | None = None,
     enforce_source_budgets: bool | None = None,
-    claimed_jobs: list[dict[str, Any]] | None = None,
+    dispatch: Any | None = None,
+    dispatch_lease_seconds: int = 1800,
 ) -> dict[str, Any]:
     routed = collection_id or settings.project_id
     if routed != settings.project_id:
@@ -534,11 +454,6 @@ def run_phase1_laskin(
         rotation = int(time.time() // 3600)
 
     all_jobs = load_non_browser_jobs(source_manifest)
-    if claimed_jobs is not None:
-        # The queue, not this process, decides what runs this tick. Without this,
-        # every host would run its own copy of the manifest and the lease would be
-        # decoration (#378).
-        all_jobs = claimed_jobs
     setup_errors = preflight_optional_dependencies(all_jobs)
     if setup_errors:
         return {
@@ -625,11 +540,18 @@ def run_phase1_laskin(
                 ),
             )
     policy = RealtimePolicy.ai26()
-    jobs = (
-        claimed_jobs
-        if claimed_jobs is not None
-        else select_job_window(all_jobs, max_jobs=max_jobs, rotation=rotation * max_jobs)
-    )
+    if dispatch is not None:
+        # #378: the queue decides, not the local manifest window. Fallback to the
+        # manifest slice stays available by simply not passing a dispatcher.
+        jobs = dispatch_claim(
+            dispatch,
+            all_jobs,
+            worker_id=worker_id,
+            max_jobs=max_jobs,
+            lease_seconds=dispatch_lease_seconds,
+        )
+    else:
+        jobs = select_job_window(all_jobs, max_jobs=max_jobs, rotation=rotation * max_jobs)
     synced = 0
     collected = 0
     skipped_before_floor = 0
@@ -652,6 +574,9 @@ def run_phase1_laskin(
         source_outcomes.append(outcome)
         if synced >= remaining:
             deferred_by_tick_limit += 1
+            # A job we claimed but cannot run this tick goes straight back to the
+            # queue, otherwise its lease would hold it until it expired.
+            dispatch_finish(dispatch, row, outcome, worker_id=worker_id)
             continue
         try:
             records, source_warnings = _records_for_job(
@@ -724,6 +649,7 @@ def run_phase1_laskin(
         except Exception as exc:  # noqa: BLE001
             outcome.update(status="error", reason="collection_or_ingest_failed")
             errors.append(f"{row.get('kind')}:{row.get('name','unnamed')}: {str(exc)[:180]}")
+        dispatch_finish(dispatch, row, outcome, worker_id=worker_id)
 
     # Issue #206: make source-manifest drift visible every cycle. The deployed
     # manifest is gitignored runtime config; the audited plan lives in
@@ -803,63 +729,6 @@ def run_phase1_laskin(
     }
 
 
-def run_queued_laskin_cycle(
-    settings: Settings,
-    *,
-    store: Any,
-    study_config: str | Path,
-    source_manifest: str | Path,
-    worker_id: str = "laskin-cron",
-    max_jobs: int = 6,
-    lease_seconds: int = 900,
-    **kwargs: Any,
-) -> dict[str, Any]:
-    """One bounded cycle driven by the lease queue instead of the local manifest.
-
-    Enqueue -> claim -> run exactly what was claimed -> complete or release. The
-    manifest still defines *what jobs exist*; the queue decides *which of them this
-    tick runs*, so two hosts cannot collect the same job.
-    """
-    rows = queue_rows_from_manifest(load_non_browser_jobs(source_manifest))
-    enqueued = store.enqueue(rows)
-    leases = store.claim(worker_id, LASKIN_CAPABILITIES, limit=max_jobs,
-                         lease_seconds=lease_seconds)
-    jobs, orphaned = claimed_jobs_for_run(leases, rows)
-    for job_id in orphaned:
-        store.release(job_id, worker_id, error="job_not_in_manifest")
-    if not jobs:
-        return {"status": "idle", "queue": {"enqueued": enqueued, "claimed": 0,
-                                            "completed": 0, "released": 0,
-                                            "orphaned_released": len(orphaned)}}
-    result = run_phase1_laskin(
-        settings, study_config=study_config, source_manifest=source_manifest,
-        worker_id=worker_id, claimed_jobs=jobs, **kwargs,
-    )
-    by_key = {
-        f"{o.get('kind')}:{o.get('name')}": o for o in (result.get("source_outcomes") or [])
-    }
-    completed = released = 0
-    for lease in leases:
-        job_id = str(lease.get("_id") or "")
-        if job_id in orphaned:
-            continue
-        outcome = by_key.get(job_id) or {}
-        state = str(outcome.get("status") or "")
-        if state in ("ok", "warning"):
-            store.complete(job_id, worker_id, outcome=state)
-            completed += 1
-        else:
-            # Not done is not done: a deferred, blocked or failed job goes back to
-            # the queue so another worker (or a later attempt) can take it. Attempts
-            # are bounded in the store, so this cannot spin forever.
-            store.release(job_id, worker_id,
-                          error=str(outcome.get("reason") or state or "no_outcome"))
-            released += 1
-    result["queue"] = {"enqueued": enqueued, "claimed": len(jobs), "completed": completed,
-                       "released": released, "orphaned_released": len(orphaned)}
-    return result
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="laclaugpt-ai26-laskin")
     parser.add_argument("--study-config", required=True)
@@ -888,48 +757,59 @@ def main(argv: list[str] | None = None) -> int:
         help="force the declared caps OFF for a deliberate unbounded run",
     )
     parser.add_argument(
-        "--queue",
-        action="store_true",
-        help="consume the shared lease queue instead of selecting jobs locally (#378)",
-    )
-    parser.add_argument(
-        "--queue-collection",
-        default=QUEUE_COLLECTION,
-        help=f"queue collection name (default: {QUEUE_COLLECTION})",
-    )
-    parser.add_argument(
         "--tracked-plan",
         default=None,
         help="audited plan under configs/studies/; when set, report manifest drift",
     )
+    parser.add_argument(
+        "--dispatch-mongo",
+        action="store_true",
+        help="claim work from the shared MongoDB job queue instead of slicing the local manifest (#378)",
+    )
+    parser.add_argument(
+        "--dispatch-lease-seconds",
+        type=int,
+        default=1800,
+        help="lease length for claimed jobs; must exceed one collection cycle",
+    )
     args = parser.parse_args(argv)
+
     settings = Settings()
-    common = {
-        "study_config": args.study_config,
-        "source_manifest": args.source_manifest,
-        "worker_id": args.worker_id,
-        "max_feeds": args.max_feeds,
-        "max_jobs": args.max_jobs,
-        "per_source_limit": args.per_source_limit,
-        "limit": args.limit,
-        "tracked_plan": args.tracked_plan,
-        "enforce_source_budgets": args.enforce_source_budgets,
-    }
-    if getattr(args, "queue", False):
-        store = queue_store(settings, args.queue_collection)
-        if store is None:
-            result = {
-                "status": "setup_error",
-                "errors": ["queue mode requested but no MongoDB URI is configured"],
-                "source_outcomes": [],
-                "queue": {"enqueued": 0, "claimed": 0, "completed": 0, "released": 0},
-            }
-        else:
-            result = run_queued_laskin_cycle(settings, store=store, **common)
-    else:
-        result = run_phase1_laskin(
-            settings, collection_id=args.collection_id, **common
+    dispatch = None
+    if args.dispatch_mongo:
+        from pymongo import MongoClient
+
+        from .distributed import ProjectNamespace
+        from .distributed_jobs import JobLeaseStore
+
+        if not settings.mongodb_uri:
+            parser.error("--dispatch-mongo needs a MongoDB URI in the settings")
+        client = MongoClient(
+            settings.mongodb_uri,
+            serverSelectionTimeoutMS=settings.mongodb_connect_timeout_ms,
+            connect=False,
         )
+        collection = client[settings.mongodb_database][
+            ProjectNamespace(project_id=settings.project_id).mongo_collection("jobs")
+        ]
+        dispatch = JobLeaseStore(collection)
+        dispatch.ensure_indexes()
+
+    result = run_phase1_laskin(
+        settings,
+        study_config=args.study_config,
+        source_manifest=args.source_manifest,
+        collection_id=args.collection_id,
+        worker_id=args.worker_id,
+        max_feeds=args.max_feeds,
+        max_jobs=args.max_jobs,
+        per_source_limit=args.per_source_limit,
+        limit=args.limit,
+        tracked_plan=args.tracked_plan,
+        enforce_source_budgets=args.enforce_source_budgets,
+        dispatch=dispatch,
+        dispatch_lease_seconds=args.dispatch_lease_seconds,
+    )
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     return 0 if not result["errors"] else 1
 

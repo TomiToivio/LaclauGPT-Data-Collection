@@ -19,6 +19,10 @@ from laclaugpt_data_collection.distributed_jobs import (
     RUNNING,
     JobLeaseStore,
     capability_filter,
+    dispatch_claim,
+    dispatch_finish,
+    job_identity,
+    priority_rank,
     requires_browser,
 )
 
@@ -51,8 +55,6 @@ def jobs(*specs):
 
 def test_capability_filter_excludes_every_browser_kind():
     flt = capability_filter(LASKIN_CAPABILITIES)
-    # Allowlist, not exclusion: an unclassified kind must not be claimable by a
-    # browser-less worker, which is what the old $nin silently permitted.
     assert flt == {"kind": {"$in": sorted(NON_BROWSER_KINDS)}}
     assert capability_filter(LOCALHOST_CAPABILITIES) == {}
 
@@ -192,3 +194,71 @@ def test_status_counts_expired_leases(store):
     store.claim("laskin", LASKIN_CAPABILITIES, limit=1, lease_seconds=5)
     store._clock.advance(10)
     assert store.status()["expired_leases"] == 1
+
+def test_job_identity_is_stable_across_hosts():
+    row = {"kind": "web_source", "name": "openai-news", "priority": "P1"}
+    assert job_identity(row) == "web_source:openai-news"
+    assert job_identity(dict(row)) == job_identity(row)
+
+
+def test_job_identity_requires_kind_and_name():
+    with pytest.raises(ValueError):
+        job_identity({"kind": "web_source"})
+    with pytest.raises(ValueError):
+        job_identity({"name": "x"})
+
+
+def test_dispatch_claim_returns_only_work_laskin_may_do(store):
+    rows = [
+        {"kind": "x_account", "name": "lula"},
+        {"kind": "instagram_account", "name": "gov"},
+        {"kind": "web_source", "name": "openai-news"},
+    ]
+    claimed = dispatch_claim(store, rows, worker_id="laskin", max_jobs=5)
+    assert [c["name"] for c in claimed] == ["openai-news"]
+    assert claimed[0]["_job_id"] == "web_source:openai-news"
+    assert claimed[0]["kind"] == "web_source"
+
+
+def test_dispatch_claim_is_empty_once_leased(store):
+    rows = [{"kind": "web_source", "name": "openai-news"}]
+    assert dispatch_claim(store, rows, worker_id="laskin", max_jobs=5)
+    assert dispatch_claim(store, rows, worker_id="laskin", max_jobs=5) == []
+
+
+def test_dispatch_finish_completes_success(store):
+    rows = [{"kind": "web_source", "name": "s"}]
+    claim = dispatch_claim(store, rows, worker_id="laskin", max_jobs=1)
+    dispatch_finish(store, claim[0], {"status": "ok"}, worker_id="laskin")
+    assert store.jobs.find_one({"_id": "web_source:s"})["status"] == DONE
+
+
+def test_dispatch_finish_requeues_failure(store):
+    rows = [{"kind": "web_source", "name": "s"}]
+    claim = dispatch_claim(store, rows, worker_id="laskin", max_jobs=1)
+    dispatch_finish(store, claim[0], {"status": "error", "reason": "boom"}, worker_id="laskin")
+    doc = store.jobs.find_one({"_id": "web_source:s"})
+    assert doc["status"] == PENDING
+    assert doc["last_error"] == "boom"
+
+
+def test_dispatch_finish_requeues_deferred_tick(store):
+    rows = [{"kind": "web_source", "name": "s"}]
+    claim = dispatch_claim(store, rows, worker_id="laskin", max_jobs=1)
+    dispatch_finish(store, claim[0], {"status": "deferred"}, worker_id="laskin")
+    assert store.jobs.find_one({"_id": "web_source:s"})["status"] == PENDING
+
+
+def test_dispatch_finish_ignores_unleased_rows(store):
+    dispatch_finish(store, {"kind": "web_source", "name": "s"}, {"status": "ok"}, worker_id="laskin")
+    assert store.jobs.count_documents({}) == 0
+
+def test_priority_accepts_manifest_notation(store):
+    assert priority_rank("P1") == 1
+    assert priority_rank("p3") == 3
+    assert priority_rank(2) == 2
+    assert priority_rank("2") == 2
+    assert priority_rank(None) == 2
+    store.enqueue([{"job_id": "a", "kind": "web_source", "priority": "P1"},
+                   {"job_id": "b", "kind": "web_source", "priority": "P3"}])
+    assert [c["_id"] for c in store.claim("laskin", LASKIN_CAPABILITIES, limit=2)] == ["a", "b"]

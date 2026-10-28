@@ -31,6 +31,7 @@ import csv
 import hashlib
 import json
 import os
+import re
 import sqlite3
 import sys
 import threading
@@ -94,8 +95,33 @@ def sha256_of(path: Path, chunk: int = 1 << 20) -> str:
     return h.hexdigest()
 
 
+def post_code(url: str) -> str:
+    """The platform-native code inside a post URL, ignoring ``/p/`` vs ``/reel/``."""
+    m = re.search(r"/(?:p|reel|reels|status|video|watch)/([^/?#]+)", url or "")
+    return m.group(1) if m else ""
+
+
+def _post_text(rec: dict) -> str:
+    payload = (rec.get("raw_capture") or {}).get("payload") or {}
+    legacy = payload.get("legacy") or {}
+    caption = payload.get("caption") or {}
+    content = rec.get("content") or {}
+    for candidate in (rec.get("text"), content.get("text"), legacy.get("full_text"),
+                      caption.get("text"), payload.get("desc")):
+        if isinstance(candidate, str) and candidate.strip():
+            return " ".join(candidate.split())
+    return ""
+
+
 def load_posts(normalized_dir: Path) -> dict[tuple[str, str], dict]:
-    """document_id -> metadata, per platform, from the normalized JSONL."""
+    """document_id -> metadata, per platform, from the normalized JSONL.
+
+    The canonical record contract nests the platform under ``source.platform`` and the
+    id under ``source_native_ids.document_id``. Reading only flat keys silently matched
+    nothing on the Helsinki deployment: 97 canonical rows, 0 with an author, 0 with a
+    timestamp, in a CSV the report called canonical. Flat keys still work for older
+    exports.
+    """
     posts: dict[tuple[str, str], dict] = {}
     if not normalized_dir.is_dir():
         return posts
@@ -109,10 +135,18 @@ def load_posts(normalized_dir: Path) -> dict[tuple[str, str], dict]:
                     rec = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                platform = rec.get("platform") or f.stem
-                doc = rec.get("document_id")
+                source = rec.get("source") or {}
+                platform = str(rec.get("platform") or source.get("platform") or f.stem).lower()
+                doc = str(rec.get("document_id") or rec.get("post_id")
+                          or (rec.get("source_native_ids") or {}).get("document_id") or "")
                 if doc:
-                    posts[(platform, doc)] = rec
+                    posts[(platform, doc)] = {
+                        "source_url": str(rec.get("source_url") or ""),
+                        "author": str(rec.get("author") or source.get("author") or ""),
+                        "timestamp": str(rec.get("timestamp") or source.get("created_at") or ""),
+                        "text": _post_text(rec),
+                        "hashtags": rec.get("hashtags") or source.get("hashtags") or [],
+                    }
     return posts
 
 
@@ -129,7 +163,12 @@ def build_manifests(state_db: Path, data_root: Path, *, verify_hashes: bool = Fa
     ):
         rec = dict(row)
         path = resolve_local_path(data_root, rec["local_path"] or "")
-        cid = canonical_id(rec["platform"], rec["document_id"])
+        doc = str(rec["document_id"] or "")
+        if doc.startswith("http"):
+            # Some indexes store the post URL here, in a different URL form from the
+            # records (/p/ vs /reel/). The native code in the URL is the document id.
+            doc = post_code(doc) or doc
+        cid = canonical_id(rec["platform"], doc)
         entry = {
             "canonical_id": cid, "platform": rec["platform"], "document_id": rec["document_id"],
             "media_key": rec["media_key"], "media_index": rec["media_index"],
