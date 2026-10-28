@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass
 
 _PROJECT_ID = re.compile(r"^[a-z0-9][a-z0-9_-]{1,63}$")
-_MONGO_KINDS = {"records", "annotations", "reviews", "runs", "artifacts"}
+_MONGO_KINDS = {"records", "annotations", "reviews", "runs", "artifacts", "jobs"}
 _S3_KINDS = {
     "raw",
     "canonical",
