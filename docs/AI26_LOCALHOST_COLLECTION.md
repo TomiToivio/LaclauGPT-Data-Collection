@@ -190,6 +190,40 @@ curl -s http://127.0.0.1:8765/status             # study: ai26
 - **Media:** inline capture produced none on this host; run `scripts/run_ai26_localhost_media.sh`
   once an object store is configured.
 
+### Config fingerprint and queue smoke check (#392)
+
+AC 1 of #378 needs proof that two hosts resolve the same study settings. Compare a hash, not
+two private YAMLs:
+
+```sh
+PYTHONPATH=src python -m laclaugpt_data_collection.effective_config \
+    --project "$LACLAUGPT_STUDY_CONFIG" --hash-only
+```
+
+This workstation resolves the private AI26 study to
+`sha256:a17af4cb84fefefdfc338a10c900dd1e9c0656ffd59486908dfa0af64f56af9d`. Run the same
+command on the other two hosts; only these hashes have to match, and the snapshot output
+(`--hash-only` omitted) redacts credentials and private target lists.
+
+The queue path can be exercised without the shared database, against the loopback `mongod`
+(a smoke database, not the study store):
+
+```sh
+LACLAUGPT_MONGODB_URI=mongodb://127.0.0.1:27017 \
+LACLAUGPT_MONGODB_DATABASE=laclaugpt_smoke LACLAUGPT_PROJECT_ID=ai26 \
+PYTHONPATH=src python -m laclaugpt_data_collection.ai26_localhost_collect --status
+```
+
+It reports `capabilities: [non_browser]`, `browser_capable: false` and `browser_backlog: 0`,
+which is the capability split this host is supposed to have. The shared deployment still
+needs the real URI in the private env file.
+
+**Publication floor — decision (#392).** Browser capture keeps posts older than
+`publication_date_floor` on purpose: the capture is evidence of what the timeline showed, and
+the study's window is applied when records are selected for analysis (the plugin pass already
+does this). Filtering at capture would silently discard the raw provenance that makes a
+sampling audit possible. The 323 pre-floor posts from the first pass therefore stay.
+
 ## 6. Download media/files and upload to Allas
 
 ```bash

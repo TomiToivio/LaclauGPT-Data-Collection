@@ -252,3 +252,42 @@ def _validate_effective(data: Mapping[str, Any]) -> None:
     platforms = data.get("platforms")
     if platforms is not None and not isinstance(platforms, (Mapping, list)):
         raise ValueError("platforms must be a mapping or list")
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Print the effective-config hash and layer hashes for cross-host comparison.
+
+    AC 1 of #378 asks the three collection hosts to prove they resolve the same study
+    settings. Comparing this output on each host is the check; secrets and private
+    target lists stay redacted by ``safe_snapshot``.
+    """
+    import argparse
+    import json
+    import sys
+
+    parser = argparse.ArgumentParser(prog="effective-config")
+    parser.add_argument("--project", required=True)
+    parser.add_argument("--arena")
+    parser.add_argument("--machine")
+    parser.add_argument("--execution")
+    parser.add_argument("--private", action="append", default=[])
+    parser.add_argument("--hash-only", action="store_true")
+    args = parser.parse_args(argv)
+
+    resolved = resolve_collection_config(
+        project=args.project,
+        arena=args.arena,
+        machine=args.machine,
+        execution=args.execution,
+        private_overrides=tuple(args.private),
+    )
+    if args.hash_only:
+        print(resolved.digest)
+    else:
+        json.dump(resolved.safe_snapshot(), sys.stdout, indent=2, sort_keys=True, default=str)
+        print()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
