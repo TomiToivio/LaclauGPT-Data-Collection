@@ -101,9 +101,22 @@ python scripts/brazil26/consolidate.py upload \
 
 ## Safety
 
-- Originals are only **read**; nothing is deleted, moved or rewritten.
-- Reruns skip an object only when both size and SHA-256 agree; a differing object is **refused**
+- **Original local files are never deleted or moved.** The tool only reads them.
+- No overwrite without `--overwrite`.
+- A rerun skips an object only when **both** size and SHA-256 agree; a differing object is refused
   rather than overwritten.
 - `--dry-run` performs no network I/O.
+- The manifest records `status` per file (`ok`, `missing_local`, `hash_mismatch`, `size_mismatch`), so an
+  incomplete source is visible rather than averaged into a percentage.
 - Media, manifests and canonical CSVs are research data: they stay in private storage and Allas,
   never in this repository.
+
+## What this does not do
+
+- It does not verify that a downloaded file is the *content* the platform served — that is a collection
+  question, not a consolidation one.
+- It does not re-hash every file by default (`--verify` does, and takes as long as reading the whole corpus).
+- It does not archive the raw metadata tree to Allas; only media and the two CSVs. The `raw/` NDJSON is the
+  collection log and can be added under `brazil26/metadata/raw/` if wanted.
+- It does not resolve duplicate metadata copies between hosts — recorded, not deleted, because deciding
+  which copy is authoritative is the author's call.
