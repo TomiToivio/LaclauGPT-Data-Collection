@@ -60,10 +60,19 @@ laclaugpt-server-rss \
   --per-feed-limit "${LACLAUGPT_RSS_PER_FEED_LIMIT:-6}" \
   --limit "${LACLAUGPT_RSS_BATCH_LIMIT:-120}"
 
+# #378: queue dispatch is opt-in, exactly like the Laskin runner. Default stays the
+# manifest pass so switching the live cron is an operator decision, not a side effect.
+DISPATCH_ARGS=()
+if [[ "${LACLAUGPT_AI26_DISTRIBUTED_JOBS:-0}" == "1" ]]; then
+  DISPATCH_ARGS+=(--dispatch-mongo --worker-id "${LACLAUGPT_WORKER_ID:-localhost-$(hostname -s)}")
+  DISPATCH_ARGS+=(--max-jobs "${LACLAUGPT_AI26_MAX_JOBS:-10}")
+fi
+
 python -m laclaugpt_data_collection.ai26_localhost_collect \
   --source-manifest "$SOURCE_MANIFEST" \
   --study-config "$STUDY_CONFIG" \
   --project-id ai26 \
   --collection-id ai26 \
   --machine "$LACLAUGPT_MACHINE" \
-  --run-id "${LACLAUGPT_RUN_ID:-}"
+  --run-id "${LACLAUGPT_RUN_ID:-}" \
+  ${DISPATCH_ARGS[@]+"${DISPATCH_ARGS[@]}"}
