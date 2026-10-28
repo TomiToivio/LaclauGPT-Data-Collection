@@ -8,7 +8,7 @@ already exists.
 
 | source | path | contents |
 |---|---|---|
-| **live capture root** | `/home/tomi/laclaugpt-brasil-data` | 31 GB — `media/` (6,966 files), `media/tiktok_pyktok/`, `normalized/*.jsonl`, `manifests/`, `state.sqlite3` |
+| **live capture root** | `$BRAZIL26_ROOT` | 31 GB — `media/` (6,966 files), `media/tiktok_pyktok/`, `normalized/*.jsonl`, `manifests/`, `state.sqlite3` |
 | collection metadata (×3, identical) | `…/KEEP_PRIVATE/collection-data/brazil26` | 477 MB each — `raw/` (9,065 NDJSON), `normalized/`, `manifests/`, `state.sqlite3` |
 | config only | `…/LaclauGPT-Private/collection/brazil26` | 24 KB — no data |
 
@@ -58,8 +58,8 @@ carry losslessly stays in `normalized/*.jsonl` and is referenced by `document_id
 ```bash
 # 1. inventory — reads the state DB, writes the CSV pair and inventory.json
 python scripts/brazil26_consolidate.py inventory \
-    --state-db /home/tomi/laclaugpt-brasil-data/state.sqlite3 \
-    --data-root /home/tomi/laclaugpt-brasil-data \
+    --state-db "$BRAZIL26_ROOT/state.sqlite3" \
+    --data-root "$BRAZIL26_ROOT" \
     --out out/brazil26            # add --verify to recompute every SHA-256
 
 # 2. upload — idempotent, resumable, safe to interrupt
