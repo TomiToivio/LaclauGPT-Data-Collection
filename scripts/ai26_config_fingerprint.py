@@ -7,6 +7,7 @@ The effective representation is parsed TOML/YAML, not byte-for-byte formatting.
 from __future__ import annotations
 
 import argparse
+import datetime
 import hashlib
 import json
 import sys
@@ -26,9 +27,14 @@ def fingerprint(sources: Path, study: Path) -> dict[str, str]:
     if not isinstance(source_data, dict) or not isinstance(study_data, dict):
         raise ValueError("AI26 sources and study must contain mapping documents")
 
+    def json_default(value: object) -> str:
+        if isinstance(value, (datetime.date, datetime.datetime)):
+            return value.isoformat()
+        raise TypeError(f"unsupported configuration value: {type(value).__name__}")
+
     def digest(value: object) -> str:
         canonical = json.dumps(value, sort_keys=True, separators=(",", ":"),
-                               ensure_ascii=False, allow_nan=False)
+                               ensure_ascii=False, allow_nan=False, default=json_default)
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     return {"format": FORMAT, "sources_sha256": digest(source_data),
