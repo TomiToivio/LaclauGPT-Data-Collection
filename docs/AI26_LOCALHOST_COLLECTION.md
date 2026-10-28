@@ -131,6 +131,37 @@ Source-family labels, arena, priority and machine identity are sampling/collecti
 
 X remains browser-assisted and manual. Firefox itself is never scheduled. Mastodon account rows are not guessed through the current public-timeline-only plugin, and YouTube channel-name rows are not converted into invented video URLs. Those source families should join this same wrapper once their canonical target-specific execution path can consume the manifest safely. Do not create a second scheduler or study-specific schema to add them.
 
+### Distributed queue mode (#378)
+
+The same collector can take its work from the shared MongoDB queue instead of re-reading the
+manifest on every tick. This is the localhost half of the three-host deployment: the queue, not a
+CLI flag, decides who may take which job.
+
+```bash
+# claim non-browser jobs for this host and settle each one
+python -m laclaugpt_data_collection.ai26_localhost_collect \
+    --source-manifest "$LACLAUGPT_SOURCE_MANIFEST" \
+    --study-config "$LACLAUGPT_STUDY_CONFIG" \
+    --dispatch-mongo --worker-id "desktop-$(hostname -s)" --max-jobs 10
+
+# read-only health: capabilities, queue depth by status/kind, browser backlog
+python -m laclaugpt_data_collection.ai26_localhost_collect --status
+```
+
+What the worker declares matters. The CLI collector declares **only** `non_browser`, because it
+cannot drive Firefox; the queue filters browser kinds out inside the Mongo query, so a browser job
+cannot be handed over even if the worker asks. The Laskin worker keeps the same restriction. When
+the capability is missing from the queue entry, the job is not lost: it stays pending and appears
+in `--status` as `browser_backlog`, which is what the X capture session is working down.
+
+Browser work therefore stays human-driven by design (#258): start the capture backend with
+`scripts/start_ai26_x_capture.sh`, browse in Firefox, and let the extension post to the loopback
+capture server. Nothing here schedules Firefox or automates a session.
+
+`--status` needs `LACLAUGPT_MONGODB_URI` from the private runtime env. Without it the command exits
+2 with `no MongoDB URI in the runtime settings` rather than pretending the queue is empty; that is
+also how a host with no AI26 runtime configuration is detected.
+
 ## 6. Download media/files and upload to Allas
 
 ```bash

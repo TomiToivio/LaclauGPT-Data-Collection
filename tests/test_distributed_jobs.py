@@ -14,6 +14,7 @@ from laclaugpt_data_collection.distributed_jobs import (
     FAILED,
     LASKIN_CAPABILITIES,
     LOCALHOST_CAPABILITIES,
+    NON_BROWSER_KINDS,
     PENDING,
     RUNNING,
     JobLeaseStore,
@@ -54,7 +55,7 @@ def jobs(*specs):
 
 def test_capability_filter_excludes_every_browser_kind():
     flt = capability_filter(LASKIN_CAPABILITIES)
-    assert flt == {"kind": {"$nin": sorted(BROWSER_REQUIRED_KINDS)}}
+    assert flt == {"kind": {"$in": sorted(NON_BROWSER_KINDS)}}
     assert capability_filter(LOCALHOST_CAPABILITIES) == {}
 
 

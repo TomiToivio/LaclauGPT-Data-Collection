@@ -19,10 +19,11 @@ import yaml
 from .collectors.base import CollectionResult
 from .config import Settings
 from .distributed_jobs import (
-    LOCALHOST_CAPABILITIES,
+    JobLeaseStore,
     dispatch_claim,
     dispatch_finish,
-    job_identity,
+    queue_snapshot,
+    requires_browser,
 )
 from .factory import build_record_store
 from .models import CanonicalRecord, CollectionProvenance
@@ -163,56 +164,46 @@ def _run_plugin(
     }
 
 
-def _row_name(kind: str, row: dict[str, Any]) -> str:
-    """The stable name a manifest row contributes to its job identity.
+def _manifest_jobs(manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    """The manifest rows this collector can actually execute, as queue jobs.
 
-    The manifest's ``name`` field wins, because that is the field the Laskin runner enqueues with.
-    Deriving the identity from ``handle``/``query`` instead makes the same source two different queue
-    entries on two hosts — which is the duplication this change exists to remove.
+    Identity is ``(kind, name)`` — the same pair :func:`distributed_jobs.job_identity` uses — so
+    re-reading the manifest on another host addresses the same queue entry.
     """
-    candidate = row.get("name")
-    if not candidate:
-        candidate = row.get("handle") if kind == "bluesky_account" else row.get("query")
-    return str(candidate or kind)
+    jobs: list[dict[str, Any]] = []
+    for row in manifest.get("bluesky_account", []):
+        jobs.append({"kind": "bluesky_account", "name": str(row.get("name") or row.get("handle") or ""), "row": row})
+    for row in manifest.get("scholarly_query", []):
+        services = {str(item).lower() for item in row.get("services", [])}
+        if "arxiv" in services:
+            jobs.append({"kind": "scholarly_query", "name": str(row.get("name") or row.get("query") or ""), "row": row})
+    return jobs
 
 
-def plan_jobs(
-    manifest: dict[str, Any],
+def _run_job(
+    plugins: PluginRegistry,
+    store: RecordStore,
+    job: dict[str, Any],
     *,
-    dispatch: Any | None = None,
-    worker_id: str = "localhost-cron",
-    max_jobs: int = 12,
-    lease_seconds: int = 1800,
-) -> tuple[list[tuple[str, dict[str, Any]]], list[dict[str, Any]]]:
-    """Which manifest rows this host runs this tick (#378).
-
-    Without a dispatcher the answer is "all of them", which is the pre-#378 behaviour and the reason
-    two hosts could collect the same source. With a dispatcher the answer is whatever the shared
-    queue grants, and only for kinds this orchestrator can execute: a browser kind is never claimed,
-    because X capture is the Firefox extension's path and a claim here would park it on a lease.
-    """
-    planned: list[tuple[str, dict[str, Any]]] = [
-        ("bluesky_account", row) for row in manifest.get("bluesky_account", [])
-    ] + [("scholarly_query", row) for row in manifest.get("scholarly_query", [])]
-    total = len(planned)
-    if dispatch is None:
-        return planned, [], total
-    claimable = []
-    for kind, row in planned:
-        name = _row_name(kind, row)
-        claimable.append({**row, "kind": kind, "name": name,
-                          "job_id": job_identity({"kind": kind, "name": name})})
-    claimed = dispatch_claim(
-        dispatch, claimable, worker_id=worker_id, max_jobs=max_jobs, lease_seconds=lease_seconds,
-        capabilities=LOCALHOST_CAPABILITIES,
-        executable_kinds={"bluesky_account", "scholarly_query"},
-    )
-    granted = {str(job.get("_job_id")) for job in claimed}
-    selected = [
-        (kind, row) for kind, row in planned
-        if job_identity({"kind": kind, "name": _row_name(kind, row)}) in granted
-    ]
-    return selected, claimed, total
+    project_id: str,
+    collection_id: str,
+    machine: str,
+    run_id: str,
+) -> dict[str, Any]:
+    kind, row = str(job["kind"]), dict(job["row"])
+    if kind == "bluesky_account":
+        cap = int(os.getenv("LACLAUGPT_BLUESKY_PER_ACCOUNT_LIMIT", "20"))
+        return _run_plugin(plugins, store, "bluesky", row=row,
+                           config={"actor": row["handle"], "max_results": cap},
+                           project_id=project_id, collection_id=collection_id,
+                           machine=machine, run_id=run_id)
+    if kind == "scholarly_query":
+        cap = int(os.getenv("LACLAUGPT_ARXIV_PER_QUERY_LIMIT", "10"))
+        return _run_plugin(plugins, store, "arxiv", row=row,
+                           config={"query": row["query"], "max_results": cap},
+                           project_id=project_id, collection_id=collection_id,
+                           machine=machine, run_id=run_id)
+    raise ValueError(f"localhost collector has no executor for job kind {kind!r}")
 
 
 def collect_manifest(
@@ -223,10 +214,10 @@ def collect_manifest(
     collection_id: str = "ai26",
     machine: str = "laptop",
     run_id: str = "",
-    dispatch: Any | None = None,
-    worker_id: str = "localhost-cron",
-    dispatch_lease_seconds: int = 1800,
-    max_jobs: int = 12,
+    dispatch: JobLeaseStore | None = None,
+    worker_id: str = "",
+    max_jobs: int = 10,
+    lease_seconds: int = 1800,
 ) -> dict[str, Any]:
     manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
     study = yaml.safe_load(study_path.read_text(encoding="utf-8")) or {}
@@ -245,115 +236,110 @@ def collect_manifest(
     plugins = default_registry()
     results: list[dict[str, Any]] = []
 
-    planned, results_claimed, jobs_planned = plan_jobs(
-        manifest, dispatch=dispatch, worker_id=worker_id, max_jobs=max_jobs,
-        lease_seconds=dispatch_lease_seconds,
-    )
+    jobs = _manifest_jobs(manifest)
+    if dispatch is not None:
+        # #378: the shared queue decides which jobs this host runs. The manifest is enqueued
+        # idempotently first, so a restart follows the queue instead of accumulating copies.
+        payload = [
+            {"kind": job["kind"], "name": job["name"],
+             **{k: v for k, v in job["row"].items() if k not in {"job_id", "id", "kind"}}}
+            for job in jobs
+        ]
+        claimed = dispatch_claim(
+            dispatch,
+            payload,
+            worker_id=worker_id,
+            max_jobs=max_jobs,
+            lease_seconds=lease_seconds,
+            capabilities={"non_browser"},
+            executable_kinds={"bluesky_account", "scholarly_query"},
+        )
+        selected = [
+            {"kind": c.get("kind", ""), "name": c.get("name", ""), "row": c, "_job_id": c.get("_job_id")}
+            for c in claimed
+        ]
+        # The CLI cannot drive Firefox (#258 keeps browser navigation user-controlled), so a
+        # browser job must never be executed here even if one is somehow handed over.
+        offending = [j["kind"] for j in selected if requires_browser(j["kind"])]
+        if offending:
+            raise RuntimeError(f"non-browser localhost worker was offered browser jobs: {offending}")
+    else:
+        selected = jobs
 
-    claimed_by_id = {str(job.get("_job_id")): job for job in results_claimed}
-
-    def settle(kind: str, row: dict[str, Any], outcome: dict[str, Any]) -> None:
-        """Settle the queue entry this row holds; a no-op in manifest mode."""
-        if dispatch is None:
-            return
-        job_id = job_identity({"kind": kind, "name": _row_name(kind, row)})
-        job = claimed_by_id.get(job_id)
-        if job is not None:
-            dispatch_finish(dispatch, job, outcome, worker_id=worker_id)
-
-    bluesky_cap = int(os.getenv("LACLAUGPT_BLUESKY_PER_ACCOUNT_LIMIT", "20"))
-    for row in [row for kind, row in planned if kind == "bluesky_account"]:
+    for job in selected:
         try:
-            results.append(_run_plugin(
-                plugins, store, "bluesky", row=row,
-                config={"actor": row["handle"], "max_results": bluesky_cap},
-                project_id=project_id, collection_id=collection_id, machine=machine,
-                run_id=run_id,
-            ))
-        except Exception as exc:  # noqa: BLE001 - one source must not abort the pass
-            # A claimed job is released with its reason, so it does not sit on a dead lease.
-            results.append({"plugin": "bluesky", "source": _row_name("bluesky_account", row),
-                            "status": "error", "reason": f"{type(exc).__name__}: {exc}"[:300]})
-            settle("bluesky_account", row, {"status": "error",
-                                            "reason": f"{type(exc).__name__}: {exc}"[:300]})
-            continue
-        settle("bluesky_account", row, {"status": "ok"})
-
-    arxiv_cap = int(os.getenv("LACLAUGPT_ARXIV_PER_QUERY_LIMIT", "10"))
-    for row in [row for kind, row in planned if kind == "scholarly_query"]:
-        services = {str(item).lower() for item in row.get("services", [])}
-        if "arxiv" not in services:
-            # Not an arXiv query: nothing to run, so the queue entry goes back rather than dying.
-            settle("scholarly_query", row, {"status": "deferred", "reason": "not an arxiv query"})
-            continue
-        try:
-            results.append(_run_plugin(
-                plugins, store, "arxiv", row=row,
-                config={"query": row["query"], "max_results": arxiv_cap},
-                project_id=project_id, collection_id=collection_id, machine=machine,
-                run_id=run_id,
-            ))
-        except Exception as exc:  # noqa: BLE001
-            results.append({"plugin": "arxiv", "source": _row_name("scholarly_query", row),
-                            "status": "error", "reason": f"{type(exc).__name__}: {exc}"[:300]})
-            settle("scholarly_query", row, {"status": "error",
-                                            "reason": f"{type(exc).__name__}: {exc}"[:300]})
-            continue
-        settle("scholarly_query", row, {"status": "ok"})
+            result = _run_job(plugins, store, job, project_id=project_id,
+                              collection_id=collection_id, machine=machine, run_id=run_id)
+            result["status"] = "ok"
+        except Exception as exc:  # settle the lease instead of holding it until expiry
+            result = {"plugin": _plugin_for(job["kind"]), "source": job["name"],
+                      "records_seen": 0, "records_written": 0, "duplicates_skipped": 0,
+                      "warnings": [], "status": "error", "error": str(exc)}
+        results.append(result)
+        if dispatch is not None and job.get("_job_id"):
+            dispatch_finish(
+                dispatch,
+                {"_job_id": job["_job_id"]},
+                {"status": result["status"], "reason": result.get("error", "")},
+                worker_id=worker_id,
+            )
 
     return {
         "project_id": project_id,
         "collection_id": collection_id,
         "machine": machine,
-        "worker_id": worker_id,
-        "dispatch": "mongo" if dispatch is not None else "manifest",
-        "jobs_planned": jobs_planned,
-        "jobs_claimed": len(results_claimed),
         "publication_date_floor": not_before.date().isoformat(),
         "runs": results,
         "skipped_before_window": store.skipped_before_window,
         "unresolved_publication_time": store.unresolved_publication_time,
+        "dispatch": "mongodb" if dispatch is not None else "manifest",
         "notes": [
             "RSS is executed by the same shell wrapper before this Phase 1 plugin pass.",
-            "X/browser capture remains manual and is never scheduled.",
+            "X/browser capture remains manual and is never scheduled; this worker declares "
+            "only the non_browser capability, so the queue cannot hand it browser work.",
             "Mastodon account rows are not run until the canonical plugin supports account-target collection.",
             "YouTube manifest rows name channels rather than canonical video URLs, so transcript collection is not guessed here.",
         ],
     }
 
 
+def _plugin_for(kind: str) -> str:
+    return {"bluesky_account": "bluesky", "scholarly_query": "arxiv"}.get(kind, kind)
+
+
+def queue_health(dispatch: JobLeaseStore, *, capabilities) -> dict[str, Any]:
+    """Read-only queue snapshot for this worker; never mutates a job."""
+    docs = list(dispatch.jobs.find({}, {"status": 1, "kind": 1}))
+    snapshot = queue_snapshot(docs, capabilities)
+    snapshot["worker_kind"] = "localhost"
+    snapshot["browser_capture"] = "manual (never scheduled)"
+    return snapshot
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="ai26-localhost-collect")
-    parser.add_argument("--source-manifest", required=True)
-    parser.add_argument("--study-config", required=True)
+    parser.add_argument("--source-manifest")
+    parser.add_argument("--study-config")
     parser.add_argument("--project-id", default="ai26")
     parser.add_argument("--collection-id", default="ai26")
     parser.add_argument("--machine", default=os.getenv("LACLAUGPT_MACHINE", "laptop"))
     parser.add_argument("--run-id", default=os.getenv("LACLAUGPT_RUN_ID", ""))
-    parser.add_argument("--worker-id", default=os.getenv("LACLAUGPT_WORKER_ID", "localhost-cron"))
     parser.add_argument("--dispatch-mongo", action="store_true",
-                        help="claim this host's share from the shared MongoDB queue (#378)")
-    parser.add_argument("--dispatch-lease-seconds", type=int, default=1800)
-    parser.add_argument("--max-jobs", type=int, default=12)
+                        help="claim non-browser jobs from the shared MongoDB queue (#378)")
+    parser.add_argument("--worker-id", default=os.getenv("LACLAUGPT_WORKER_ID", ""))
+    parser.add_argument("--max-jobs", type=int, default=10)
+    parser.add_argument("--lease-seconds", type=int, default=1800)
+    parser.add_argument("--status", action="store_true", help="print this host's queue health and exit")
     args = parser.parse_args(argv)
-    dispatch = None
-    if args.dispatch_mongo:
-        from pymongo import MongoClient
 
-        from .distributed import ProjectNamespace
-        from .distributed_jobs import JobLeaseStore
+    if args.status:
+        return _print_status(args)
+    if not args.source_manifest or not args.study_config:
+        parser.error("--source-manifest and --study-config are required unless --status is used")
 
-        settings = Settings()
-        if not settings.mongodb_uri:
-            parser.error("--dispatch-mongo needs a MongoDB URI in the settings")
-        client = MongoClient(settings.mongodb_uri,
-                             serverSelectionTimeoutMS=settings.mongodb_connect_timeout_ms,
-                             connect=False)
-        dispatch = JobLeaseStore(
-            client[settings.mongodb_database][
-                ProjectNamespace(project_id=args.project_id).mongo_collection("jobs")]
-        )
-        dispatch.ensure_indexes()
+    dispatch = _dispatch_store() if args.dispatch_mongo else None
+    if args.dispatch_mongo and dispatch is None:
+        return 2
     result = collect_manifest(
         Path(args.source_manifest),
         Path(args.study_config),
@@ -362,11 +348,44 @@ def main(argv: list[str] | None = None) -> int:
         machine=args.machine,
         run_id=args.run_id,
         dispatch=dispatch,
-        worker_id=args.worker_id,
-        dispatch_lease_seconds=args.dispatch_lease_seconds,
+        worker_id=args.worker_id or _default_worker_id(args.machine),
         max_jobs=args.max_jobs,
+        lease_seconds=args.lease_seconds,
     )
     print(json.dumps(result, indent=2, sort_keys=True))
+    return 0
+
+
+def _default_worker_id(machine: str) -> str:
+    import socket
+    host = socket.gethostname().split(".")[0] or "localhost"
+    return f"{machine}-{host}"
+
+
+def _dispatch_store() -> JobLeaseStore | None:
+    """Open the shared queue; return None (with a reason) when MongoDB is not configured."""
+    from pymongo import MongoClient
+
+    from .distributed import ProjectNamespace
+
+    settings = Settings()
+    if not settings.mongodb_uri:
+        print(json.dumps({"error": "no MongoDB URI in the runtime settings; set "
+                                   "LACLAUGPT_MONGODB_URI via the private env file"}, indent=2))
+        return None
+    client = MongoClient(settings.mongodb_uri,
+                         serverSelectionTimeoutMS=settings.mongodb_connect_timeout_ms)
+    collection = client[settings.mongodb_database][
+        ProjectNamespace(project_id=settings.project_id).mongo_collection("jobs")
+    ]
+    return JobLeaseStore(collection)
+
+
+def _print_status(args) -> int:
+    dispatch = _dispatch_store()
+    if dispatch is None:
+        return 2
+    print(json.dumps(queue_health(dispatch, capabilities={"non_browser"}), indent=2, sort_keys=True))
     return 0
 
 

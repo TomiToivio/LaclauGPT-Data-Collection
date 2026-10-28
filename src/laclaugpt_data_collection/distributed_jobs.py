@@ -14,8 +14,8 @@ holding it forever.
 Design notes:
 
 * Capability enforcement is in the *query*, not in the caller. ``claim()`` builds the filter from the
-  worker's declared capabilities; a non-browser worker's filter carries ``$nin`` over
-  ``BROWSER_REQUIRED_KINDS``.
+  worker's declared capabilities; a non-browser worker uses an explicit allowlist
+  of ``NON_BROWSER_KINDS``.
 * Claims are single-document updates. MongoDB guarantees atomicity per document, which is the whole
   concurrency argument; there is no read-then-write race in the claim path.
 * Attempts are counted on claim and bounded by ``max_attempts``, so a job that keeps crashing parks
@@ -88,13 +88,13 @@ def capability_filter(capabilities: Iterable[str]) -> dict[str, Any]:
     """The Mongo clause that limits a worker to work it is allowed to do.
 
     A browser-capable worker gets an empty clause. A worker without the capability is restricted to
-    the non-browser kinds *by exclusion*, so a new browser-only kind is denied by default rather than
-    silently allowed.
+    explicitly classified non-browser kinds *by inclusion*, so unknown kinds are denied
+    by default.
     """
     caps = {str(c) for c in capabilities}
     if "browser" in caps:
         return {}
-    return {"kind": {"$nin": sorted(BROWSER_REQUIRED_KINDS)}}
+    return {"kind": {"$in": sorted(NON_BROWSER_KINDS)}}
 
 
 def _now() -> float:
@@ -172,21 +172,12 @@ class JobLeaseStore:
         lease_seconds: int = 900,
         kinds: Iterable[str] | None = None,
     ) -> list[dict[str, Any]]:
-        """Atomically claim up to ``limit`` jobs this worker is allowed to do.
-
-        ``kinds`` is a second, independent restriction: a host may *hold* the browser capability and
-        still not be able to execute a browser job (the WSL localhost drives X through its capture
-        receiver, not through this runner). Declaring the capability and being able to run the kind
-        are different questions, and the query has to answer both.
-        """
+        """Atomically claim up to ``limit`` jobs this worker is allowed to do."""
         if limit < 1:
             raise ValueError("limit must be at least 1")
-        kind_clause: dict[str, Any] = {}
-        if kinds is not None:
-            allowed = sorted({str(kind) for kind in kinds})
-            if not allowed:
-                return []
-            kind_clause = {"kind": {"$in": allowed}}
+        allowed_kinds = sorted({str(k) for k in kinds}) if kinds is not None else None
+        if allowed_kinds is not None and not allowed_kinds:
+            return []
         claimed: list[dict[str, Any]] = []
         caps = {str(c) for c in capabilities}
         for _ in range(limit):
@@ -201,7 +192,7 @@ class JobLeaseStore:
                     },
                     {"$expr": {"$lt": ["$attempts", "$max_attempts"]}},
                     capability_filter(caps),
-                    *([kind_clause] if kind_clause else []),
+                    *([{"kind": {"$in": allowed_kinds}}] if allowed_kinds is not None else []),
                 ]
             }
             update = {
@@ -248,12 +239,29 @@ class JobLeaseStore:
         )
         return bool(getattr(result, "modified_count", 0))
 
-    def release(self, job_id: str, worker_id: str, *, error: str | None = None) -> bool:
-        """Give a job back after a failure, leaving it claimable until its attempts run out."""
+    def release(
+        self,
+        job_id: str,
+        worker_id: str,
+        *,
+        error: str | None = None,
+        refund_attempt: bool = False,
+    ) -> bool:
+        """Give a job back after a failure, leaving it claimable until its attempts run out.
+
+        ``refund_attempt`` exists for failures that say nothing about the *job*: an object
+        store that is out of quota, a database that is unreachable. Those must not consume
+        the retry budget, or a single infrastructure outage permanently drains the queue —
+        which is exactly what happened on 2026-10-28, when an exhausted Allas quota burned
+        three attempts off every job in one hour.
+        """
         now = self._clock()
         doc = self.jobs.find_one({"_id": job_id, "worker_id": str(worker_id), "status": RUNNING})
         if not doc:
             return False
+        if refund_attempt:
+            self.jobs.update_one({"_id": job_id}, {"$inc": {"attempts": -1}})
+            doc["attempts"] = max(0, int(doc.get("attempts", 0)) - 1)
         exhausted = int(doc.get("attempts", 0)) >= int(doc.get("max_attempts", 3))
         self.jobs.update_one(
             {"_id": job_id, "worker_id": str(worker_id), "status": RUNNING},
@@ -334,8 +342,8 @@ def dispatch_claim(
     max_jobs: int,
     lease_seconds: int = 1800,
     study_fingerprint: str | None = None,
-    capabilities: Iterable[str] = LASKIN_CAPABILITIES,
-    executable_kinds: Iterable[str] | None = NON_BROWSER_KINDS,
+    capabilities: Iterable[str] | None = None,
+    executable_kinds: Iterable[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Claim work from the shared queue instead of slicing the local manifest (#378).
 
@@ -348,11 +356,49 @@ def dispatch_claim(
         study_fingerprint=study_fingerprint,
     )
     dispatch.reap_expired()
-    claimed = dispatch.claim(
-        worker_id, capabilities, limit=max_jobs, lease_seconds=lease_seconds,
-        kinds=executable_kinds,
-    )
+    # #378: the caller declares its capabilities. Defaulting to the Laskin set keeps the
+    # original call site honest (a worker that says nothing gets the most restrictive role),
+    # while a localhost can pass LOCALHOST_CAPABILITIES and actually receive browser work.
+    caps = frozenset(capabilities) if capabilities is not None else LASKIN_CAPABILITIES
+    claimed = dispatch.claim(worker_id, caps, limit=max_jobs, lease_seconds=lease_seconds, kinds=executable_kinds)
     return [{**dict(c.get("payload") or {}), "kind": c["kind"], "_job_id": c["_id"]} for c in claimed]
+
+
+def queue_snapshot(
+    docs: Iterable[Mapping[str, Any]], capabilities: Iterable[str]
+) -> dict[str, Any]:
+    """Summarise the queue for one worker without touching MongoDB.
+
+    Kept pure so the health/status output can be tested with plain dicts. ``browser_backlog``
+    is the number of queued browser jobs no non-browser worker may take; surfacing it is the
+    point — otherwise a localhost looks idle while X work waits for a human session.
+    """
+    caps = {str(c) for c in capabilities}
+    browser_allowed = "browser" in caps
+    by_status: dict[str, int] = {}
+    by_kind: dict[str, int] = {}
+    browser_backlog = 0
+    eligible_pending = 0
+    for doc in docs:
+        status = str(doc.get("status") or "")
+        kind = str(doc.get("kind") or "")
+        if status:
+            by_status[status] = by_status.get(status, 0) + 1
+        if kind:
+            by_kind[kind] = by_kind.get(kind, 0) + 1
+        browser_kind = requires_browser(kind)
+        if browser_kind and status in {PENDING, RUNNING}:
+            browser_backlog += 1
+        if status == PENDING and (browser_allowed or not browser_kind):
+            eligible_pending += 1
+    return {
+        "capabilities": sorted(caps),
+        "by_status": dict(sorted(by_status.items())),
+        "by_kind": dict(sorted(by_kind.items())),
+        "eligible_pending": eligible_pending,
+        "browser_backlog": browser_backlog,
+        "browser_capable": browser_allowed,
+    }
 
 
 def dispatch_finish(
@@ -366,4 +412,11 @@ def dispatch_finish(
     if status in {"ok", "warning"}:
         dispatch.complete(str(job_id), worker_id, outcome=status)
     else:
-        dispatch.release(str(job_id), worker_id, error=str(outcome.get("reason") or status))
+        # An infrastructure failure is not evidence about this job, so it must not spend
+        # the job's retry budget.
+        dispatch.release(
+            str(job_id),
+            worker_id,
+            error=str(outcome.get("reason") or status),
+            refund_attempt=bool(outcome.get("infrastructure")),
+        )
