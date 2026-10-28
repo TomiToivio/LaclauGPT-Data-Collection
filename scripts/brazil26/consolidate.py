@@ -28,6 +28,7 @@ import csv
 import hashlib
 import json
 import os
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -101,12 +102,25 @@ def read_media_index(db: Path) -> list[dict]:
         conn.close()
 
 
+def _post_text(rec: dict) -> str:
+    payload = (rec.get("raw_capture") or {}).get("payload") or {}
+    legacy = payload.get("legacy") or {}
+    for candidate in (rec.get("text"), legacy.get("full_text"), payload.get("desc")):
+        if isinstance(candidate, str) and candidate.strip():
+            return " ".join(candidate.split())
+    return ""
+
+
 def read_posts(root: Path) -> dict[tuple[str, str], dict]:
     """Post-level metadata, joined on (platform, document_id).
 
     The media index carries no author or text, so the canonical CSV would be
-    metadata-poor without this join. Missing normalized files are not an error:
-    a host may have collected media without post records.
+    metadata-poor without this join.
+
+    The canonical record contract nests the platform under ``source.platform`` and the
+    id under ``source_native_ids.document_id``; flat keys are accepted too, because
+    older exports wrote them that way. Returning a normalised dict keeps the CSV writer
+    free of schema branching.
     """
     posts: dict[tuple[str, str], dict] = {}
     ndir = root / "normalized"
@@ -122,11 +136,57 @@ def read_posts(root: Path) -> dict[tuple[str, str], dict]:
                     rec = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                platform = str(rec.get("platform") or path.stem).lower()
-                doc = str(rec.get("document_id") or rec.get("post_id") or "")
-                if doc:
-                    posts[(platform, doc)] = rec
+                source = rec.get("source") or {}
+                platform = str(rec.get("platform") or source.get("platform") or path.stem).lower()
+                doc = str(rec.get("document_id") or rec.get("post_id")
+                          or (rec.get("source_native_ids") or {}).get("document_id") or "")
+                if not doc:
+                    continue
+                posts[(platform, doc)] = {
+                    "source_url": str(rec.get("source_url") or ""),
+                    "author": str(rec.get("author") or source.get("author") or ""),
+                    "timestamp": str(rec.get("timestamp") or source.get("created_at") or ""),
+                    "text": _post_text(rec),
+                    "language": str(rec.get("language") or source.get("language") or ""),
+                }
     return posts
+
+
+def read_post_urls(root: Path) -> dict[str, tuple[str, str]]:
+    """Map a post URL to (platform, native id).
+
+    Some indexes store the post URL in ``document_id`` instead of the native id. Without
+    this map the join to normalized post metadata silently misses every row, and the
+    canonical CSV ships with empty author/text while claiming to be canonical.
+    """
+    urls: dict[str, tuple[str, str]] = {}
+    ndir = root / "normalized"
+    if not ndir.is_dir():
+        return urls
+    for path in sorted(ndir.glob("*.jsonl")):
+        with path.open(encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                source = rec.get("source") or {}
+                platform = str(rec.get("platform") or source.get("platform") or path.stem).lower()
+                doc = str(rec.get("document_id") or rec.get("post_id")
+                          or (rec.get("source_native_ids") or {}).get("document_id") or "")
+                code = post_code(str(rec.get("source_url") or ""))
+                if platform and doc and code:
+                    urls[f"{platform}:{code}"] = doc
+    return urls
+
+
+def post_code(url: str) -> str:
+    """The platform-native code in a post URL, ignoring the ``/p/`` vs ``/reel/`` form."""
+    m = re.search(r"/(?:p|reel|reels|status|video|watch)/([^/?#]+)", url)
+    return m.group(1) if m else ""
 
 
 def inventory(root: Path, limit: int | None = None) -> dict:
@@ -162,7 +222,8 @@ def inventory(root: Path, limit: int | None = None) -> dict:
     }
 
 
-def build_manifest(root: Path, workers: int = 8, limit: int | None = None) -> list[MediaRow]:
+def build_manifest(root: Path, workers: int = 8, limit: int | None = None,
+                   urls: dict[str, tuple[str, str]] | None = None) -> list[MediaRow]:
     """Hash every media file on disk and attach the index facts for it."""
     host = os.uname().nodename
     media_dir = root / MEDIA_DIR
@@ -202,6 +263,11 @@ def build_manifest(root: Path, workers: int = 8, limit: int | None = None) -> li
         index_size = int(idx.get("byte_size") or 0)
         platform = (idx.get("platform") or "").lower() or "unknown"
         doc = str(idx.get("document_id") or "")
+        if doc.startswith("http") and urls:
+            code = post_code(doc)
+            resolved = urls.get(f"{platform}:{code}")
+            if resolved:
+                doc = resolved
         mindex = str(idx.get("media_index") or "")
         logical = f"{platform}:{doc}:{mindex}" if doc else f"file:{rel}"
         return MediaRow(
@@ -446,7 +512,7 @@ def cmd_run(args) -> int:
     out_dir = Path(args.out_dir)
     start = datetime.now()
     inv = inventory(root, args.limit)
-    rows = build_manifest(root, args.workers, args.limit)
+    rows = build_manifest(root, args.workers, args.limit, read_post_urls(root))
     dedupe = deduplicate(rows)
     posts = read_posts(root)
     csvs = write_csvs(rows, dedupe, posts, out_dir, args.dataset)
