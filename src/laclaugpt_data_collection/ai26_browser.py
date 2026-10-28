@@ -99,13 +99,23 @@ class JsonlDistributedMirror:
         return offsets
 
     def _save_offsets(self) -> None:
+        """Persist the mirror offsets, tolerating a filesystem that refuses the atomic rename.
+
+        On the WSL/OneDrive research checkout ``Path.replace`` of a dot-temp file fails with
+        ``FileNotFoundError`` (a sync agent moves or removes it between the write and the rename),
+        which aborted every scan after the first synced row and left the offsets stale — so a
+        restart replayed the whole JSONL and re-attempted ingests. A direct write is not atomic, but
+        a truncated offsets file only costs a replay (the mirror is idempotent), while a failed scan
+        loses the capture-to-shared-plane path entirely.
+        """
         self.data_root.mkdir(parents=True, exist_ok=True)
+        payload = json.dumps(self._offsets, indent=2, sort_keys=True) + "\n"
         tmp = self.state_path.with_suffix(self.state_path.suffix + ".tmp")
-        tmp.write_text(
-            json.dumps(self._offsets, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
-        tmp.replace(self.state_path)
+        try:
+            tmp.write_text(payload, encoding="utf-8")
+            tmp.replace(self.state_path)
+        except OSError:
+            self.state_path.write_text(payload, encoding="utf-8")
 
     def scan_once(self) -> dict[str, int]:
         scanned = synced = rejected = 0
