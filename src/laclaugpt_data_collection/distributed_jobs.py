@@ -14,8 +14,8 @@ holding it forever.
 Design notes:
 
 * Capability enforcement is in the *query*, not in the caller. ``claim()`` builds the filter from the
-  worker's declared capabilities; a non-browser worker's filter carries ``$nin`` over
-  ``BROWSER_REQUIRED_KINDS``.
+  worker's declared capabilities; a non-browser worker uses an explicit allowlist
+  of ``NON_BROWSER_KINDS``.
 * Claims are single-document updates. MongoDB guarantees atomicity per document, which is the whole
   concurrency argument; there is no read-then-write race in the claim path.
 * Attempts are counted on claim and bounded by ``max_attempts``, so a job that keeps crashing parks
@@ -88,13 +88,13 @@ def capability_filter(capabilities: Iterable[str]) -> dict[str, Any]:
     """The Mongo clause that limits a worker to work it is allowed to do.
 
     A browser-capable worker gets an empty clause. A worker without the capability is restricted to
-    the non-browser kinds *by exclusion*, so a new browser-only kind is denied by default rather than
-    silently allowed.
+    explicitly classified non-browser kinds *by inclusion*, so unknown kinds are denied
+    by default.
     """
     caps = {str(c) for c in capabilities}
     if "browser" in caps:
         return {}
-    return {"kind": {"$nin": sorted(BROWSER_REQUIRED_KINDS)}}
+    return {"kind": {"$in": sorted(NON_BROWSER_KINDS)}}
 
 
 def _now() -> float:

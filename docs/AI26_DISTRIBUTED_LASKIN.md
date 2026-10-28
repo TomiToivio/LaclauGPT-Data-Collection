@@ -124,3 +124,7 @@ Rules that must hold on this host:
 1. Never start Firefox, geckodriver, Playwright or any desktop browser session.
 2. Run collection with `--capabilities laskin` so browser kinds are withheld.
 3. Keep AI26 settings in the private repository; never commit the env file.
+
+## Safety reconciliation for PR #384
+
+The main branch already uses `--dispatch-mongo` with `LACLAUGPT_AI26_DISTRIBUTED_JOBS=1`. Do not run a second independent `--queue` path. Laskin now claims only explicitly classified `NON_BROWSER_KINDS`: unclassified kinds (including future browser kinds) cannot be dispatched to a non-browser worker. This retains the newer shared dispatch implementation while incorporating #384's fail-closed capability rule.
