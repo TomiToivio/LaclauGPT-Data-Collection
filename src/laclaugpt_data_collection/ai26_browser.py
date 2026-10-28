@@ -203,6 +203,24 @@ class JsonlDistributedMirror:
             self._thread = None
 
 
+def startup_scan(mirror: Any) -> bool:
+    """Replay the backlog before the port binds, without letting it block the capture path.
+
+    The replay exists so a restart does not lose unsynced records. It must not become a startup
+    dependency on the remote plane: on 2026-10-28 an exhausted Allas quota made the first replayed
+    record raise ``ObjectStoreError``, and because that call was unguarded the whole backend exited
+    and the Firefox capture path could not even listen. The failure belongs in ``last_error``, which
+    ``/status`` reports, not in an exit.
+    """
+    try:
+        mirror.scan_once()
+    except Exception as exc:  # noqa: BLE001 - capture must start without the remote plane
+        mirror.last_error = str(exc)[:300]
+        print(f"distributed mirror startup replay failed (capture continues): {exc}", flush=True)
+        return False
+    return True
+
+
 def run_backend(
     *,
     study_config: str,
@@ -242,7 +260,7 @@ def run_backend(
     )
 
     if mirror is not None:
-        mirror.scan_once()
+        startup_scan(mirror)
     server = CaptureServer(
         study_config,
         data_root,
@@ -252,6 +270,10 @@ def run_backend(
         capture_media_inline=getattr(settings, "capture_media_inline", False),
         capture_media_max_bytes=getattr(settings, "capture_media_max_bytes", 64 * 1024 * 1024),
     )
+    # #378: /status reports what the mirror has done (or the error that stops it), so a host whose
+    # captures never reach the shared plane cannot look healthy just because they are being written
+    # to local JSONL.
+    server.mirror = mirror
     if mirror is not None:
         mirror.start()
     try:

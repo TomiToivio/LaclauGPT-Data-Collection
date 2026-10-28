@@ -142,6 +142,40 @@ def capture_meta_for_account(account_row: dict[str, Any] | None) -> dict[str, st
     return fields
 
 
+def distributed_status(mirror: Any | None) -> dict[str, Any]:
+    """What the capture mirror has actually done, or why it is not running.
+
+    A capture backend that writes local JSONL while the mirror silently fails looks healthy from
+    every counter it publishes: on 2026-10-28 this host served 146 captures and 0 records reached
+    MongoDB because the Allas quota refused each raw object. ``last_error`` is the field that makes
+    that distinguishable from an idle, working host.
+    """
+    if mirror is None:
+        return {"enabled": False, "reason": "local-only profile: no distributed mirror"}
+    return {
+        "enabled": True,
+        "synced_total": int(getattr(mirror, "synced_total", 0)),
+        "rejected_total": int(getattr(mirror, "rejected_total", 0)),
+        "last_error": str(getattr(mirror, "last_error", ""))[:300],
+    }
+
+
+def status_payload(server: Any) -> dict[str, Any]:
+    return {
+        "collector": COLLECTOR_VERSION,
+        "git_commit": git_commit(),
+        "run_id": server.run_id,
+        "study": server.cfg.study,
+        "active": server.active(),
+        "date": str(server.local_today()),
+        "stats": dict(server.stats),
+        "seen_total": server.store.seen_count(),
+        "capture_media_inline": server.capture_media_inline,
+        "capture_media_max_bytes": server.capture_media_max_bytes,
+        "distributed": distributed_status(getattr(server, "mirror", None)),
+    }
+
+
 class CaptureServer(ThreadingHTTPServer):
     """HTTP endpoints: /capture, /ping, /tour and /status."""
 
@@ -162,6 +196,10 @@ class CaptureServer(ThreadingHTTPServer):
         self.media_handoff = CaptureTimeMediaHandoff(self.store)
         self.capture_media_inline = capture_media_inline
         self.capture_media_max_bytes = max(1, capture_media_max_bytes)
+        # #378: set by ai26_browser.run_backend when a distributed mirror runs alongside this
+        # server. None means the profile is local-only, which /status must say out loud rather
+        # than leaving an operator to assume the captures are reaching the shared plane.
+        self.mirror: Any | None = None
         self.stats = {
             "captures": 0,
             "posts": 0,
@@ -296,18 +334,7 @@ class Handler(BaseHTTPRequestHandler):
                 "timezone": cfg.timezone,
             })
         elif path == "/status":
-            self._json(200, {
-                "collector": COLLECTOR_VERSION,
-                "git_commit": git_commit(),
-                "run_id": self.server.run_id,
-                "study": self.server.cfg.study,
-                "active": self.server.active(),
-                "date": str(self.server.local_today()),
-                "stats": dict(self.server.stats),
-                "seen_total": self.server.store.seen_count(),
-                "capture_media_inline": self.server.capture_media_inline,
-                "capture_media_max_bytes": self.server.capture_media_max_bytes,
-            })
+            self._json(200, status_payload(self.server))
         else:
             self._json(404, {"error": "not found"})
 
