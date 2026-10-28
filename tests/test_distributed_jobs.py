@@ -293,14 +293,30 @@ def test_dispatch_claim_is_laskin_safe_by_default(store):
 
 
 def test_dispatch_claim_on_a_browser_host_still_only_takes_runnable_work(store):
-    """A browser-capable host claims its capability, but the runner cannot execute browser kinds."""
+    """A browser-capable host claims its capability, but a runner declares what it can execute.
+
+    The capability says what the *host* may do; ``executable_kinds`` says what this *worker* can run.
+    The AI26 runner executes non-browser kinds only, so a browser job claimed here would sit on a
+    lease until it expired instead of being served by the Firefox capture path.
+    """
+    from laclaugpt_data_collection.distributed_jobs import NON_BROWSER_KINDS
+
     rows = [{"kind": "x_account", "name": "x1"}, {"kind": "web_source", "name": "w1"}]
     claimed = dispatch_claim(store, rows, worker_id="blazer", max_jobs=5,
-                             capabilities=LOCALHOST_CAPABILITIES)
+                             capabilities=LOCALHOST_CAPABILITIES,
+                             executable_kinds=NON_BROWSER_KINDS)
     assert [job["kind"] for job in claimed] == ["web_source"]
     # the browser job is still pending for the capture path, not parked on a lease
     pending = store.status()["by_kind"]
     assert pending.get("x_account") == 1
+
+
+def test_a_browser_capability_alone_still_receives_browser_work(store):
+    """No silent narrowing: the capability decides unless the caller restricts the kinds."""
+    rows = [{"kind": "x_account", "name": "x1"}]
+    claimed = dispatch_claim(store, rows, worker_id="desktop", max_jobs=1,
+                             capabilities=LOCALHOST_CAPABILITIES)
+    assert [job["kind"] for job in claimed] == ["x_account"]
 
 
 def test_worker_id_names_the_host_not_laskin(monkeypatch):
