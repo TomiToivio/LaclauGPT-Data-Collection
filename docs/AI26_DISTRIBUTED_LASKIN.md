@@ -71,10 +71,15 @@ authorized database, and the queue must not assume it can create a database.
 
 ## 4. Not done — stated plainly
 
-- **The runner does not consume the queue yet.** `ai26_laskin_runner.py` still selects jobs from the
-  local manifest. The store is implemented and proven, but wiring it into `run_ai26_laskin_collect.sh`
-  is a separate change, and claiming otherwise would be false. Until then the capability matrix is
-  enforced by the store when used, not by the running cron.
+- **The runner now consumes the queue** (`--queue`, enabled per host with `LACLAUGPT_AI26_QUEUE=1`).
+  The manifest still defines *what jobs exist*; the queue decides *which of them this tick runs*.
+  Manifest selection remains the fallback for a host with no database.
+- **Capability routing was an exclusion list, and that was unsafe.** `capability_filter` returned
+  `{"kind": {"$nin": BROWSER_REQUIRED_KINDS}}` while its docstring promised that a newly added
+  browser kind would be denied. It was not: anything unclassified was claimable. Verified against the
+  live queue on 2026-10-28 — a known `x_account` job was refused, an unclassified `x_search` job was
+  claimed by Laskin. It is now an **allowlist** (`$in NON_BROWSER_KINDS`), so forgetting to classify a
+  new kind makes it wait rather than run on a host that must never drive a browser.
 - **AI26 media has no Allas archival step.** Brazil26 has one (#373); AI26 does not. The Allas project
   quota is currently **exhausted** — even a 30-byte write returns `403 QuotaExceeded` — so an AI26
   archival run could not complete today even if it existed. This is the same blocker recorded on #373.
@@ -83,6 +88,19 @@ authorized database, and the queue must not assume it can create a database.
   heartbeat registry beyond the leases that workers hold.
 
 ## 5. Laskin runbook
+
+Enabling queue-driven collection on a host (opt-in; the manifest path is the default):
+
+```bash
+LACLAUGPT_AI26_QUEUE=1
+LACLAUGPT_AI26_QUEUE_COLLECTION=ai26_jobs   # optional, this is the default
+```
+
+One cycle claims up to `--max-jobs` jobs this worker is allowed to take, runs exactly
+those, then completes what finished and releases what did not (`deferred`, `blocked`,
+`error`) back to the queue. Attempts are bounded in the store, so a permanently failing
+job stops rather than spinning.
+
 
 Status of the collection worker:
 

@@ -59,13 +59,19 @@ def capability_filter(capabilities: Iterable[str]) -> dict[str, Any]:
     """The Mongo clause that limits a worker to work it is allowed to do.
 
     A browser-capable worker gets an empty clause. A worker without the capability is restricted to
-    the non-browser kinds *by exclusion*, so a new browser-only kind is denied by default rather than
-    silently allowed.
+    an **allowlist** of the non-browser kinds, so a kind nobody has classified is denied by default.
+
+    This was an exclusion list (``$nin`` of the browser kinds) and the docstring claimed a new
+    browser-only kind would be denied. It was not: anything absent from the list was allowed, so a
+    new kind — including a new browser kind — was silently claimable on Laskin. Verified against the
+    live queue on 2026-10-28: a known ``x_account`` job was refused while an unclassified
+    ``x_search`` job was claimed. The allowlist makes the documented behaviour true, and the cost of
+    forgetting to classify a new kind is that it waits, rather than that it runs where it must not.
     """
     caps = {str(c) for c in capabilities}
     if "browser" in caps:
         return {}
-    return {"kind": {"$nin": sorted(BROWSER_REQUIRED_KINDS)}}
+    return {"kind": {"$in": sorted(NON_BROWSER_KINDS)}}
 
 
 def _now() -> float:
