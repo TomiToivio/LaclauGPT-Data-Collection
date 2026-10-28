@@ -1,10 +1,10 @@
 """Regression tests for #368 and #369. No private records or network."""
-from datetime import UTC, datetime, timedelta
 import importlib.util
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from laclaugpt_data_collection.realtime import RealtimePolicy, analysis_eligibility
 from laclaugpt_data_collection.handoff import build_handoff
+from laclaugpt_data_collection.realtime import RealtimePolicy, analysis_eligibility
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts/check_ai26_capture_freshness.py"
 spec = importlib.util.spec_from_file_location("ai26_freshness", SCRIPT)
