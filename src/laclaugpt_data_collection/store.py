@@ -3,14 +3,50 @@ from __future__ import annotations
 
 import itertools
 import json
+import re
 import sqlite3
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 
 def utc_stamp() -> str:
     return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+
+
+#: Payload keys whose values are credentials, not research data. The browser extension
+#: posts every X GraphQL response, and some of them (notably ``grok_account_jwt``) carry
+#: live bearer tokens; storing them verbatim puts a working credential on disk.
+_SECRET_KEY = re.compile(
+    r"(?i)(?:^|[_-])(jwt|token|secret|password|passwd|authorization|cookie|session|api_?key|bearer)(?:$|[_-])"
+)
+#: A bare JWT anywhere in a string value, regardless of the key it sits under.
+_JWT_VALUE = re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b")
+REDACTED = "[REDACTED]"
+
+
+def redact_secrets(value: Any) -> Any:
+    """Return ``value`` with credential-bearing entries replaced by ``[REDACTED]``.
+
+    Structural information is preserved (keys and list lengths stay), so a raw capture
+    remains useful for diagnosing a parser failure without keeping a token that could be
+    replayed. Applied in :meth:`CollectionStore.append_raw`, i.e. on every platform, so no
+    caller can forget it.
+    """
+    if isinstance(value, dict):
+        cleaned: dict[Any, Any] = {}
+        for key, item in value.items():
+            if isinstance(key, str) and _SECRET_KEY.search(key) and not isinstance(item, (dict, list)):
+                cleaned[key] = REDACTED
+            else:
+                cleaned[key] = redact_secrets(item)
+        return cleaned
+    if isinstance(value, list):
+        return [redact_secrets(item) for item in value]
+    if isinstance(value, str) and _JWT_VALUE.search(value):
+        return _JWT_VALUE.sub(REDACTED, value)
+    return value
 
 
 class CollectionStore:
@@ -110,7 +146,7 @@ class CollectionStore:
         directory.mkdir(parents=True, exist_ok=True)
         path = directory / f"capture-{utc_stamp()}-{next(self._counter):08x}.ndjson"
         with path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=False, default=str) + "\n")
+            handle.write(json.dumps(redact_secrets(payload), ensure_ascii=False, default=str) + "\n")
         return path.relative_to(self.root).as_posix()
 
     @staticmethod
@@ -144,7 +180,7 @@ class CollectionStore:
             else:
                 payload["raw_ref"] = raw_ref
             with path.open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps(payload, ensure_ascii=False, default=str) + "\n")
+                handle.write(json.dumps(redact_secrets(payload), ensure_ascii=False, default=str) + "\n")
             self._db.execute(
                 "INSERT INTO seen_posts (platform, document_id, first_seen, normalized_ref) VALUES (?, ?, ?, ?)",
                 (
