@@ -106,18 +106,16 @@ fi
 # as a silently stopped stage even though its records were collected. Capture the
 # runner status, always emit the end marker, and propagate the status so cron/CI
 # still sees a non-zero exit for a partial tick.
-# Issue #378: the lease queue decides which job this tick runs, so two hosts cannot
-# collect the same work. Opt-in per host (LACLAUGPT_AI26_QUEUE=1) because the manifest
-# path must keep working on a host with no database, and because switching a live
-# schedule over is a deployment decision, not a code one.
-QUEUE_ARGS=()
-if [[ "${LACLAUGPT_AI26_QUEUE:-0}" == "1" ]]; then
-  QUEUE_ARGS+=(--queue --queue-collection "${LACLAUGPT_AI26_QUEUE_COLLECTION:-ai26_jobs}")
+# #378: opt in to the shared queue. Off by default so a host that has not been
+# migrated keeps the audited manifest behaviour unchanged.
+DISPATCH_ARGS=()
+if [[ "${LACLAUGPT_AI26_DISTRIBUTED_JOBS:-0}" == "1" ]]; then
+  DISPATCH_ARGS=(--dispatch-mongo --dispatch-lease-seconds "${LACLAUGPT_AI26_LEASE_SECONDS:-1800}")
 fi
 
 set +e
 "${RUN[@]}" \
-  "${QUEUE_ARGS[@]}" \
+  "${DISPATCH_ARGS[@]}" \
   --study-config "$STUDY_CONFIG" \
   --source-manifest "$SOURCE_MANIFEST" \
   --collection-id "ai26" \

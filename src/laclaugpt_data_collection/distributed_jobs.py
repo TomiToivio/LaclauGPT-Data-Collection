@@ -14,8 +14,8 @@ holding it forever.
 Design notes:
 
 * Capability enforcement is in the *query*, not in the caller. ``claim()`` builds the filter from the
-  worker's declared capabilities; a non-browser worker's filter carries ``$nin`` over
-  ``BROWSER_REQUIRED_KINDS``.
+  worker's declared capabilities; a non-browser worker uses an explicit allowlist
+  of ``NON_BROWSER_KINDS``.
 * Claims are single-document updates. MongoDB guarantees atomicity per document, which is the whole
   concurrency argument; there is no read-then-write race in the claim path.
 * Attempts are counted on claim and bounded by ``max_attempts``, so a job that keeps crashing parks
@@ -55,18 +55,41 @@ def requires_browser(kind: str) -> bool:
     return str(kind) in BROWSER_REQUIRED_KINDS
 
 
+def priority_rank(value: Any) -> int:
+    """Manifest priorities are written ``P1``..``P3``; the queue orders on an integer.
+
+    Accepts either form so a manifest edit does not silently break enqueueing, and maps anything
+    unrecognised to the middle rank rather than failing a whole cycle.
+    """
+    if isinstance(value, (int, float)):
+        return int(value)
+    text = str(value or "").strip().upper()
+    if text.startswith("P") and text[1:].isdigit():
+        return int(text[1:])
+    if text.isdigit():
+        return int(text)
+    return 2
+
+
+def job_identity(row: Mapping[str, Any]) -> str:
+    """Stable identity for a manifest row, identical on every host.
+
+    Derived from the source table and name, never from a timestamp or index, so re-reading the same
+    manifest on another machine addresses the same queue entry instead of creating a second one.
+    """
+    kind = str(row.get("kind") or row.get("table") or "").strip()
+    name = str(row.get("name") or "").strip()
+    if not kind or not name:
+        raise ValueError(f"job needs kind and name, got {kind!r}/{name!r}")
+    return f"{kind}:{name}"
+
+
 def capability_filter(capabilities: Iterable[str]) -> dict[str, Any]:
     """The Mongo clause that limits a worker to work it is allowed to do.
 
     A browser-capable worker gets an empty clause. A worker without the capability is restricted to
-    an **allowlist** of the non-browser kinds, so a kind nobody has classified is denied by default.
-
-    This was an exclusion list (``$nin`` of the browser kinds) and the docstring claimed a new
-    browser-only kind would be denied. It was not: anything absent from the list was allowed, so a
-    new kind — including a new browser kind — was silently claimable on Laskin. Verified against the
-    live queue on 2026-10-28: a known ``x_account`` job was refused while an unclassified
-    ``x_search`` job was claimed. The allowlist makes the documented behaviour true, and the cost of
-    forgetting to classify a new kind is that it waits, rather than that it runs where it must not.
+    explicitly classified non-browser kinds *by inclusion*, so unknown kinds are denied
+    by default.
     """
     caps = {str(c) for c in capabilities}
     if "browser" in caps:
@@ -123,7 +146,7 @@ class JobLeaseStore:
                 "_id": job_id,
                 "kind": kind,
                 "name": str(job.get("name") or job_id),
-                "priority": int(job.get("priority", 2)),
+                "priority": priority_rank(job.get("priority", 2)),
                 "payload": {k: v for k, v in job.items() if k not in {"job_id", "id", "kind"}},
                 "status": PENDING,
                 "attempts": 0,
@@ -287,3 +310,83 @@ class JobLeaseStore:
             "workers": workers,
             "stale_after_s": stale_after,
         }
+
+
+def dispatch_claim(
+    dispatch: "JobLeaseStore",
+    rows: list[dict[str, Any]],
+    *,
+    worker_id: str,
+    max_jobs: int,
+    lease_seconds: int = 1800,
+    study_fingerprint: str | None = None,
+    capabilities: Iterable[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Claim work from the shared queue instead of slicing the local manifest (#378).
+
+    The manifest is still the source of truth for *what exists*, so it is enqueued first (idempotent
+    on ``job_id``). What changes is who may take a job: ``claim`` filters browser kinds out for a
+    Laskin-capable worker inside the query, so this host cannot be handed one.
+    """
+    dispatch.enqueue(
+        [{**row, "job_id": job_identity(row)} for row in rows],
+        study_fingerprint=study_fingerprint,
+    )
+    dispatch.reap_expired()
+    # #378: the caller declares its capabilities. Defaulting to the Laskin set keeps the
+    # original call site honest (a worker that says nothing gets the most restrictive role),
+    # while a localhost can pass LOCALHOST_CAPABILITIES and actually receive browser work.
+    caps = frozenset(capabilities) if capabilities is not None else LASKIN_CAPABILITIES
+    claimed = dispatch.claim(worker_id, caps, limit=max_jobs, lease_seconds=lease_seconds)
+    return [{**dict(c.get("payload") or {}), "kind": c["kind"], "_job_id": c["_id"]} for c in claimed]
+
+
+def queue_snapshot(
+    docs: Iterable[Mapping[str, Any]], capabilities: Iterable[str]
+) -> dict[str, Any]:
+    """Summarise the queue for one worker without touching MongoDB.
+
+    Kept pure so the health/status output can be tested with plain dicts. ``browser_backlog``
+    is the number of queued browser jobs no non-browser worker may take; surfacing it is the
+    point — otherwise a localhost looks idle while X work waits for a human session.
+    """
+    caps = {str(c) for c in capabilities}
+    browser_allowed = "browser" in caps
+    by_status: dict[str, int] = {}
+    by_kind: dict[str, int] = {}
+    browser_backlog = 0
+    eligible_pending = 0
+    for doc in docs:
+        status = str(doc.get("status") or "")
+        kind = str(doc.get("kind") or "")
+        if status:
+            by_status[status] = by_status.get(status, 0) + 1
+        if kind:
+            by_kind[kind] = by_kind.get(kind, 0) + 1
+        browser_kind = requires_browser(kind)
+        if browser_kind and status in {PENDING, RUNNING}:
+            browser_backlog += 1
+        if status == PENDING and (browser_allowed or not browser_kind):
+            eligible_pending += 1
+    return {
+        "capabilities": sorted(caps),
+        "by_status": dict(sorted(by_status.items())),
+        "by_kind": dict(sorted(by_kind.items())),
+        "eligible_pending": eligible_pending,
+        "browser_backlog": browser_backlog,
+        "browser_capable": browser_allowed,
+    }
+
+
+def dispatch_finish(
+    dispatch: "JobLeaseStore", row: dict[str, Any], outcome: dict[str, Any], *, worker_id: str
+) -> None:
+    """Settle a claimed job: done on success, back on the queue when it failed."""
+    job_id = row.get("_job_id")
+    if not job_id:
+        return
+    status = str(outcome.get("status") or "")
+    if status in {"ok", "warning"}:
+        dispatch.complete(str(job_id), worker_id, outcome=status)
+    else:
+        dispatch.release(str(job_id), worker_id, error=str(outcome.get("reason") or status))

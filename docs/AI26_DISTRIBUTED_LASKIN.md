@@ -69,17 +69,29 @@ A permission fact worth recording: the collection's MongoDB user **cannot create
 (`dropDatabase` returns `Unauthorized`). The smoke therefore uses a throwaway *collection* inside the
 authorized database, and the queue must not assume it can create a database.
 
-## 4. Not done — stated plainly
+## 4. Queue wiring — opt-in, not yet the live default
 
-- **The runner now consumes the queue** (`--queue`, enabled per host with `LACLAUGPT_AI26_QUEUE=1`).
-  The manifest still defines *what jobs exist*; the queue decides *which of them this tick runs*.
-  Manifest selection remains the fallback for a host with no database.
-- **Capability routing was an exclusion list, and that was unsafe.** `capability_filter` returned
-  `{"kind": {"$nin": BROWSER_REQUIRED_KINDS}}` while its docstring promised that a newly added
-  browser kind would be denied. It was not: anything unclassified was claimable. Verified against the
-  live queue on 2026-10-28 — a known `x_account` job was refused, an unclassified `x_search` job was
-  claimed by Laskin. It is now an **allowlist** (`$in NON_BROWSER_KINDS`), so forgetting to classify a
-  new kind makes it wait rather than run on a host that must never drive a browser.
+`ai26_laskin_runner.py` now takes `--dispatch-mongo` (and `--dispatch-lease-seconds`). With it, the
+runner enqueues the manifest, claims work from the shared queue, and settles each job: `complete` on a
+successful source, `release` on error, blocked or deferred-by-tick-limit — so a claimed job never sits
+on a dead lease.
+
+The wrapper exposes it as `LACLAUGPT_AI26_DISTRIBUTED_JOBS=1` (default off), because switching the live
+cron is an operational decision, not a code decision. **Until that variable is set, the cron still
+slices the local manifest** and the queue is unused by the running pipeline.
+
+Verified against the live queue with the real manifest (26 non-browser rows):
+
+```
+manifest non-browser rows: 26  kinds: ['bluesky_account','mastodon_account','scholarly_query','web_source']
+new rows enqueued: 26
+claimed by laskin: [('bluesky_account','Timnit Gebru'), ('web_source','anthropic_news'), ...]
+queue: {'pending': 26}  depth 26
+browser kinds queued: []
+```
+
+Those 26 are parked as pending, which is the intended state before the switch is flipped. No collecting
+cycle has been run with the flag yet.
 - **AI26 media has no Allas archival step.** Brazil26 has one (#373); AI26 does not. The Allas project
   quota is currently **exhausted** — even a 30-byte write returns `403 QuotaExceeded` — so an AI26
   archival run could not complete today even if it existed. This is the same blocker recorded on #373.
@@ -88,19 +100,6 @@ authorized database, and the queue must not assume it can create a database.
   heartbeat registry beyond the leases that workers hold.
 
 ## 5. Laskin runbook
-
-Enabling queue-driven collection on a host (opt-in; the manifest path is the default):
-
-```bash
-LACLAUGPT_AI26_QUEUE=1
-LACLAUGPT_AI26_QUEUE_COLLECTION=ai26_jobs   # optional, this is the default
-```
-
-One cycle claims up to `--max-jobs` jobs this worker is allowed to take, runs exactly
-those, then completes what finished and releases what did not (`deferred`, `blocked`,
-`error`) back to the queue. Attempts are bounded in the store, so a permanently failing
-job stops rather than spinning.
-
 
 Status of the collection worker:
 
@@ -125,3 +124,7 @@ Rules that must hold on this host:
 1. Never start Firefox, geckodriver, Playwright or any desktop browser session.
 2. Run collection with `--capabilities laskin` so browser kinds are withheld.
 3. Keep AI26 settings in the private repository; never commit the env file.
+
+## Safety reconciliation for PR #384
+
+The main branch already uses `--dispatch-mongo` with `LACLAUGPT_AI26_DISTRIBUTED_JOBS=1`. Do not run a second independent `--queue` path. Laskin now claims only explicitly classified `NON_BROWSER_KINDS`: unclassified kinds (including future browser kinds) cannot be dispatched to a non-browser worker. This retains the newer shared dispatch implementation while incorporating #384's fail-closed capability rule.
