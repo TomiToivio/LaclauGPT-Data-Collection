@@ -647,8 +647,23 @@ def run_phase1_laskin(
                 f"{row.get('kind')}:{row.get('name','unnamed')}: {exc.reason}: {exc.source_url}"
             )
         except Exception as exc:  # noqa: BLE001
-            outcome.update(status="error", reason="collection_or_ingest_failed")
-            errors.append(f"{row.get('kind')}:{row.get('name','unnamed')}: {str(exc)[:180]}")
+            # A full object store or an unreachable database is an outage, not a bad
+            # source. Naming it separately keeps the retry budget intact and stops an
+            # infrastructure problem from being reported as a collector failure.
+            message = str(exc)
+            infra = any(
+                marker in message
+                for marker in ("QuotaExceeded", "ObjectStoreError", "ServerSelectionTimeoutError",
+                               "AutoReconnect", "connection refused", "Connection refused")
+            )
+            outcome.update(
+                status="error",
+                reason="object_store_or_database_unavailable" if infra
+                else "collection_or_ingest_failed",
+            )
+            if infra:
+                outcome["infrastructure"] = True
+            errors.append(f"{row.get('kind')}:{row.get('name','unnamed')}: {message[:180]}")
         dispatch_finish(dispatch, row, outcome, worker_id=worker_id)
 
     # Issue #206: make source-manifest drift visible every cycle. The deployed

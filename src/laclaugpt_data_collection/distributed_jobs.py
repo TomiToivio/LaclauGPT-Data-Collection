@@ -234,12 +234,29 @@ class JobLeaseStore:
         )
         return bool(getattr(result, "modified_count", 0))
 
-    def release(self, job_id: str, worker_id: str, *, error: str | None = None) -> bool:
-        """Give a job back after a failure, leaving it claimable until its attempts run out."""
+    def release(
+        self,
+        job_id: str,
+        worker_id: str,
+        *,
+        error: str | None = None,
+        refund_attempt: bool = False,
+    ) -> bool:
+        """Give a job back after a failure, leaving it claimable until its attempts run out.
+
+        ``refund_attempt`` exists for failures that say nothing about the *job*: an object
+        store that is out of quota, a database that is unreachable. Those must not consume
+        the retry budget, or a single infrastructure outage permanently drains the queue —
+        which is exactly what happened on 2026-10-28, when an exhausted Allas quota burned
+        three attempts off every job in one hour.
+        """
         now = self._clock()
         doc = self.jobs.find_one({"_id": job_id, "worker_id": str(worker_id), "status": RUNNING})
         if not doc:
             return False
+        if refund_attempt:
+            self.jobs.update_one({"_id": job_id}, {"$inc": {"attempts": -1}})
+            doc["attempts"] = max(0, int(doc.get("attempts", 0)) - 1)
         exhausted = int(doc.get("attempts", 0)) >= int(doc.get("max_attempts", 3))
         self.jobs.update_one(
             {"_id": job_id, "worker_id": str(worker_id), "status": RUNNING},
@@ -389,4 +406,11 @@ def dispatch_finish(
     if status in {"ok", "warning"}:
         dispatch.complete(str(job_id), worker_id, outcome=status)
     else:
-        dispatch.release(str(job_id), worker_id, error=str(outcome.get("reason") or status))
+        # An infrastructure failure is not evidence about this job, so it must not spend
+        # the job's retry budget.
+        dispatch.release(
+            str(job_id),
+            worker_id,
+            error=str(outcome.get("reason") or status),
+            refund_attempt=bool(outcome.get("infrastructure")),
+        )
