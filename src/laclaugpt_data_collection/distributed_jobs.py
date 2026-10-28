@@ -170,10 +170,14 @@ class JobLeaseStore:
         *,
         limit: int = 1,
         lease_seconds: int = 900,
+        kinds: Iterable[str] | None = None,
     ) -> list[dict[str, Any]]:
         """Atomically claim up to ``limit`` jobs this worker is allowed to do."""
         if limit < 1:
             raise ValueError("limit must be at least 1")
+        allowed_kinds = sorted({str(k) for k in kinds}) if kinds is not None else None
+        if allowed_kinds is not None and not allowed_kinds:
+            return []
         claimed: list[dict[str, Any]] = []
         caps = {str(c) for c in capabilities}
         for _ in range(limit):
@@ -188,6 +192,7 @@ class JobLeaseStore:
                     },
                     {"$expr": {"$lt": ["$attempts", "$max_attempts"]}},
                     capability_filter(caps),
+                    *([{"kind": {"$in": allowed_kinds}}] if allowed_kinds is not None else []),
                 ]
             }
             update = {
@@ -338,6 +343,7 @@ def dispatch_claim(
     lease_seconds: int = 1800,
     study_fingerprint: str | None = None,
     capabilities: Iterable[str] | None = None,
+    executable_kinds: Iterable[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Claim work from the shared queue instead of slicing the local manifest (#378).
 
@@ -354,7 +360,7 @@ def dispatch_claim(
     # original call site honest (a worker that says nothing gets the most restrictive role),
     # while a localhost can pass LOCALHOST_CAPABILITIES and actually receive browser work.
     caps = frozenset(capabilities) if capabilities is not None else LASKIN_CAPABILITIES
-    claimed = dispatch.claim(worker_id, caps, limit=max_jobs, lease_seconds=lease_seconds)
+    claimed = dispatch.claim(worker_id, caps, limit=max_jobs, lease_seconds=lease_seconds, kinds=executable_kinds)
     return [{**dict(c.get("payload") or {}), "kind": c["kind"], "_job_id": c["_id"]} for c in claimed]
 
 

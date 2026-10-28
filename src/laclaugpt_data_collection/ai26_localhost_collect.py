@@ -172,11 +172,11 @@ def _manifest_jobs(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     """
     jobs: list[dict[str, Any]] = []
     for row in manifest.get("bluesky_account", []):
-        jobs.append({"kind": "bluesky_account", "name": str(row.get("handle") or ""), "row": row})
+        jobs.append({"kind": "bluesky_account", "name": str(row.get("name") or row.get("handle") or ""), "row": row})
     for row in manifest.get("scholarly_query", []):
         services = {str(item).lower() for item in row.get("services", [])}
         if "arxiv" in services:
-            jobs.append({"kind": "scholarly_query", "name": str(row.get("query") or ""), "row": row})
+            jobs.append({"kind": "scholarly_query", "name": str(row.get("name") or row.get("query") or ""), "row": row})
     return jobs
 
 
@@ -252,6 +252,7 @@ def collect_manifest(
             max_jobs=max_jobs,
             lease_seconds=lease_seconds,
             capabilities={"non_browser"},
+            executable_kinds={"bluesky_account", "scholarly_query"},
         )
         selected = [
             {"kind": c.get("kind", ""), "name": c.get("name", ""), "row": c, "_job_id": c.get("_job_id")}

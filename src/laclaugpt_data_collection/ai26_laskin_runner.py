@@ -9,7 +9,9 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 import re
+import socket
 import time
 import tomllib
 from collections.abc import Callable
@@ -25,7 +27,13 @@ from .collectors.rss import RSSCollector
 from .collectors.youtube import YouTubeCollector
 from .config import Settings
 from .distributed_capture import DistributedCaptureSink, HollowRecordError
-from .distributed_jobs import dispatch_claim, dispatch_finish
+from .distributed_jobs import (
+    LASKIN_CAPABILITIES,
+    LOCALHOST_CAPABILITIES,
+    NON_BROWSER_KINDS,
+    dispatch_claim,
+    dispatch_finish,
+)
 from .language import unlabelled_language_warning
 from .models import CanonicalRecord, CollectionProvenance, NormalizedRecord
 from .plugins import RetryPolicy
@@ -430,13 +438,26 @@ def _rss_window(
     return (feeds, depth)
 
 
+def default_worker_id() -> str:
+    """A worker id that names the machine, so the queue shows which host holds a lease.
+
+    The old default was ``laskin-cron`` on every host, which made a WSL or desktop worker
+    indistinguishable from Laskin in the shared queue.
+    """
+    explicit = os.environ.get("LACLAUGPT_WORKER_ID", "").strip()
+    if explicit:
+        return explicit
+    host = (socket.gethostname() or "localhost").split(".")[0].lower()
+    return f"{host}-cron"
+
+
 def run_phase1_laskin(
     settings: Settings,
     *,
     study_config: str | Path,
     source_manifest: str | Path,
     collection_id: str | None = None,
-    worker_id: str = "laskin-cron",
+    worker_id: str = "laskin-cron",  # callers pass a host-derived id; see default_worker_id
     max_feeds: int = 8,
     max_jobs: int = 6,
     per_source_limit: int = 5,
@@ -446,6 +467,7 @@ def run_phase1_laskin(
     enforce_source_budgets: bool | None = None,
     dispatch: Any | None = None,
     dispatch_lease_seconds: int = 1800,
+    capabilities: Any = None,
 ) -> dict[str, Any]:
     routed = collection_id or settings.project_id
     if routed != settings.project_id:
@@ -549,6 +571,10 @@ def run_phase1_laskin(
             worker_id=worker_id,
             max_jobs=max_jobs,
             lease_seconds=dispatch_lease_seconds,
+            capabilities=capabilities or LASKIN_CAPABILITIES,
+            # The runner executes non-browser kinds only. Claiming a browser kind here would park it
+            # on a lease until it expired, which is worse than leaving it for the capture path.
+            executable_kinds=NON_BROWSER_KINDS,
         )
     else:
         jobs = select_job_window(all_jobs, max_jobs=max_jobs, rotation=rotation * max_jobs)
@@ -749,7 +775,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--study-config", required=True)
     parser.add_argument("--source-manifest", required=True)
     parser.add_argument("--collection-id", default=None)
-    parser.add_argument("--worker-id", default="laskin-cron")
+    parser.add_argument("--worker-id", default=default_worker_id())
     parser.add_argument("--max-feeds", type=int, default=8)
     parser.add_argument("--max-jobs", type=int, default=6)
     parser.add_argument("--per-source-limit", type=int, default=5)
@@ -780,6 +806,14 @@ def main(argv: list[str] | None = None) -> int:
         "--dispatch-mongo",
         action="store_true",
         help="claim work from the shared MongoDB job queue instead of slicing the local manifest (#378)",
+    )
+    parser.add_argument(
+        "--capabilities",
+        default=os.environ.get("LACLAUGPT_WORKER_CAPABILITIES", "laskin"),
+        choices=("laskin", "non_browser", "localhost", "all"),
+        help=("declare this worker's capabilities for the shared queue (#378): 'laskin'/'non_browser' "
+              "never see browser kinds; 'localhost'/'all' declare a browser-capable host. The runner "
+              "still claims only kinds it can execute, so a browser kind is never parked on a lease."),
     )
     parser.add_argument(
         "--dispatch-lease-seconds",
@@ -824,6 +858,10 @@ def main(argv: list[str] | None = None) -> int:
         enforce_source_budgets=args.enforce_source_budgets,
         dispatch=dispatch,
         dispatch_lease_seconds=args.dispatch_lease_seconds,
+        capabilities=(
+            LOCALHOST_CAPABILITIES if args.capabilities in {"localhost", "all"}
+            else LASKIN_CAPABILITIES
+        ),
     )
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     return 0 if not result["errors"] else 1
