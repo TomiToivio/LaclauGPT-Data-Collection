@@ -1,0 +1,24 @@
+name: Brazil26 offline reconciliation
+on:
+  push:
+    paths:
+      - 'scripts/brazil26_reconcile_offline.py'
+      - 'tests/test_issue_373_brazil26_reconciliation.py'
+      - '.github/workflows/brazil26-reconcile.yml'
+  pull_request:
+    paths:
+      - 'scripts/brazil26_reconcile_offline.py'
+      - 'tests/test_issue_373_brazil26_reconciliation.py'
+      - '.github/workflows/brazil26-reconcile.yml'
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pytest
+        run: python -m pip install -e . 'pytest>=8.3,<9'
+      - name: Validate offline reconciliation
+        run: python -m pytest -q tests/test_issue_373_brazil26_reconciliation.py
