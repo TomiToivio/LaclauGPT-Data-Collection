@@ -49,7 +49,7 @@ operational decision, and an un-migrated host must keep behaving exactly as audi
 ## 4. Runbook
 
 ```bash
-cd "/mnt/c/Users/totoivio/OneDrive - University of Helsinki/LaclauGPT-Data-Collection"
+cd "$LACLAUGPT_CHECKOUT"          # the checkout that owns data/ on this host
 set -a; source data/config/ai26-localhost.env; set +a
 
 # host health (read-only): queue depth, leases, whether this host may take browser work
