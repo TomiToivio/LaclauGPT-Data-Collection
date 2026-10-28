@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from typing import Any
 from urllib.parse import urlsplit
@@ -204,6 +204,10 @@ def analysis_eligibility(record: dict, policy: RealtimePolicy) -> tuple[bool, st
         return False, "missing_source_publication_time"
     if policy.publication_date_floor and published < policy.publication_date_floor:
         return False, "before_publication_date_floor"
+    # #369: future-dated event listings are not yet published evidence.
+    # A 24-hour grace period accommodates date-only stamps and timezone ambiguity.
+    if published > datetime.now(UTC) + timedelta(hours=24):
+        return False, "future_source_publication_time"
     return True, "eligible"
 
 
