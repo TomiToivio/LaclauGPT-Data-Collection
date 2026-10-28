@@ -106,8 +106,16 @@ fi
 # as a silently stopped stage even though its records were collected. Capture the
 # runner status, always emit the end marker, and propagate the status so cron/CI
 # still sees a non-zero exit for a partial tick.
+# #378: opt in to the shared queue. Off by default so a host that has not been
+# migrated keeps the audited manifest behaviour unchanged.
+DISPATCH_ARGS=()
+if [[ "${LACLAUGPT_AI26_DISTRIBUTED_JOBS:-0}" == "1" ]]; then
+  DISPATCH_ARGS=(--dispatch-mongo --dispatch-lease-seconds "${LACLAUGPT_AI26_LEASE_SECONDS:-1800}")
+fi
+
 set +e
 "${RUN[@]}" \
+  "${DISPATCH_ARGS[@]}" \
   --study-config "$STUDY_CONFIG" \
   --source-manifest "$SOURCE_MANIFEST" \
   --collection-id "ai26" \

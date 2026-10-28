@@ -69,12 +69,29 @@ A permission fact worth recording: the collection's MongoDB user **cannot create
 (`dropDatabase` returns `Unauthorized`). The smoke therefore uses a throwaway *collection* inside the
 authorized database, and the queue must not assume it can create a database.
 
-## 4. Not done — stated plainly
+## 4. Queue wiring — opt-in, not yet the live default
 
-- **The runner does not consume the queue yet.** `ai26_laskin_runner.py` still selects jobs from the
-  local manifest. The store is implemented and proven, but wiring it into `run_ai26_laskin_collect.sh`
-  is a separate change, and claiming otherwise would be false. Until then the capability matrix is
-  enforced by the store when used, not by the running cron.
+`ai26_laskin_runner.py` now takes `--dispatch-mongo` (and `--dispatch-lease-seconds`). With it, the
+runner enqueues the manifest, claims work from the shared queue, and settles each job: `complete` on a
+successful source, `release` on error, blocked or deferred-by-tick-limit — so a claimed job never sits
+on a dead lease.
+
+The wrapper exposes it as `LACLAUGPT_AI26_DISTRIBUTED_JOBS=1` (default off), because switching the live
+cron is an operational decision, not a code decision. **Until that variable is set, the cron still
+slices the local manifest** and the queue is unused by the running pipeline.
+
+Verified against the live queue with the real manifest (26 non-browser rows):
+
+```
+manifest non-browser rows: 26  kinds: ['bluesky_account','mastodon_account','scholarly_query','web_source']
+new rows enqueued: 26
+claimed by laskin: [('bluesky_account','Timnit Gebru'), ('web_source','anthropic_news'), ...]
+queue: {'pending': 26}  depth 26
+browser kinds queued: []
+```
+
+Those 26 are parked as pending, which is the intended state before the switch is flipped. No collecting
+cycle has been run with the flag yet.
 - **AI26 media has no Allas archival step.** Brazil26 has one (#373); AI26 does not. The Allas project
   quota is currently **exhausted** — even a 30-byte write returns `403 QuotaExceeded` — so an AI26
   archival run could not complete today even if it existed. This is the same blocker recorded on #373.

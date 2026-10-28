@@ -55,6 +55,35 @@ def requires_browser(kind: str) -> bool:
     return str(kind) in BROWSER_REQUIRED_KINDS
 
 
+def priority_rank(value: Any) -> int:
+    """Manifest priorities are written ``P1``..``P3``; the queue orders on an integer.
+
+    Accepts either form so a manifest edit does not silently break enqueueing, and maps anything
+    unrecognised to the middle rank rather than failing a whole cycle.
+    """
+    if isinstance(value, (int, float)):
+        return int(value)
+    text = str(value or "").strip().upper()
+    if text.startswith("P") and text[1:].isdigit():
+        return int(text[1:])
+    if text.isdigit():
+        return int(text)
+    return 2
+
+
+def job_identity(row: Mapping[str, Any]) -> str:
+    """Stable identity for a manifest row, identical on every host.
+
+    Derived from the source table and name, never from a timestamp or index, so re-reading the same
+    manifest on another machine addresses the same queue entry instead of creating a second one.
+    """
+    kind = str(row.get("kind") or row.get("table") or "").strip()
+    name = str(row.get("name") or "").strip()
+    if not kind or not name:
+        raise ValueError(f"job needs kind and name, got {kind!r}/{name!r}")
+    return f"{kind}:{name}"
+
+
 def capability_filter(capabilities: Iterable[str]) -> dict[str, Any]:
     """The Mongo clause that limits a worker to work it is allowed to do.
 
@@ -117,7 +146,7 @@ class JobLeaseStore:
                 "_id": job_id,
                 "kind": kind,
                 "name": str(job.get("name") or job_id),
-                "priority": int(job.get("priority", 2)),
+                "priority": priority_rank(job.get("priority", 2)),
                 "payload": {k: v for k, v in job.items() if k not in {"job_id", "id", "kind"}},
                 "status": PENDING,
                 "attempts": 0,
@@ -281,3 +310,43 @@ class JobLeaseStore:
             "workers": workers,
             "stale_after_s": stale_after,
         }
+
+
+def dispatch_claim(
+    dispatch: "JobLeaseStore",
+    rows: list[dict[str, Any]],
+    *,
+    worker_id: str,
+    max_jobs: int,
+    lease_seconds: int = 1800,
+    study_fingerprint: str | None = None,
+) -> list[dict[str, Any]]:
+    """Claim work from the shared queue instead of slicing the local manifest (#378).
+
+    The manifest is still the source of truth for *what exists*, so it is enqueued first (idempotent
+    on ``job_id``). What changes is who may take a job: ``claim`` filters browser kinds out for a
+    Laskin-capable worker inside the query, so this host cannot be handed one.
+    """
+    dispatch.enqueue(
+        [{**row, "job_id": job_identity(row)} for row in rows],
+        study_fingerprint=study_fingerprint,
+    )
+    dispatch.reap_expired()
+    claimed = dispatch.claim(
+        worker_id, LASKIN_CAPABILITIES, limit=max_jobs, lease_seconds=lease_seconds
+    )
+    return [{**dict(c.get("payload") or {}), "kind": c["kind"], "_job_id": c["_id"]} for c in claimed]
+
+
+def dispatch_finish(
+    dispatch: "JobLeaseStore", row: dict[str, Any], outcome: dict[str, Any], *, worker_id: str
+) -> None:
+    """Settle a claimed job: done on success, back on the queue when it failed."""
+    job_id = row.get("_job_id")
+    if not job_id:
+        return
+    status = str(outcome.get("status") or "")
+    if status in {"ok", "warning"}:
+        dispatch.complete(str(job_id), worker_id, outcome=status)
+    else:
+        dispatch.release(str(job_id), worker_id, error=str(outcome.get("reason") or status))

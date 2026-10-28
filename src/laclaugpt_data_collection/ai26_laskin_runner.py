@@ -25,6 +25,7 @@ from .collectors.rss import RSSCollector
 from .collectors.youtube import YouTubeCollector
 from .config import Settings
 from .distributed_capture import DistributedCaptureSink, HollowRecordError
+from .distributed_jobs import dispatch_claim, dispatch_finish
 from .language import unlabelled_language_warning
 from .models import CanonicalRecord, CollectionProvenance, NormalizedRecord
 from .plugins import RetryPolicy
@@ -443,6 +444,8 @@ def run_phase1_laskin(
     rotation: int | None = None,
     tracked_plan: str | Path | None = None,
     enforce_source_budgets: bool | None = None,
+    dispatch: Any | None = None,
+    dispatch_lease_seconds: int = 1800,
 ) -> dict[str, Any]:
     routed = collection_id or settings.project_id
     if routed != settings.project_id:
@@ -537,7 +540,18 @@ def run_phase1_laskin(
                 ),
             )
     policy = RealtimePolicy.ai26()
-    jobs = select_job_window(all_jobs, max_jobs=max_jobs, rotation=rotation * max_jobs)
+    if dispatch is not None:
+        # #378: the queue decides, not the local manifest window. Fallback to the
+        # manifest slice stays available by simply not passing a dispatcher.
+        jobs = dispatch_claim(
+            dispatch,
+            all_jobs,
+            worker_id=worker_id,
+            max_jobs=max_jobs,
+            lease_seconds=dispatch_lease_seconds,
+        )
+    else:
+        jobs = select_job_window(all_jobs, max_jobs=max_jobs, rotation=rotation * max_jobs)
     synced = 0
     collected = 0
     skipped_before_floor = 0
@@ -560,6 +574,9 @@ def run_phase1_laskin(
         source_outcomes.append(outcome)
         if synced >= remaining:
             deferred_by_tick_limit += 1
+            # A job we claimed but cannot run this tick goes straight back to the
+            # queue, otherwise its lease would hold it until it expired.
+            dispatch_finish(dispatch, row, outcome, worker_id=worker_id)
             continue
         try:
             records, source_warnings = _records_for_job(
@@ -632,6 +649,7 @@ def run_phase1_laskin(
         except Exception as exc:  # noqa: BLE001
             outcome.update(status="error", reason="collection_or_ingest_failed")
             errors.append(f"{row.get('kind')}:{row.get('name','unnamed')}: {str(exc)[:180]}")
+        dispatch_finish(dispatch, row, outcome, worker_id=worker_id)
 
     # Issue #206: make source-manifest drift visible every cycle. The deployed
     # manifest is gitignored runtime config; the audited plan lives in
@@ -743,9 +761,42 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="audited plan under configs/studies/; when set, report manifest drift",
     )
+    parser.add_argument(
+        "--dispatch-mongo",
+        action="store_true",
+        help="claim work from the shared MongoDB job queue instead of slicing the local manifest (#378)",
+    )
+    parser.add_argument(
+        "--dispatch-lease-seconds",
+        type=int,
+        default=1800,
+        help="lease length for claimed jobs; must exceed one collection cycle",
+    )
     args = parser.parse_args(argv)
+
+    settings = Settings()
+    dispatch = None
+    if args.dispatch_mongo:
+        from pymongo import MongoClient
+
+        from .distributed import ProjectNamespace
+        from .distributed_jobs import JobLeaseStore
+
+        if not settings.mongodb_uri:
+            parser.error("--dispatch-mongo needs a MongoDB URI in the settings")
+        client = MongoClient(
+            settings.mongodb_uri,
+            serverSelectionTimeoutMS=settings.mongodb_connect_timeout_ms,
+            connect=False,
+        )
+        collection = client[settings.mongodb_database][
+            ProjectNamespace(project_id=settings.project_id).mongo_collection("jobs")
+        ]
+        dispatch = JobLeaseStore(collection)
+        dispatch.ensure_indexes()
+
     result = run_phase1_laskin(
-        Settings(),
+        settings,
         study_config=args.study_config,
         source_manifest=args.source_manifest,
         collection_id=args.collection_id,
@@ -756,6 +807,8 @@ def main(argv: list[str] | None = None) -> int:
         limit=args.limit,
         tracked_plan=args.tracked_plan,
         enforce_source_budgets=args.enforce_source_budgets,
+        dispatch=dispatch,
+        dispatch_lease_seconds=args.dispatch_lease_seconds,
     )
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     return 0 if not result["errors"] else 1
