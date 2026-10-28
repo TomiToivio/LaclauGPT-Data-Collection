@@ -35,7 +35,7 @@ def collection(tmp_path: Path) -> Path:
     # Identical bytes, different name: one object, two references.
     _write(root / "media" / "tiktok_1.jpg", b"alpha")
     # Same logical item, genuinely different bytes: two variants, both kept.
-    b = _write(root / "media" / "x_1_v2.jpg", b"beta")
+    _write(root / "media" / "x_1_v2.jpg", b"beta")
     # A file the index does not know about.
     _write(root / "media" / "orphan.mp4", b"gamma")
 
