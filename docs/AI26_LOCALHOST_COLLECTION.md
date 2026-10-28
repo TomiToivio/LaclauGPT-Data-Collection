@@ -162,6 +162,34 @@ capture server. Nothing here schedules Firefox or automates a session.
 2 with `no MongoDB URI in the runtime settings` rather than pretending the queue is empty; that is
 also how a host with no AI26 runtime configuration is detected.
 
+### This workstation's live setup (#378)
+
+Brazil26 collection is complete and retired here; the same 8765 port now serves AI26 so the
+already-loaded Firefox extension needs no reconfiguration.
+
+```sh
+systemctl --user status ai26-capture.service    # owns 127.0.0.1:8765
+systemctl --user status brazil26-capture.service  # disabled
+curl -s http://127.0.0.1:8765/status             # study: ai26
+```
+
+- **Data root:** `data/ai26/` — its own `state.sqlite3`, `raw/`, `normalized/`, `media/`.
+  Sharing `data/` would dedupe AI26 posts against Brazil26's `seen_posts`, which is keyed by
+  `(platform, document_id)` with no project scope, so a post Brazil26 saw first would be
+  skipped for AI26.
+- **Profile:** local-only (no MongoDB/Redis/S3); the backend reports
+  `remote: {status: disabled}` and writes canonical JSONL locally. `--status` on the queue
+  worker exits 2 without a Mongo URI rather than reporting an empty queue.
+- **Credentials in raw captures:** the extension posts every X GraphQL response, including
+  token-bearing ones. `CollectionStore.append_raw` redacts credential-keyed fields and bare
+  JWTs before writing, so `raw/` stays safe to keep; the redaction is structural, keys and
+  list lengths survive for debugging.
+- **Publication floor:** browser capture stores what the timeline shows, including posts
+  older than `publication_date_floor`; the plugin pass applies the floor. Filter downstream
+  rather than assuming capture is windowed.
+- **Media:** inline capture produced none on this host; run `scripts/run_ai26_localhost_media.sh`
+  once an object store is configured.
+
 ## 6. Download media/files and upload to Allas
 
 ```bash
