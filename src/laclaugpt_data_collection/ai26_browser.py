@@ -205,13 +205,17 @@ def run_backend(
         raise ValueError("AI26 browser backend must bind to localhost/loopback")
     study = _ensure_ai26_study(study_config)
     settings = _ai26_settings()
-    mirror = JsonlDistributedMirror(
-        settings,
-        study_config=study_config,
-        data_root=data_root,
-        interval_seconds=sync_interval,
+    # #378: a host with no MongoDB/S3 credentials still has to be able to capture. Brazil26's
+    # backend already degrades to local-only; AI26 used to construct the distributed sink
+    # unconditionally and crashed at startup, which is why the Firefox path could not be
+    # pointed at AI26 on this workstation. Local canonical JSONL + the configured local
+    # record store remain the recovery source; the mirror is only added when the profile
+    # actually requests distributed backends.
+    mirror = _mirror_if_distributed(settings, study_config, data_root, sync_interval)
+    remote: dict[str, Any] = (
+        mirror.sink.smoke_check() if mirror is not None
+        else {"status": "disabled", "reason": "local-only profile"}
     )
-    remote = mirror.sink.smoke_check()
     print(
         json.dumps(
             {
@@ -227,7 +231,8 @@ def run_backend(
         flush=True,
     )
 
-    mirror.scan_once()
+    if mirror is not None:
+        mirror.scan_once()
     server = CaptureServer(
         study_config,
         data_root,
@@ -237,17 +242,19 @@ def run_backend(
         capture_media_inline=getattr(settings, "capture_media_inline", False),
         capture_media_max_bytes=getattr(settings, "capture_media_max_bytes", 64 * 1024 * 1024),
     )
-    mirror.start()
+    if mirror is not None:
+        mirror.start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
-        mirror.stop()
-        try:
-            mirror.scan_once()
-        except Exception as exc:  # noqa: BLE001
-            print(f"final distributed mirror failed: {exc}", flush=True)
+        if mirror is not None:
+            mirror.stop()
+            try:
+                mirror.scan_once()
+            except Exception as exc:  # noqa: BLE001
+                print(f"final distributed mirror failed: {exc}", flush=True)
         server.store.write_manifest(
             {
                 "study": server.cfg.study,
@@ -255,15 +262,36 @@ def run_backend(
                 "run_id": settings.run_id,
                 "stats": dict(server.stats),
                 "seen_total": server.store.seen_count(),
-                "distributed_synced_total": mirror.synced_total,
-                "distributed_rejected_total": mirror.rejected_total,
-                "distributed_last_rejections": mirror.rejections,
-                "distributed_last_error": mirror.last_error,
+                "distributed_synced_total": mirror.synced_total if mirror else 0,
+                "distributed_rejected_total": mirror.rejected_total if mirror else 0,
+                "distributed_last_rejections": mirror.rejections if mirror else [],
+                "distributed_last_error": mirror.last_error if mirror else "",
             }
         )
         server.store.close()
         server.server_close()
     return 0
+
+
+def _mirror_if_distributed(
+    settings: Settings,
+    study_config: str,
+    data_root: str,
+    interval_seconds: float,
+) -> "JsonlDistributedMirror | None":
+    """Build the distributed mirror only when this profile asks for one.
+
+    Returning None is what lets the AI26 Firefox backend run on a workstation without
+    MongoDB or Allas credentials, exactly as the Brazil26 backend does.
+    """
+    if not settings.distributed_requested:
+        return None
+    return JsonlDistributedMirror(
+        settings,
+        study_config=study_config,
+        data_root=data_root,
+        interval_seconds=interval_seconds,
+    )
 
 
 def run_check(*, study_config: str) -> int:
