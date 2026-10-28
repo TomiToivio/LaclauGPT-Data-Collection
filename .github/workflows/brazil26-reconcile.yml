@@ -19,6 +19,6 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install pytest
-        run: python -m pip install pytest
+        run: python -m pip install -e . 'pytest>=8.3,<9'
       - name: Validate offline reconciliation
         run: python -m pytest -q tests/test_issue_373_brazil26_reconciliation.py
