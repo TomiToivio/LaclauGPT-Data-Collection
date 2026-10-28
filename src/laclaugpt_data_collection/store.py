@@ -145,8 +145,14 @@ class CollectionStore:
         directory = self.raw_dir / platform / day
         directory.mkdir(parents=True, exist_ok=True)
         path = directory / f"capture-{utc_stamp()}-{next(self._counter):08x}.ndjson"
-        with path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(redact_secrets(payload), ensure_ascii=False, default=str) + "\n")
+        # Write-then-rename: a crash mid-write must not leave a half-line that later
+        # breaks every reader of raw/ (two such truncated lines were observed on the
+        # AI26 capture host, #392). The temp name is unique per file, so concurrent
+        # writers cannot clobber each other's staging file.
+        line = json.dumps(redact_secrets(payload), ensure_ascii=False, default=str) + "\n"
+        staging = path.with_name(path.name + ".tmp")
+        staging.write_text(line, encoding="utf-8")
+        staging.replace(path)
         return path.relative_to(self.root).as_posix()
 
     @staticmethod
