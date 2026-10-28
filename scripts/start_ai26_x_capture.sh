@@ -263,6 +263,20 @@ if [[ "$MODE" == status ]]; then
   # take the whole status command down with it.
   rows=$(find "$DATA_ROOT/normalized" -maxdepth 1 -name '*.jsonl' 2>/dev/null | wc -l || true)
   echo "  canonical:     $rows JSONL file(s) under $DATA_ROOT/normalized"
+  # #378: captures landing locally is not the same as captures reaching the shared plane. Print
+  # what the mirror did, and its last error when it has one.
+  distributed=$(printf '%s' "$status_json" | "$PYTHON_BIN" -c '
+import json, sys
+d = json.load(sys.stdin).get("distributed") or {}
+if not d.get("enabled"):
+    print("off (" + (d.get("reason") or "local-only") + ")")
+else:
+    line = "on, synced %s, rejected %s" % (d.get("synced_total"), d.get("rejected_total"))
+    if d.get("last_error"):
+        line += " | last error: " + d["last_error"][:160]
+    print(line)
+' 2>/dev/null || echo unknown)
+  echo "  distributed:   $distributed"
   if pid_alive "$pid" && [[ -n "$status_json" ]] && probe_tour; then
     echo "  health:        ok"
     exit 0

@@ -217,3 +217,22 @@ If Firefox cannot reach the backend, confirm the process is running and the exte
 If local capture succeeds but distributed mirroring fails, keep the local data root intact. Re-run `check`, verify the private Mongo/Redis/Allas environment and restart the backend. Do not copy Brazil26 checkpoint/state files into AI26.
 
 If media fails, inspect the cron log and rerun the same command. Do not delete the AI26 SQLite state merely to force retries because it contains deduplication and media status.
+
+## Mirror health is part of `/status`
+
+`/status` reports what the distributed mirror has done, because "captures are landing" and "captures
+are reaching the shared plane" are different facts:
+
+```json
+"distributed": {"enabled": true, "synced_total": 0, "rejected_total": 0,
+                "last_error": "upload failed for projects/ai26/runs/.../raw/<sha>.json: ... QuotaExceeded"}
+```
+
+`enabled: false` means the profile is local-only (no distributed mirror). A non-empty `last_error`
+means captures are being written locally but not archived — the state this host was in on 2026-10-28,
+when 146 captures produced 0 MongoDB records because every raw-envelope PUT was refused by the CSC
+Allas quota. `scripts/start_ai26_x_capture.sh status` prints the same line.
+
+A failing startup replay no longer kills the backend either: the replay is attempted, its error goes
+to `last_error`, and the capture server still binds its loopback port, because a host must be able to
+capture while the remote plane is unavailable.
