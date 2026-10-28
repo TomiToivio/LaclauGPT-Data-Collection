@@ -404,10 +404,23 @@ groups:
   - id: governance_institutions_x
     name: Public governance institutions
     arena: parliamentary
-    notes: regulation, standards, oversight, competitiveness and public policy; institutional accounts reduce party-political sampling bias in the public demo. The Finnish Government handle is listed because the paper's Finland component needs a first-party Finnish-language parliamentary source; handle verified live 2026-10-02 (4104 posts, newest 2026-10-02). Inclusion is a SAMPLING decision and never an ideological classification.
+    notes: >-
+      regulation, standards, oversight, competitiveness and public policy;
+      institutional accounts reduce party-political sampling bias in the public
+      demo. The Finnish Government handle is listed because the paper's Finland
+      component needs a first-party Finnish-language parliamentary source;
+      handle verified live 2026-10-02 (4104 posts, newest 2026-10-02). Added
+      2026-10-28: the European Parliament's own Bluesky account
+      (europarl.europa.eu, 982 posts, newest 2026-10-28T13:11Z). Reason: the
+      arena's legislative layer is still uncollected (0 Eduskunta records, #360)
+      and the only legislative account it had, Europarl_EN, is an X handle that
+      receives no new capture since the X stratum froze (#368); Bluesky is the
+      platform the stage does collect. This adds a platform, not a new actor,
+      and complements europarl_press_releases (RSS) rather than replacing it.
+      Inclusion is a SAMPLING decision and never an ideological classification.
     accounts:
       x: [EU_Commission, Europarl_EN, OECD_AI, NIST]
-      bluesky: [valtioneuvosto.fi]
+      bluesky: [valtioneuvosto.fi, europarl.europa.eu]
     discovery_entities:
       - European Commission AI Office
       - European Parliament

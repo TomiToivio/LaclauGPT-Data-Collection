@@ -932,6 +932,27 @@ arena = "parliamentary"
 source_family = "Finland government / national policy"
 priority = "P1"
 
+# ---- 2026-10-28: the parliamentary arena's legislative layer, on a platform
+# that is actually being collected. The arena has held executive and
+# institutional press only (0 Eduskunta records, #360 parked pending a new
+# collector), and its one legislative account, Europarl_EN, is an X handle that
+# no longer receives new capture (#368). The European Parliament speaks in its
+# own institutional voice on a live Bluesky account, so the legislature is
+# reachable today without a new collector. Inclusion is a SAMPLING decision
+# (institutional position in the policy process) and NEVER an ideological
+# classification of the institution. Verified live 2026-10-28 via the public
+# Bluesky API: 982 posts, newest 2026-10-28T13:11Z, dated post records. Not all
+# posts are AI-related; relevance is resolved at the analysis stage, never at
+# collection. This complements, and does not replace, europarl_press_releases
+# (RSS) or Europarl_EN (X); it adds a platform the arena is actually collecting.
+[[bluesky_account]]
+name = "European Parliament"
+handle = "europarl.europa.eu"
+profile_url = "https://bsky.app/profile/europarl.europa.eu"
+arena = "parliamentary"
+source_family = "EU legislature / first-party parliamentary voice (social)"
+priority = "P1"
+
 # Creator-rights sources explicitly declared in ai26.example.yaml (#266).
 # These are institutional sampling anchors, not ideological actor labels.
 [[bluesky_account]]
