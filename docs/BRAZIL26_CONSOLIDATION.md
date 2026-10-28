@@ -1,66 +1,111 @@
-# Brazil26 consolidation
+# Brazil26 consolidation and Allas archive (#373)
 
-One dataset out of many collection hosts. The tool is `scripts/brazil26/consolidate.py`;
-it is a **consolidator, not a collector** — it reads what a host already has, and never
-deletes, moves or rewrites media.
+Every Brazil26 video collected on any host, merged into one deduplicated dataset in CSC Allas, with a
+canonical CSV that names each object. The corpus is **not** re-scraped here: this is consolidation of what
+already exists.
 
-## Why identity needs two keys
+## What the corpus is on this host (Laskin, 2026-10-28)
 
-| question | key |
-| --- | --- |
-| *which media item is this?* | `(platform, document_id, media_index)` |
-| *is this the same file?* | SHA-256 of the bytes |
+| source | path | contents |
+|---|---|---|
+| **live capture root** | `/home/tomi/laclaugpt-brasil-data` | 31 GB — `media/` (6,966 files), `media/tiktok_pyktok/`, `normalized/*.jsonl`, `manifests/`, `state.sqlite3` |
+| collection metadata (×3, identical) | `…/KEEP_PRIVATE/collection-data/brazil26` | 477 MB each — `raw/` (9,065 NDJSON), `normalized/`, `manifests/`, `state.sqlite3` |
+| config only | `…/LaclauGPT-Private/collection/brazil26` | 24 KB — no data |
 
-A consolidation that uses only the first key duplicates storage when the same image is
-used in several posts. One that uses only the second loses the post it belongs to.
-Both are needed: identical bytes collapse to one object, and a logical item that has two
-genuinely different files keeps both, flagged for review rather than silently resolved.
+The three `KEEP_PRIVATE` copies are byte-for-byte the same metadata tree; only one needs archiving, and the
+duplication is recorded here rather than silently resolved by deleting a copy.
 
-## Usage
+`state.sqlite3` is the inventory backbone — `media_index` already carries `sha256`, `byte_size`,
+`mime_type`, `local_path` and `downloaded_at` for **7,023** media rows, and `normalized/*.jsonl` carries
+the post metadata (`author`, `timestamp`, `source_url`, `text`, `hashtags`, `engagement`).
 
-```bash
-python scripts/brazil26/consolidate.py run \
-    --root "$BRAZIL26_ROOT" \
-    --out-dir "$BRAZIL26_CONSOLIDATION_OUT" \
-    --workers 12
+## Identity and deduplication
+
+Two keys, doing two different jobs:
+
+- **Logical video** — `(platform, document_id)`, written as `instagram:DdCjLTFMSxm`. One canonical row per
+  logical video; several media files (carousel images, video + thumbnail) hang off it.
+- **Byte identity** — **SHA-256**. The Allas object key *is* the hash:
+  `brazil26/videos/<sha256>.<ext>`.
+
+Because the key is the hash, the two requirements that usually conflict cannot:
+
+- identical bytes collected on two machines occupy **one** object — there is nothing else they could map to;
+- two different files can never collide, even if they share a filename or a size;
+- distinct versions stay traceable, because each keeps its own key and its own manifest row.
+
+**Measured on this host:** 7,023 media files → **5,846 distinct objects**, 28.75 GB of unique bytes out of
+31.56 GB total. 1,177 files are byte-identical duplicates within the corpus.
+
+## Layout in Allas
+
+```
+brazil26/videos/<sha256>.<ext>          one object per distinct byte sequence
+brazil26/metadata/brazil26_canonical.csv  one row per logical video
+brazil26/manifests/brazil26_files.csv     one row per media file, linked by canonical_id
+brazil26/manifests/inventory.json         counts, bytes, anomalies
 ```
 
-This writes, to the output directory (never into this repository):
+Bucket: `LaclauGPT-AI26` (from `LACLAUGPT_S3_BUCKET`), endpoint `https://a3s.fi`.
 
-- `inventory.json` — what the host holds, index vs disk
-- `manifest.json` — one row per physical file, with a recomputed SHA-256
-- `dedupe.json` — duplicate groups, logical variants, index disagreements
-- `brazil26_canonical.csv` — one row per logical item, joined to post metadata
-- `brazil26_files.csv` — one row per physical file, linked by content hash
-- `AUDIT.md` — the human-readable reconciliation report
+`brazil26_canonical.csv` columns: `canonical_id, dataset, platform, document_id, url, author,
+post_timestamp, collected_at, text, hashtags, media_count, media_status, media_sha256, media_bytes,
+object_key, source_local_path`. One row per video is what downstream analysis reads; anything CSV cannot
+carry losslessly stays in `normalized/*.jsonl` and is referenced by `document_id`.
 
-Then, with CSC credentials in the environment:
+## Running it
 
 ```bash
-# stage one symlink per distinct hash, so each byte-identical file uploads once
-python scripts/brazil26/consolidate.py upload \
-    --manifest "$OUT/manifest.json" --staging "$BRAZIL26_ROOT/_staging" \
-    --dest allas:brazil26/media --dry-run     # remove --dry-run to upload
+# 1. inventory — reads the state DB, writes the CSV pair and inventory.json
+python scripts/brazil26_consolidate.py inventory \
+    --state-db /home/tomi/laclaugpt-brasil-data/state.sqlite3 \
+    --data-root /home/tomi/laclaugpt-brasil-data \
+    --out out/brazil26            # add --verify to recompute every SHA-256
 
-python scripts/brazil26/consolidate.py verify \
-    --manifest "$OUT/manifest.json" --dest allas:brazil26/media
+# 2. upload — idempotent, resumable, safe to interrupt
+python scripts/brazil26_consolidate.py upload \
+    --manifest out/brazil26/brazil26_files.csv --bucket "$LACLAUGPT_S3_BUCKET" \
+    --workers 12 --dry-run        # drop --dry-run to write
+
+# 3. validate — re-list the bucket and reconcile against the manifest
+python scripts/brazil26_consolidate.py validate \
+    --manifest out/brazil26/brazil26_files.csv --bucket "$LACLAUGPT_S3_BUCKET" \
+    --out out/brazil26/validation.json
 ```
 
-Objects are content-addressed: `media/<sha256[:2]>/<sha256><ext>`. Identical bytes
-therefore occupy one object no matter how many hosts or posts reference them, and the
-upload is idempotent — `rclone --checksum --immutable` skips what is already there, so
-re-running after an interruption neither duplicates nor overwrites.
+Credentials come from the normal boto3 chain (`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` exported from
+the project `.env`, or `~/.aws/credentials` written by `allas-conf`). Nothing is hard-coded, and no
+credential or dataset is committed to the repository.
 
-## Matching the index to the files
+### Idempotency rules — why a rerun is safe
 
-The index does not always record a resolvable path: some rows store a bare filename
-while the file lives in a per-collector subdirectory. The tool falls back to matching on
-basename, **but only when the match is unambiguous**, and records how each row was
-matched in `path_match` (`exact`, `basename`, `none`). An ambiguous filename is never
-guessed between — that would attach the wrong post metadata to a file, which is worse
-than leaving it unmatched.
+- An object is skipped only when it exists with **the same size *and* the same `sha256` metadata**.
+  Size alone is not sufficient: two different files can share a size, and treating that as "already
+  uploaded" would silently lose one of them.
+- If an object exists with a *different* size, the upload **refuses** and reports it, unless `--overwrite`
+  is given. Nothing is overwritten by default.
+- Interrupting the run loses nothing: every object is independent, and the next run recomputes the todo
+  set from the bucket's own state.
 
-## What must not go into this repository
+### On the other collection hosts
 
-Media, manifests, canonical CSVs and any post-level research data stay in private
-storage. This document and the script are code and procedure only.
+The same three commands run anywhere the collector wrote data; only `--state-db` and `--data-root` change.
+Because object keys are content hashes, two hosts archiving the same file converge on one object without
+coordination — the second upload is a skip, not a duplicate.
+
+## Safety
+
+- **Original local files are never deleted or moved.** The tool only reads them.
+- No overwrite without `--overwrite`.
+- The manifest records `status` per file (`ok`, `missing_local`, `hash_mismatch`, `size_mismatch`), so an
+  incomplete source is visible rather than averaged into a percentage.
+
+## What this does not do
+
+- It does not verify that a downloaded file is the *content* the platform served — that is a collection
+  question, not a consolidation one.
+- It does not re-hash every file by default (`--verify` does, and takes as long as reading 31 GB).
+- It does not archive the 477 MB metadata tree to Allas; only media and the two CSVs. The `raw/` NDJSON is
+  the collection log and can be added as `brazil26/metadata/raw/` if wanted.
+- It does not resolve the three duplicate `KEEP_PRIVATE` copies — recorded, not deleted, because deciding
+  which copy is authoritative is the author's call.
