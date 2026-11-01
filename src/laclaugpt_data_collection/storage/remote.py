@@ -345,6 +345,10 @@ def classify_object_store_failure(exc: BaseException) -> str:
         return "credential_rejected"
     if code in {"NoSuchBucket", "404"} or "nosuchbucket" in text:
         return "bucket_or_prefix_wrong"
+    if code in {"QuotaExceeded", "507"} or status == 507 or "quota" in text:
+        # Issue #396: a full bucket is not an unknown failure. It is the one reason whose remedy
+        # is "free space or raise the quota", and it is the one that must not drop a record.
+        return "quota_exhausted"
     if code in {"NoSuchKey", "NotFound"} or "not found" in text:
         return "object_missing"
     if code in {"SlowDown", "RequestTimeout", "RequestTimeTooSkewed"} or isinstance(
