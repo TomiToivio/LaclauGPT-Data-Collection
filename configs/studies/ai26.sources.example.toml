@@ -536,6 +536,19 @@ aggregator = "google_news"
 priority = "P2"
 active = true
 
+[[feed]]
+name = "finland_datacentre_ai_news"
+feed_url = "https://news.google.com/rss/search?q=datakeskus&hl=fi&gl=FI&ceid=FI:fi"
+homepage = "https://news.google.com/"
+arena = "grassroots"
+source_family = "Finland / data-centre build-out, energy and environmental conflict / Finnish-language news coverage"
+sampling_rationale = "Sampling decision 2026-11-01, by the daily AI26 collection-ledger run. The paper's Finland component and the grassroots arena's declared [en, fi] scope and 'data centres, energy and environmental conflict' sampling_focus had NO Finnish-language news register at all: the manifest carries 112 rows and not one Finnish news outlet or Finnish-language query, and the Finnish grassroots stratum held 69 records in 61 days. The motivating case is the police criminal investigation opened 2026-10-29 into Tuike Finland (a Google subsidiary) over suspected Water Act breaches and environmental damage from forest clearing and drainage at the Muhos and Otanmaki data-centre sites -- reported by Reuters, Yle, HS, Ilta-Sanomat and Al Jazeera -- i.e. the single strongest Finnish AI-infrastructure articulation of the observation window, and the corpus had no channel to see it. This samples COVERAGE OF the conflict, not the actors in it: a record is a headline, timestamp and publisher, so it is evidence that a conflict was reported, not first-party campaign, municipal or regulator speech. Outlet duplication is present by construction. Inclusion is by TOPIC -- the Finnish word 'datakeskus' -- and never by actor ideology; no outlet, municipality or company is classified by its presumed position. Bounded: ONE query row, P2 so it cannot displace a first-party P1 source, default per_source_limit=5 per cycle and polled once per full manifest pass. This deliberately does not extend the 'exactly two query rows' bound set for the US moratorium/pause layer in #296: that bound was a volume control for one topical wave in one country, and a Finnish-language row is a different region answering a different declared scope requirement. A first-party public-broadcaster row was considered and rejected: Yle serves only site-wide feeds (https://yle.fi/rss/news and https://yle.fi/rss/uutiset/tuoreimmat both live, but /rss/uutiset/tekniikka, /tiede, /kotimaa all 404), which would have injected general Finnish news at ~5 records per cycle unrelated to the sampling_focus. Verified live 2026-11-01 16:20 EET: HTTP 200, 100 items, newest 2026-11-01T13:06 EET ('Naapuriin voi tulla iso aanekas jattilainen, jos asutat taalla'), covering Yle, HS, Ilta-Sanomat, Tivi, Verkkouutiset, Rakennuslehti. NOT all items are AI-related; lightweight relevance filtering stays at the analysis stage."
+source_identity = "aggregator"
+aggregator = "google_news"
+priority = "P2"
+active = true
+last_verified = "2026-11-01"
+
 # ---------------------------------------------------------------------------
 # Public web endpoints
 # ---------------------------------------------------------------------------
