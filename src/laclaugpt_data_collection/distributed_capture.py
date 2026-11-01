@@ -15,7 +15,12 @@ from .config import Settings
 from .deployment import validate_profile
 from .handoff import build_handoff
 from .models import CanonicalRecord, CollectionProvenance
-from .storage.remote import MongoRecordStore, RedisCoordinator, S3ObjectStore
+from .storage.remote import (
+    MongoRecordStore,
+    ObjectStoreError,
+    RedisCoordinator,
+    S3ObjectStore,
+)
 
 HOLLOW_RECORD_REASON = "hollow_record"
 
@@ -53,6 +58,11 @@ class HollowRecordError(ValueError):
         )
 
 
+#: Object-store failures that must not destroy a record. The canonical row still belongs in MongoDB;
+#: the raw object can be uploaded on a later pass, because RSS and Bluesky re-emit their windows.
+DEFERRABLE_RAW_REASONS = frozenset({"quota_exhausted", "transient_transport"})
+
+
 class DistributedCaptureSink:
     """Mirror one canonical collection record into the shared distributed plane."""
 
@@ -87,6 +97,8 @@ class DistributedCaptureSink:
             else None
         )
         self.notification_errors: list[str] = []
+        #: Raw objects that could not be uploaded this pass (issue #396). Reported by the cycle.
+        self.pending_raw_uploads = 0
 
     def assert_private_config(self, study_config: str | Path) -> Path:
         """Require distributed study config to live in an ignored runtime config root.
@@ -193,7 +205,19 @@ class DistributedCaptureSink:
                 source_url=str(record.source_url or ""),
                 collection_id=collection_id,
             )
-        raw_ref = self._raw_object(record)
+        raw_ref = ""
+        raw_deferred = ""
+        try:
+            raw_ref = self._raw_object(record)
+        except ObjectStoreError as exc:
+            # Issue #396: on 2026-10-28 an exhausted Allas quota made every raw upload fail, and
+            # because the upload happened *before* the Mongo upsert, each collected record was
+            # discarded. Capture must degrade, not vanish: keep the record, record why the raw
+            # object is missing, and let a later pass upload it (RSS and Bluesky re-emit windows).
+            if exc.reason not in DEFERRABLE_RAW_REASONS:
+                raise
+            raw_deferred = exc.reason
+            self.pending_raw_uploads += 1
 
         if not record.provenance:
             record.provenance.append(CollectionProvenance())
@@ -205,6 +229,8 @@ class DistributedCaptureSink:
             if arena:
                 provenance.metadata.setdefault("arena", arena)
             provenance.metadata.setdefault("machine", self.settings.machine)
+            if raw_deferred:
+                provenance.metadata.setdefault("raw_capture_pending", raw_deferred)
             provenance.metadata.setdefault("execution", self.settings.execution)
         record.source.raw_metadata.setdefault("collection_id", collection_id)
         if arena:

@@ -754,6 +754,9 @@ def run_phase1_laskin(
         "non_browser_jobs_considered": len(jobs),
         "non_browser_records_collected": collected,
         "non_browser_records_synced": synced,
+        # Issue #396: records stored while their raw object could not be uploaded. Non-zero
+        # means the corpus is intact but the object store is refusing writes.
+        "raw_objects_pending": int(getattr(sink, "pending_raw_uploads", 0)),
         "records_synced": int(rss.get("records_synced", 0)) + synced,
         "records_new": created,
         "records_updated": (int(rss.get("records_synced", 0)) + synced) - created,
