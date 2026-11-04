@@ -167,8 +167,10 @@ class JobLeaseStore:
             # be rearmed; the predicate protects concurrent dispatchers and leases.
             # Keep exhausted failures parked until an operator explicitly repairs them.
             self.jobs.update_one(
-                {"_id": job_id, "status": DONE,
-                 "updated_at": {"$lte": now - DEFAULT_POLL_SECONDS}},
+                {"_id": job_id, "$or": [
+                    {"status": DONE, "updated_at": {"$lte": now - DEFAULT_POLL_SECONDS}},
+                    {"status": DISABLED},
+                ]},
                 {"$set": {"status": PENDING, "attempts": 0, "worker_id": None,
                           "lease_expires_at": None, "last_error": None,
                           "updated_at": now}},
