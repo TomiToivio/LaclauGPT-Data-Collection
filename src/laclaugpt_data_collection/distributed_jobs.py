@@ -246,7 +246,12 @@ class JobLeaseStore:
             {
                 "poll_seconds": {"$gt": 0},
                 "status": {"$in": [DONE, FAILED]},
-                "next_run_at": {"$lte": now},
+                # A job that finished before ``next_run_at`` existed has no schedule to compare
+                # against. Treat it as due once: it runs, and from then on it has a real one. The
+                # alternative — waiting for a field that nothing will ever write — is exactly the
+                # drained queue this issue is about, wearing a migration.
+                "$or": [{"next_run_at": {"$lte": now}},
+                        {"next_run_at": {"$exists": False}}],
             },
             {"$set": {"status": PENDING, "attempts": 0, "worker_id": None,
                       "lease_expires_at": None, "last_error": None, "updated_at": now}},
