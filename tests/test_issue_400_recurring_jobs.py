@@ -15,6 +15,7 @@ import pytest
 from laclaugpt_data_collection.distributed_jobs import (
     CANCELLED,
     DEFAULT_POLL_SECONDS,
+    DONE,
     FAILED,
     LASKIN_CAPABILITIES,
     PENDING,
@@ -79,6 +80,23 @@ def test_a_completed_job_becomes_claimable_again_when_its_cadence_elapses(store)
     store._clock.advance(DEFAULT_POLL_SECONDS + 1)
     assert store.rearm_due() == 1
     assert [c["_id"] for c in store.claim("laskin", LASKIN_CAPABILITIES, limit=10)] == ["web_source:yle"]
+
+
+def test_a_job_finished_before_the_field_existed_is_still_due(store):
+    """The migration case that made the fix inert in production on its first run.
+
+    The 01:10 cycle wrote ``poll_seconds`` onto every existing job but not ``next_run_at`` (that
+    field is insert-only by design). A filter of ``next_run_at <= now`` therefore matched nothing,
+    the queue stayed at zero pending, and the sources stayed stopped — the original bug, wearing a
+    migration.
+    """
+    store.enqueue(rows(("web_source", "yle")))
+    store.jobs.update_one({"_id": "web_source:yle"},
+                          {"$set": {"status": DONE}, "$unset": {"next_run_at": ""}})
+    assert store.jobs.find_one({"_id": "web_source:yle"}).get("next_run_at") is None
+
+    assert store.rearm_due() == 1
+    assert store.jobs.find_one({"_id": "web_source:yle"})["status"] == PENDING
 
 
 def test_a_job_not_yet_due_is_not_rearmed(store):
