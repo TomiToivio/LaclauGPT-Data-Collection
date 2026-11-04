@@ -386,6 +386,17 @@ active = true
 last_verified = "2026-10-04"
 
 [[feed]]
+name = "jhl"
+feed_url = "https://www.jhl.fi/feed/"
+homepage = "https://www.jhl.fi/"
+arena = "grassroots"
+source_family = "Finnish public- and welfare-services union / labour / algorithmic management"
+sampling_rationale = "JHL, the Finnish public and welfare services union (SAK affiliate, municipal, state and wellbeing-services members): the first-party Finnish voice of the workers who operate and are monitored by public-sector digital systems. The grassroots arena declares languages [en, fi] and names both 'labour and automation' and 'surveillance and data extraction', but its Finnish material was confederation-level policy plus one industrial union; JHL supplies the public-services stratum where the automation of care and administrative work is actually negotiated, and it is currently reporting algorithmic management and worker surveillance ('Parkkipaten työntekijät tulivat julkisuuteen: työntekijöitä seurataan', 29 Oct 2026). Inclusion is a SAMPLING decision, never an ideological classification; JHL is a bargaining actor with its own position and that position is not treated as discourse ground truth. Verified live 2026-11-04: HTTP 200, 12 items, newest 2026-11-04T07:00:00Z, canonical /feed/ (no redirect; the #205 defect class does not apply). No AI-specific item in the current 12-item window: the row is added as a sector stratum, not because the feed currently carries AI vocabulary, and relevance stays an analysis-stage judgement. Priority P2 so it does not displace P1 rows in the tick budget. NOT all items are AI-related."
+priority = "P2"
+active = true
+last_verified = "2026-11-04"
+
+[[feed]]
 name = "etla"
 feed_url = "https://www.etla.fi/feed/"
 homepage = "https://www.etla.fi/"
