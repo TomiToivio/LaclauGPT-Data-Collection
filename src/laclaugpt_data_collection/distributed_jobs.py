@@ -34,6 +34,9 @@ PENDING = "pending"
 RUNNING = "running"
 DONE = "done"
 FAILED = "failed"
+DISABLED = "disabled"
+# A completed manifest source becomes eligible again after its polling interval.
+DEFAULT_POLL_SECONDS = 3600
 
 #: Source tables that can only be collected by driving a browser. A worker without the ``browser``
 #: capability must never be offered these.
@@ -160,7 +163,30 @@ class JobLeaseStore:
             }
             result = self.jobs.update_one({"_id": job_id}, {"$setOnInsert": doc}, upsert=True)
             written += int(bool(getattr(result, "upserted_id", None)))
+            # Recurring sources are not one-shot tasks. Only a completed, due job can
+            # be rearmed; the predicate protects concurrent dispatchers and leases.
+            # Keep exhausted failures parked until an operator explicitly repairs them.
+            self.jobs.update_one(
+                {"_id": job_id, "$or": [
+                    {"status": DONE, "updated_at": {"$lte": now - DEFAULT_POLL_SECONDS}},
+                    {"status": DISABLED},
+                ]},
+                {"$set": {"status": PENDING, "attempts": 0, "worker_id": None,
+                          "lease_expires_at": None, "last_error": None,
+                          "updated_at": now}},
+            )
         return written
+
+    def retire_absent(self, active_ids: Iterable[str], *, study_fingerprint: str | None = None) -> int:
+        """Retire inactive/removed non-browser rows without touching active leases or X jobs."""
+        result = self.jobs.update_many(
+            {"_id": {"$nin": list(active_ids)},
+             "kind": {"$in": sorted(NON_BROWSER_KINDS)},
+             "study_fingerprint": study_fingerprint,
+             "status": {"$in": [PENDING, DONE, FAILED]}},
+            {"$set": {"status": DISABLED, "updated_at": self._clock()}},
+        )
+        return int(getattr(result, "modified_count", 0))
 
     # -- lease lifecycle ------------------------------------------------------------------------
     def claim(
@@ -351,10 +377,13 @@ def dispatch_claim(
     on ``job_id``). What changes is who may take a job: ``claim`` filters browser kinds out for a
     Laskin-capable worker inside the query, so this host cannot be handed one.
     """
+    active_rows = [row for row in rows if row.get("enabled", row.get("active", True)) is not False]
     dispatch.enqueue(
-        [{**row, "job_id": job_identity(row)} for row in rows],
+        [{**row, "job_id": job_identity(row)} for row in active_rows],
         study_fingerprint=study_fingerprint,
     )
+    dispatch.retire_absent((job_identity(row) for row in active_rows),
+                           study_fingerprint=study_fingerprint)
     dispatch.reap_expired()
     # #378: the caller declares its capabilities. Defaulting to the Laskin set keeps the
     # original call site honest (a worker that says nothing gets the most restrictive role),

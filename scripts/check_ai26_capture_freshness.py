@@ -10,6 +10,7 @@ import argparse
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+import os
 
 
 def evaluate(captures: dict, *, now: datetime, max_age_hours: float = 24) -> dict:
@@ -30,16 +31,54 @@ def evaluate(captures: dict, *, now: datetime, max_age_hours: float = 24) -> dic
     return {"ok": not failures, "failures": failures, "observed": observed}
 
 
+def mongo_capture_observations(*, uri: str, database: str = "spectacleScraper",
+                               collection: str = "ai26__records") -> dict:
+    """Read actual X provenance; never substitute publication or job timestamps.
+
+    No writes are performed. A missing collection, X stratum or timestamp is a
+    failure for evaluate(), not a fabricated successful heartbeat.
+    """
+    from pymongo import MongoClient
+    with MongoClient(uri, serverSelectionTimeoutMS=5000) as client:
+        record = client[database][collection].find_one(
+            {"project_id": "ai26", "source.platform": "x",
+             "provenance.0.captured_at": {"$exists": True}},
+            {"provenance.captured_at": 1},
+            sort=[("provenance.0.captured_at", -1)],
+        )
+    provenance = (record or {}).get("provenance") or []
+    return {"x": provenance[0].get("captured_at") if provenance else None}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--captures-json", required=True, type=Path,
+    sources = parser.add_mutually_exclusive_group(required=True)
+    sources.add_argument("--captures-json", type=Path,
                         help="Private JSON mapping platforms to latest capture timestamps")
+    sources.add_argument("--mongo", action="store_true",
+                         help="Read X capture provenance from the AI26 Mongo store")
+    parser.add_argument("--mongo-uri-env", default="LACLAUGPT_MONGODB_URI")
+    parser.add_argument("--mongo-database", default="spectacleScraper")
     parser.add_argument("--max-age-hours", type=float, default=24)
     args = parser.parse_args()
     if args.max_age_hours <= 0:
         parser.error("max-age-hours must be positive")
-    report = evaluate(json.loads(args.captures_json.read_text(encoding="utf-8")),
-                      now=datetime.now(UTC), max_age_hours=args.max_age_hours)
+    if args.mongo:
+        uri = os.environ.get(args.mongo_uri_env)
+        if not uri:
+            print(json.dumps({"ok": False, "failures": {"x": "mongo_uri_missing"}}))
+            return 2
+        try:
+            captures = mongo_capture_observations(uri=uri, database=args.mongo_database)
+        except Exception as exc:
+            # Never print credentials or connection URIs from driver exceptions.
+            print(json.dumps({"ok": False, "failures": {"x": "mongo_query_failed"},
+                              "error_type": type(exc).__name__}))
+            return 2
+    else:
+        captures = json.loads(args.captures_json.read_text(encoding="utf-8"))
+    report = evaluate(captures, now=datetime.now(UTC),
+                      max_age_hours=args.max_age_hours)
     print(json.dumps(report, indent=2))
     return 0 if report["ok"] else 2
 
