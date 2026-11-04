@@ -4,7 +4,6 @@ from __future__ import annotations
 import importlib.util
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from types import SimpleNamespace
 
 import mongomock
 
@@ -28,7 +27,6 @@ def test_mongo_freshness_uses_capture_not_publication_time(monkeypatch):
         "provenance": [{"captured_at": (now - timedelta(days=3)).isoformat()}],
     })
     import pymongo
-    monkeypatch.setattr(pymongo, "MongoClient", lambda *a, **kw: client)
     # mongomock clients do not promise pymongo's context manager protocol.
     class ClientContext:
         def __enter__(self):
