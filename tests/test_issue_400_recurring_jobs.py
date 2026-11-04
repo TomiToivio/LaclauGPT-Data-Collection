@@ -15,11 +15,9 @@ import pytest
 from laclaugpt_data_collection.distributed_jobs import (
     CANCELLED,
     DEFAULT_POLL_SECONDS,
-    DONE,
     FAILED,
     LASKIN_CAPABILITIES,
     PENDING,
-    RUNNING,
     JobLeaseStore,
     dispatch_claim,
     job_identity,
