@@ -1006,6 +1006,33 @@ source_family = "creator rights / open licensing / generative AI"
 sampling_rationale = "First-party open-licensing organisation for copyright, permission and AI-training policy discourse; live in study window as verified 2026-10-12 (#266)."
 priority = "P1"
 
+# ---- 2026-11-10: rebalance the elites arena's SOCIAL stratum, which the X
+# freeze (#368/#401, root cause the Allas quota #396) left with only two live
+# accounts, both critical-AI (Gebru, Bender). The arena's declared sampling_focus
+# names "frontier-lab and industry discourse" and "AI safety, alignment,
+# evaluation and pacing"; on a browser-free stage the only reachable platform for
+# individual social voices is Bluesky. Verified live 2026-11-10 via the public
+# Bluesky API: getProfile handle=emollick.bsky.social, 3,406 posts, 37,747
+# followers, and getAuthorFeed returned posts dated 2026-11-10 (today), i.e. well
+# inside the 2026-09-01 floor. Inclusion is a SAMPLING decision -- an institutional
+# and visibility criterion (Wharton professor studying enterprise AI adoption) --
+# and NEVER an ideological classification of the actor; positions are inferred
+# downstream from documents, not from source identity.
+#
+# What this does NOT fix, stated so the config is not read as coverage: the
+# accelerationist and frontier-lab first-party layer has no active Bluesky
+# presence (anthropicai.bsky.social postsCount=0, openai.com unresolved,
+# beffjezos.bsky.social postsCount=0, karpathy/pmarca newest post 2023), so those
+# voices remain unreachable until X capture returns or a browser stage exists.
+[[bluesky_account]]
+name = "Ethan Mollick"
+handle = "emollick.bsky.social"
+profile_url = "https://bsky.app/profile/emollick.bsky.social"
+arena = "elites"
+source_family = "industry AI adoption / labour and organisational practice"
+sampling_rationale = "One of the highest-visibility academic commentators on how generative AI is actually adopted inside firms and workplaces -- the industry-practice side of the elites arena, which the X freeze left unrepresented in the social stratum. Verified live 2026-11-10: 3,406 posts, 37,747 followers, newest post 2026-11-10T03:49Z."
+priority = "P2"
+
 # ---------------------------------------------------------------------------
 # Long-form and scholarly discovery
 # ---------------------------------------------------------------------------
