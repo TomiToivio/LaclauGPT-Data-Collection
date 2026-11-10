@@ -578,6 +578,11 @@ def run_phase1_laskin(
         )
     else:
         jobs = select_job_window(all_jobs, max_jobs=max_jobs, rotation=rotation * max_jobs)
+    synced = 0
+    collected = 0
+    skipped_before_floor = 0
+    warnings = list(rss.get("warnings") or [])
+    errors = list(rss.get("errors") or [])
     # #406: what the worker *could* still claim after this cycle's claim. Without it, eleven
     # sources that had never been claimed looked exactly like an idle queue, and fourteen cycles
     # in a row reported `ok` with `deferred_by_tick_limit: 0` while a whole stratum was frozen.
@@ -592,11 +597,6 @@ def run_phase1_laskin(
             except Exception as exc:  # noqa: BLE001 - a counter must not fail the cycle
                 warnings.append(f"claimable_by_kind unavailable: {str(exc)[:120]}")
     claimable_not_claimed = int(sum(claimable_by_kind.values()))
-    synced = 0
-    collected = 0
-    skipped_before_floor = 0
-    warnings = list(rss.get("warnings") or [])
-    errors = list(rss.get("errors") or [])
     source_outcomes: list[dict[str, Any]] = []
     deferred_by_tick_limit = 0
 
