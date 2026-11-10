@@ -319,6 +319,29 @@ class JobLeaseStore:
             claimed.append(doc)
         return claimed
 
+    def claimable_count(
+        self, capabilities: Iterable[str], *, kinds: Iterable[str] | None = None
+    ) -> int:
+        """Eligible, due jobs not yet claimed, for cycle backlog visibility (#406)."""
+        now = self._clock()
+        clauses: list[dict[str, Any]] = [
+            {"$or": [
+                {"status": PENDING, "$or": [
+                    {"next_run_at": {"$lte": now}},
+                    {"next_run_at": {"$exists": False}},
+                ]},
+                {"status": RUNNING, "lease_expires_at": {"$lt": now}},
+            ]},
+            {"$expr": {"$lt": ["$attempts", "$max_attempts"]}},
+            capability_filter(capabilities),
+        ]
+        if kinds is not None:
+            allowed = sorted({str(k) for k in kinds})
+            if not allowed:
+                return 0
+            clauses.append({"kind": {"$in": allowed}})
+        return int(self.jobs.count_documents({"$and": clauses}))
+
     def renew(self, job_id: str, worker_id: str, *, lease_seconds: int = 900) -> bool:
         now = self._clock()
         result = self.jobs.update_one(
