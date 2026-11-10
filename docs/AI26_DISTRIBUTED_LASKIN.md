@@ -31,8 +31,32 @@ Added in this change:
   without the `browser` capability claims through a filter carrying
   `kind: {$nin: BROWSER_REQUIRED_KINDS}`, so a browser job cannot be handed to Laskin even if a
   caller asks for one. A future browser-only kind is therefore denied by default.
-- **Atomic claims** — one `find_one_and_update` per job, sorted by priority then age. MongoDB's
-  per-document atomicity is the whole concurrency argument, so two workers cannot win the same job.
+- **Atomic claims** — one `find_one_and_update` per job, ordered by
+  `(priority, next_run_at, created_at, _id)`. MongoDB's per-document atomicity is the whole
+  concurrency argument, so two workers cannot win the same job.
+
+  The order used to be `(priority, created_at)`, and every job in the AI26 queue was bulk-enqueued
+  from a single clock read — a total tie. The winner was therefore whatever index the planner
+  picked, and `(status, kind, …)` sorts `bluesky_account` before `web_source`: eleven web sources
+  never ran once in twelve days while six account jobs were claimed every hour (#406).
+  `next_run_at` ascending puts a job that has never run first (Mongo sorts a missing field before
+  numbers) and a job that has waited longest next; `_id` ends the sort, so the answer is a rule and
+  not a plan.
+
+- **Round-robin across kinds.** `claim()` takes one job per kind per round instead of the cheapest
+  `limit` in one flat order, so a stratum cannot be crowded out by a bigger one in the same
+  priority. With `--max-jobs 6` and four claimable kinds, every kind is reached in the first round;
+  within a kind the order is the one above, so the longest-waiting source goes first (#405).
+
+- **Deferral is not failure.** The cycle claims `--max-jobs` and then stops at the tick's record
+  limit; the jobs it never started go back through `defer()`, which refunds the attempt the claim
+  spent and leaves `next_run_at` alone. Through `release()` they were charged a full `poll_seconds`,
+  which is how a capacity limit became a source's permanent cadence and admitted two P1 Bluesky
+  sources once a day while their peers ran every other cycle (#405).
+
+- **`claimable_by_kind` per cycle.** Each cycle now reports how many jobs it *could* still claim,
+  per kind. Without it, eleven sources that had never been claimed looked exactly like an idle
+  queue: fourteen cycles in a row said `ok` with `deferred_by_tick_limit: 0` (#406).
 - **Leases with expiry** — a machine that dies mid-job stops holding it; `reap_expired()` returns the
   work to the queue, so recovery does not need an operator. Attempts are bounded, so a job that
   crashes repeatedly parks itself as `failed` instead of spinning.

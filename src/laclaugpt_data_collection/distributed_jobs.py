@@ -259,6 +259,77 @@ class JobLeaseStore:
         return int(getattr(result, "modified_count", 0))
 
 
+    # -- claim ordering and fairness ------------------------------------------------------------
+    #: Deterministic claim order (#406). ``next_run_at`` ascending puts jobs that have never run
+    #: (no field, which Mongo sorts before numbers) first, then the ones whose turn came longest
+    #: ago; ``_id`` ends the sort, so the answer no longer depends on which index the planner
+    #: chooses. The previous key was ``(priority, created_at)`` and every job in the AI26 store
+    #: shares one ``created_at`` to the microsecond, so a whole queue was ordered by plan choice —
+    #: ``(status, kind, ...)`` puts ``bluesky_account`` first and ``web_source`` last, every cycle.
+    CLAIM_SORT: tuple[tuple[str, int], ...] = (
+        ("priority", 1),
+        ("next_run_at", 1),
+        ("created_at", 1),
+        ("_id", 1),
+    )
+
+    def _claim_query(
+        self,
+        capabilities: Iterable[str],
+        *,
+        kinds: Iterable[str] | None = None,
+        now: float | None = None,
+    ) -> dict[str, Any]:
+        """The filter that decides what this worker may claim. One place, so counting and claiming agree."""
+        caps = {str(c) for c in capabilities}
+        allowed_kinds = sorted({str(k) for k in kinds}) if kinds is not None else None
+        stamp = self._clock() if now is None else now
+        clauses: list[dict[str, Any]] = [
+            {
+                "$or": [
+                    {"status": PENDING},
+                    {"status": RUNNING, "lease_expires_at": {"$lt": stamp}},
+                ]
+            },
+            {"$expr": {"$lt": ["$attempts", "$max_attempts"]}},
+            capability_filter(caps),
+        ]
+        if allowed_kinds is not None:
+            clauses.append({"kind": {"$in": allowed_kinds}})
+        return {"$and": clauses}
+
+    def claimable_by_kind(
+        self,
+        capabilities: Iterable[str],
+        *,
+        kinds: Iterable[str] | None = None,
+    ) -> dict[str, int]:
+        """How many jobs this worker *could* claim right now, per kind (#406).
+
+        The cycle used to report ``non_browser_jobs_considered`` and nothing else, so eleven
+        sources that had never been claimed looked exactly like an idle queue. This is the number
+        that makes the difference visible.
+        """
+        query = self._claim_query(capabilities, kinds=kinds)
+        rows = self.jobs.aggregate(
+            [
+                {"$match": query},
+                {"$group": {"_id": "$kind", "n": {"$sum": 1}}},
+            ]
+        )
+        return {str(row["_id"]): int(row["n"]) for row in rows if row.get("_id")}
+
+    def _claimable_kinds(self, query: dict[str, Any]) -> list[str]:
+        """Claimable kinds, cheapest priority first, so a round-robin still spends P1 before P2."""
+        rows = self.jobs.aggregate(
+            [
+                {"$match": query},
+                {"$group": {"_id": "$kind", "p": {"$min": "$priority"}}},
+                {"$sort": {"p": 1, "_id": 1}},
+            ]
+        )
+        return [str(row["_id"]) for row in rows if row.get("_id")]
+
     # -- lease lifecycle ------------------------------------------------------------------------
     def claim(
         self,
@@ -269,29 +340,27 @@ class JobLeaseStore:
         lease_seconds: int = 900,
         kinds: Iterable[str] | None = None,
     ) -> list[dict[str, Any]]:
-        """Atomically claim up to ``limit`` jobs this worker is allowed to do."""
+        """Atomically claim up to ``limit`` jobs this worker is allowed to do.
+
+        Claims round-robin *across kinds* rather than taking the cheapest ``limit`` in one order
+        (#405, #406). With one flat order, six slots per cycle and fifteen claimable jobs, the same
+        strata can be selected forever: the web stratum never ran once in twelve days, and two P1
+        Bluesky sources were admitted in 1 and 3 of 16 cycles. Kinds within a priority are served
+        in turn, so a source that has waited longest always gets its slot.
+        """
         if limit < 1:
             raise ValueError("limit must be at least 1")
         allowed_kinds = sorted({str(k) for k in kinds}) if kinds is not None else None
         if allowed_kinds is not None and not allowed_kinds:
             return []
-        claimed: list[dict[str, Any]] = []
         caps = {str(c) for c in capabilities}
-        for _ in range(limit):
+        claimed: list[dict[str, Any]] = []
+        while len(claimed) < limit:
             now = self._clock()
-            query: dict[str, Any] = {
-                "$and": [
-                    {
-                        "$or": [
-                            {"status": PENDING},
-                            {"status": RUNNING, "lease_expires_at": {"$lt": now}},
-                        ]
-                    },
-                    {"$expr": {"$lt": ["$attempts", "$max_attempts"]}},
-                    capability_filter(caps),
-                    *([{"kind": {"$in": allowed_kinds}}] if allowed_kinds is not None else []),
-                ]
-            }
+            query = self._claim_query(caps, kinds=allowed_kinds, now=now)
+            pending_kinds = self._claimable_kinds(query)
+            if not pending_kinds:
+                break
             update = {
                 "$set": {
                     "status": RUNNING,
@@ -301,16 +370,51 @@ class JobLeaseStore:
                 },
                 "$inc": {"attempts": 1},
             }
-            doc = self.jobs.find_one_and_update(
-                query,
-                update,
-                sort=[("priority", 1), ("created_at", 1)],
-                return_document=True,
-            )
-            if doc is None:
+            progressed = False
+            for kind in pending_kinds:
+                if len(claimed) >= limit:
+                    break
+                doc = self.jobs.find_one_and_update(
+                    {**query, "kind": kind},
+                    update,
+                    sort=list(self.CLAIM_SORT),
+                    return_document=True,
+                )
+                if doc is not None:
+                    claimed.append(doc)
+                    progressed = True
+            if not progressed:
+                # Everything claimable was taken by another worker between the count and the claim.
                 break
-            claimed.append(doc)
         return claimed
+
+    def defer(self, job_id: str, worker_id: str, *, reason: str = "tick_record_limit") -> bool:
+        """Put a claimed-but-not-started job back without charging it a cadence (#405).
+
+        The cycle claims ``max_jobs`` and then stops at the tick's record limit; the jobs it never
+        started are not failures and not slow sources. ``release()`` charged them a full
+        ``poll_seconds``, so the same sources lost their turn every cycle and were admitted once a
+        day — the P1 starvation in #405. A deferral refunds the claim's attempt and leaves
+        ``next_run_at`` alone, which also keeps the job at the front of the claim order.
+        """
+        now = self._clock()
+        doc = self.jobs.find_one({"_id": job_id, "worker_id": str(worker_id), "status": RUNNING})
+        if not doc:
+            return False
+        result = self.jobs.update_one(
+            {"_id": job_id, "worker_id": str(worker_id), "status": RUNNING},
+            {
+                "$set": {
+                    "status": PENDING,
+                    "attempts": max(0, int(doc.get("attempts", 0)) - 1),
+                    "worker_id": None,
+                    "lease_expires_at": None,
+                    "last_error": (reason or "")[:500] or None,
+                    "updated_at": now,
+                }
+            },
+        )
+        return bool(getattr(result, "modified_count", 0))
 
     def renew(self, job_id: str, worker_id: str, *, lease_seconds: int = 900) -> bool:
         now = self._clock()
@@ -532,6 +636,16 @@ def dispatch_finish(
     status = str(outcome.get("status") or "")
     if status in {"ok", "warning"}:
         dispatch.complete(str(job_id), worker_id, outcome=status)
+    elif status == "deferred":
+        # A job we claimed and could not start this tick has not failed and is not slow: giving it
+        # a cadence would cost it a turn every cycle (#405). Duck-typed so older dispatchers work.
+        defer = getattr(dispatch, "defer", None)
+        if callable(defer):
+            defer(str(job_id), worker_id, reason=str(outcome.get("reason") or "deferred"))
+        else:
+            dispatch.release(
+                str(job_id), worker_id, error=str(outcome.get("reason") or status)
+            )
     else:
         # An infrastructure failure is not evidence about this job, so it must not spend
         # the job's retry budget.
