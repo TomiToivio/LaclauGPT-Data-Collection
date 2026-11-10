@@ -578,6 +578,20 @@ def run_phase1_laskin(
         )
     else:
         jobs = select_job_window(all_jobs, max_jobs=max_jobs, rotation=rotation * max_jobs)
+    # #406: what the worker *could* still claim after this cycle's claim. Without it, eleven
+    # sources that had never been claimed looked exactly like an idle queue, and fourteen cycles
+    # in a row reported `ok` with `deferred_by_tick_limit: 0` while a whole stratum was frozen.
+    claimable_by_kind: dict[str, int] = {}
+    if dispatch is not None:
+        probe_claimable = getattr(dispatch, "claimable_by_kind", None)
+        if callable(probe_claimable):
+            try:
+                claimable_by_kind = probe_claimable(
+                    capabilities or LASKIN_CAPABILITIES, kinds=NON_BROWSER_KINDS
+                )
+            except Exception as exc:  # noqa: BLE001 - a counter must not fail the cycle
+                warnings.append(f"claimable_by_kind unavailable: {str(exc)[:120]}")
+    claimable_not_claimed = int(sum(claimable_by_kind.values()))
     synced = 0
     collected = 0
     skipped_before_floor = 0
@@ -752,6 +766,10 @@ def run_phase1_laskin(
         "browser_sources_started": 0,
         "rss_records_synced": int(rss.get("records_synced", 0)),
         "non_browser_jobs_considered": len(jobs),
+        # #406: claimable jobs this cycle did not claim, by kind. A starved stratum shows up here
+        # instead of hiding behind `status: ok`.
+        "claimable_not_claimed": claimable_not_claimed,
+        "claimable_by_kind": dict(sorted(claimable_by_kind.items())),
         "non_browser_records_collected": collected,
         "non_browser_records_synced": synced,
         # Issue #396: records stored while their raw object could not be uploaded. Non-zero
