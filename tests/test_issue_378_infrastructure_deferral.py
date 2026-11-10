@@ -16,9 +16,22 @@ from laclaugpt_data_collection.distributed_jobs import JobLeaseStore, dispatch_f
 
 
 def _store() -> JobLeaseStore:
-    store = JobLeaseStore(mongomock.MongoClient()["ai26"]["jobs"])
+    store = JobLeaseStore(mongomock.MongoClient()["ai26"]["jobs"], clock=Clock())
     store.ensure_indexes()
     return store
+
+
+class Clock:
+    """A clock the test can move: a released source now waits out its cadence (#405, #407)."""
+
+    def __init__(self, start: float = 1_000_000.0) -> None:
+        self.now = start
+
+    def __call__(self) -> float:
+        return self.now
+
+    def advance(self, seconds: float) -> None:
+        self.now += seconds
 
 
 def _claim_one(store: JobLeaseStore, job_id: str) -> dict:
@@ -31,6 +44,9 @@ def test_an_outage_does_not_consume_the_retry_budget():
     store = _store()
     store.enqueue([{"job_id": "web_source:a", "kind": "web_source", "name": "a"}])
     for _ in range(4):
+        # An infrastructure failure also waits out the cadence before the source is retried, so
+        # the loop advances the clock rather than assuming the next tick is a retry.
+        store._clock.advance(3601)
         _claim_one(store, "web_source:a")
         dispatch_finish(
             store,

@@ -151,6 +151,10 @@ def test_release_returns_job_to_queue(store):
     store.claim("laskin", LASKIN_CAPABILITIES, limit=1)
     store.release("a", "laskin", error="network")
     assert store.jobs.find_one({"_id": "a"})["status"] == PENDING
+    # Recurring work does not retry on the next tick: it waits for its cadence (#405, #407), so
+    # the queue cannot let one failing source monopolise the budget.
+    assert store.claim("desktop", LOCALHOST_CAPABILITIES, limit=1) == []
+    store._clock.advance(3601)
     assert [c["_id"] for c in store.claim("desktop", LOCALHOST_CAPABILITIES, limit=1)] == ["a"]
 
 

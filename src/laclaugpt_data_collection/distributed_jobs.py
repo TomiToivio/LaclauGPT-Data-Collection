@@ -287,7 +287,16 @@ class JobLeaseStore:
         clauses: list[dict[str, Any]] = [
             {
                 "$or": [
-                    {"status": PENDING},
+                    # A pending job is claimable only when its cadence allows it: `release()`
+                    # leaves a failed source PENDING with `next_run_at` in the future, and without
+                    # this clause the next cycle claims it anyway, so the wait was decorative.
+                    {
+                        "status": PENDING,
+                        "$or": [
+                            {"next_run_at": {"$lte": stamp}},
+                            {"next_run_at": {"$exists": False}},
+                        ],
+                    },
                     {"status": RUNNING, "lease_expires_at": {"$lt": stamp}},
                 ]
             },
