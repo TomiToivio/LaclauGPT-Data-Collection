@@ -100,6 +100,17 @@ fi
 if ! "${RUNTIME_CHECK[@]}" 2>&1; then
   echo "[$(date -Is)] AI26 runtime check reported drift (lines above); collecting anyway"
 fi
+# #401: read-only Mongo capture provenance check. Laskin is not an X producer.
+# A stale/missing capture must be visible but must not block non-browser ingestion.
+if [[ -x "$ROOT_DIR/.venv/bin/python" ]]; then
+  FRESHNESS_PY="$ROOT_DIR/.venv/bin/python"
+else
+  FRESHNESS_PY=python3
+fi
+if ! "$FRESHNESS_PY" "$ROOT_DIR/scripts/check_ai26_capture_freshness.py" --platforms x --max-age-hours "${LACLAUGPT_AI26_X_MAX_AGE_HOURS:-24}"; then
+  echo "AI26 X capture freshness ALERT: browser capture missing or stale; X replay is not a producer" >&2
+fi
+
 # The runner returns 1 whenever any source recorded an error (status: partial),
 # so a single transient upstream failure (e.g. arXiv HTTP 429) would abort this
 # wrapper under `set -e` *before* the end marker below, leaving a tick that reads
