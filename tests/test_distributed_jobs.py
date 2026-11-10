@@ -376,7 +376,8 @@ def test_claimable_backlog_counts_only_due_unclaimed_non_browser_jobs(store):
                        ("social", "bluesky_account", 1),
                        ("browser", "x_account", 1)))
     assert store.claimable_count(LASKIN_CAPABILITIES, kinds=NON_BROWSER_KINDS) == 2
-    store.claim("laskin", LASKIN_CAPABILITIES, limit=1, kinds=NON_BROWSER_KINDS)
+    claimed = store.claim("laskin", LASKIN_CAPABILITIES, limit=1, kinds=NON_BROWSER_KINDS)
     assert store.claimable_count(LASKIN_CAPABILITIES, kinds=NON_BROWSER_KINDS) == 1
-    store.jobs.update_one({"_id": "social"}, {"$set": {"next_run_at": store._clock() + 60}})
+    other = ({"web", "social"} - {claimed[0]["_id"]}).pop()
+    store.jobs.update_one({"_id": other}, {"$set": {"next_run_at": store._clock() + 60}})
     assert store.claimable_count(LASKIN_CAPABILITIES, kinds=NON_BROWSER_KINDS) == 0
