@@ -769,6 +769,9 @@ def run_phase1_laskin(
         # #406: claimable jobs this cycle did not claim, by kind. A starved stratum shows up here
         # instead of hiding behind `status: ok`.
         "claimable_not_claimed": claimable_not_claimed,
+        # The name this metric was proposed under in #406; kept so the issue text and the cycle
+        # record agree, and so a dashboard written against either spelling works.
+        "claimable_but_unclaimed": claimable_not_claimed,
         "claimable_by_kind": dict(sorted(claimable_by_kind.items())),
         "non_browser_records_collected": collected,
         "non_browser_records_synced": synced,

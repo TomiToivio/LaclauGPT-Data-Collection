@@ -215,3 +215,32 @@ def test_claiming_marks_the_lease_so_another_worker_cannot_take_it(store):
     other = s.claim("w2", LASKIN_CAPABILITIES, limit=5, kinds=NON_BROWSER_KINDS)
     assert taken[0]["_id"] not in {d["_id"] for d in other}
     assert all(d["status"] == RUNNING for d in taken)
+
+
+def test_a_released_source_waits_for_its_cadence(store):
+    """The gate #407 caught: `release()` left a failed source PENDING with a future `next_run_at`,
+    and the old claim ignored it, so "waits a cadence" was decoration."""
+    s, clock = store
+    bulk(s, {"bluesky_account": 1})
+    claimed = s.claim("w", LASKIN_CAPABILITIES, limit=1, kinds=NON_BROWSER_KINDS)
+    s.release(claimed[0]["_id"], "w", error="http 500")
+
+    assert s.claim("w", LASKIN_CAPABILITIES, limit=1, kinds=NON_BROWSER_KINDS) == []
+    assert s.claimable_by_kind(LASKIN_CAPABILITIES, kinds=NON_BROWSER_KINDS) == {}
+
+    clock.advance(3601)
+    assert [d["_id"] for d in s.claim("w", LASKIN_CAPABILITIES, limit=1, kinds=NON_BROWSER_KINDS)] == [
+        claimed[0]["_id"]
+    ]
+
+
+def test_a_deferred_job_is_still_claimable_on_the_same_tick(store):
+    """The gate must not re-create #405: a deferral keeps `next_run_at` in the past, so the job
+    stays due and keeps its place in line."""
+    s, _ = store
+    bulk(s, {"web_source": 2})
+    taken = s.claim("w", LASKIN_CAPABILITIES, limit=2, kinds=NON_BROWSER_KINDS)
+    for doc in taken:
+        s.defer(doc["_id"], "w")
+    assert s.claimable_by_kind(LASKIN_CAPABILITIES, kinds=NON_BROWSER_KINDS) == {"web_source": 2}
+    assert len(s.claim("w", LASKIN_CAPABILITIES, limit=2, kinds=NON_BROWSER_KINDS)) == 2
