@@ -283,7 +283,10 @@ class JobLeaseStore:
                 "$and": [
                     {
                         "$or": [
-                            {"status": PENDING},
+                            {"status": PENDING, "$or": [
+                                {"next_run_at": {"$lte": now}},
+                                {"next_run_at": {"$exists": False}},
+                            ]},
                             {"status": RUNNING, "lease_expires_at": {"$lt": now}},
                         ]
                     },
@@ -298,13 +301,17 @@ class JobLeaseStore:
                     "worker_id": str(worker_id),
                     "lease_expires_at": now + int(lease_seconds),
                     "updated_at": now,
+                    "last_claimed_at": now,
                 },
                 "$inc": {"attempts": 1},
             }
             doc = self.jobs.find_one_and_update(
                 query,
                 update,
-                sort=[("priority", 1), ("created_at", 1)],
+                # Rotate equally prioritised sources by the last actual claim.
+                # Older never-claimed jobs sort first (Mongo null/missing first).
+                # The stable _id tail makes the result independent of query plan.
+                sort=[("priority", 1), ("last_claimed_at", 1), ("_id", 1)],
                 return_document=True,
             )
             if doc is None:
