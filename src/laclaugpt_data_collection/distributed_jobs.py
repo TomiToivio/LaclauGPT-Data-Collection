@@ -34,9 +34,18 @@ PENDING = "pending"
 RUNNING = "running"
 DONE = "done"
 FAILED = "failed"
-DISABLED = "disabled"
-# A completed manifest source becomes eligible again after its polling interval.
+#: A job whose manifest row was deactivated. Kept, not deleted: the queue has to remember that it
+#: used to exist, or the next re-read of the manifest resurrects it.
+CANCELLED = "cancelled"
+
+#: A manifest row describes a source that is *polled*, not a task that runs once (#400). One hour is
+#: the collector's own cycle, so the default reproduces the pre-#378 behaviour in which every
+#: active row was collected every cycle. A row may override it with ``poll_minutes``.
 DEFAULT_POLL_SECONDS = 3600
+
+#: Manifest keys that may carry a per-row cadence, in order of precedence.
+POLL_KEYS = ("poll_minutes", "cadence_minutes", "interval_minutes")
+
 
 #: Source tables that can only be collected by driving a browser. A worker without the ``browser``
 #: capability must never be offered these.
@@ -72,6 +81,31 @@ def priority_rank(value: Any) -> int:
     if text.isdigit():
         return int(text)
     return 2
+
+
+def poll_seconds_for(row: Mapping[str, Any]) -> int:
+    """How often a manifest row should be collected again, in seconds (#400).
+
+    A row may say ``poll_minutes`` (preferred), ``cadence_minutes`` or ``interval_minutes``. Zero
+    means "never again" and is a deliberate choice a manifest can make; the default is the
+    collector's own cycle, which is what every active row effectively had before the shared queue
+    turned each of them into a one-shot job.
+    """
+    for key in POLL_KEYS:
+        if key in row and row[key] not in (None, ""):
+            try:
+                minutes = float(row[key])
+            except (TypeError, ValueError):
+                raise ValueError(f"{key} must be a number, got {row[key]!r}") from None
+            if minutes < 0:
+                raise ValueError(f"{key} must not be negative, got {minutes}")
+            return int(minutes * 60)
+    if row.get("poll_seconds") is not None:
+        seconds = int(row["poll_seconds"])
+        if seconds < 0:
+            raise ValueError("poll_seconds must not be negative")
+        return seconds
+    return DEFAULT_POLL_SECONDS
 
 
 def job_identity(row: Mapping[str, Any]) -> str:
@@ -133,8 +167,9 @@ class JobLeaseStore:
     ) -> int:
         """Insert jobs idempotently, keyed by ``job_id``.
 
-        Re-enqueuing the same manifest is a no-op, which is what makes a restart safe: the queue
-        follows the manifest instead of accumulating a second copy of it.
+        Re-enqueuing the same manifest is a no-op for the *state* of an existing job, which is what
+        makes a restart safe. What is not frozen is the definition: payload, priority and poll
+        cadence follow the manifest, so an edited row takes effect without a migration (#400).
         """
         now = self._clock()
         written = 0
@@ -145,48 +180,84 @@ class JobLeaseStore:
             kind = str(job.get("kind") or job.get("table") or "")
             if not kind:
                 raise ValueError(f"job {job_id} has no kind")
-            doc = {
-                "_id": job_id,
-                "kind": kind,
-                "name": str(job.get("name") or job_id),
-                "priority": priority_rank(job.get("priority", 2)),
-                "payload": {k: v for k, v in job.items() if k not in {"job_id", "id", "kind"}},
-                "status": PENDING,
-                "attempts": 0,
-                "max_attempts": int(job.get("max_attempts", 3)),
-                "worker_id": None,
-                "lease_expires_at": None,
-                "last_error": None,
-                "study_fingerprint": study_fingerprint,
-                "created_at": now,
-                "updated_at": now,
-            }
-            result = self.jobs.update_one({"_id": job_id}, {"$setOnInsert": doc}, upsert=True)
-            written += int(bool(getattr(result, "upserted_id", None)))
-            # Recurring sources are not one-shot tasks. Only a completed, due job can
-            # be rearmed; the predicate protects concurrent dispatchers and leases.
-            # Keep exhausted failures parked until an operator explicitly repairs them.
-            self.jobs.update_one(
-                {"_id": job_id, "$or": [
-                    {"status": DONE, "updated_at": {"$lte": now - DEFAULT_POLL_SECONDS}},
-                    {"status": DISABLED},
-                ]},
-                {"$set": {"status": PENDING, "attempts": 0, "worker_id": None,
-                          "lease_expires_at": None, "last_error": None,
-                          "updated_at": now}},
+            payload = {k: v for k, v in job.items() if k not in {"job_id", "id", "kind"}}
+            priority = priority_rank(job.get("priority", 2))
+            poll_seconds = poll_seconds_for(job)
+            max_attempts = int(job.get("max_attempts", 3))
+            result = self.jobs.update_one(
+                {"_id": job_id},
+                {
+                    # State and identity: written once, never overwritten by a manifest re-read.
+                    "$setOnInsert": {
+                        "_id": job_id,
+                        "status": PENDING,
+                        "attempts": 0,
+                        "worker_id": None,
+                        "lease_expires_at": None,
+                        "last_error": None,
+                        "study_fingerprint": study_fingerprint,
+                        "created_at": now,
+                        "next_run_at": now,
+                    },
+                    # Definition: follows the manifest, so an edited row takes effect. The next run
+                    # time is *not* here: re-reading the manifest must not reset a finished job's
+                    # schedule, or every cycle would re-run every source regardless of cadence.
+                    "$set": {
+                        "name": str(job.get("name") or job_id),
+                        "kind": kind,
+                        "priority": priority,
+                        "payload": payload,
+                        "poll_seconds": poll_seconds,
+                        "max_attempts": max_attempts,
+                        "updated_at": now,
+                    },
+                },
+                upsert=True,
             )
+            written += int(bool(getattr(result, "upserted_id", None)))
         return written
 
-    def retire_absent(self, active_ids: Iterable[str], *, study_fingerprint: str | None = None) -> int:
-        """Retire inactive/removed non-browser rows without touching active leases or X jobs."""
+    def cancel_missing(self, active_ids: Iterable[str]) -> int:
+        """Retire queue entries whose manifest row is gone or ``active = false`` (#400).
+
+        The six deactivated ``scholarly_query`` rows kept being claimed for two hours after the
+        manifest said they were off, because nothing in the queue knew about the manifest. A
+        cancelled job stays in the collection as evidence of what used to be configured.
+        """
+        keep = [str(j) for j in active_ids]
+        now = self._clock()
         result = self.jobs.update_many(
-            {"_id": {"$nin": list(active_ids)},
-             "kind": {"$in": sorted(NON_BROWSER_KINDS)},
-             "study_fingerprint": study_fingerprint,
-             "status": {"$in": [PENDING, DONE, FAILED]}},
-            {"$set": {"status": DISABLED, "updated_at": self._clock()}},
+            {"_id": {"$nin": keep}, "status": {"$in": [PENDING, RUNNING, DONE, FAILED]}},
+            {"$set": {"status": CANCELLED, "worker_id": None, "lease_expires_at": None,
+                      "updated_at": now}},
         )
         return int(getattr(result, "modified_count", 0))
+
+    def rearm_due(self) -> int:
+        """Turn finished recurring jobs back into work whose cadence has elapsed (#400).
+
+        This is the whole fix for the drained queue: completion is a *state*, not an ending. A job
+        with ``poll_seconds > 0`` becomes pending again when its next run is due, with a fresh
+        attempt budget — otherwise one transient failure would end a source for the rest of the
+        study. Cancelled jobs are deliberately excluded: deactivation must survive.
+        """
+        now = self._clock()
+        result = self.jobs.update_many(
+            {
+                "poll_seconds": {"$gt": 0},
+                "status": {"$in": [DONE, FAILED]},
+                # A job that finished before ``next_run_at`` existed has no schedule to compare
+                # against. Treat it as due once: it runs, and from then on it has a real one. The
+                # alternative — waiting for a field that nothing will ever write — is exactly the
+                # drained queue this issue is about, wearing a migration.
+                "$or": [{"next_run_at": {"$lte": now}},
+                        {"next_run_at": {"$exists": False}}],
+            },
+            {"$set": {"status": PENDING, "attempts": 0, "worker_id": None,
+                      "lease_expires_at": None, "last_error": None, "updated_at": now}},
+        )
+        return int(getattr(result, "modified_count", 0))
+
 
     # -- lease lifecycle ------------------------------------------------------------------------
     def claim(
@@ -250,18 +321,28 @@ class JobLeaseStore:
         return bool(getattr(result, "modified_count", 0))
 
     def complete(self, job_id: str, worker_id: str, *, outcome: str | None = None) -> bool:
-        """Finish a job. Idempotent: a second completion by another worker changes nothing."""
+        """Finish a job. Idempotent: a second completion by another worker changes nothing.
+
+        Completing a *recurring* job also schedules its next run (#400). Completion is a state, not
+        an ending: without this line every manifest row ran exactly once per study and the queue
+        drained to zero while the collector kept reporting ``ok``.
+        """
         now = self._clock()
+        doc = self.jobs.find_one({"_id": job_id, "worker_id": str(worker_id), "status": RUNNING})
+        if not doc:
+            return False
+        update: dict[str, Any] = {
+            "status": DONE,
+            "lease_expires_at": None,
+            "outcome": outcome,
+            "updated_at": now,
+        }
+        poll = int(doc.get("poll_seconds", 0) or 0)
+        if poll > 0:
+            update["next_run_at"] = now + poll
         result = self.jobs.update_one(
             {"_id": job_id, "worker_id": str(worker_id), "status": RUNNING},
-            {
-                "$set": {
-                    "status": DONE,
-                    "lease_expires_at": None,
-                    "outcome": outcome,
-                    "updated_at": now,
-                }
-            },
+            {"$set": update},
         )
         return bool(getattr(result, "modified_count", 0))
 
@@ -289,17 +370,21 @@ class JobLeaseStore:
             self.jobs.update_one({"_id": job_id}, {"$inc": {"attempts": -1}})
             doc["attempts"] = max(0, int(doc.get("attempts", 0)) - 1)
         exhausted = int(doc.get("attempts", 0)) >= int(doc.get("max_attempts", 3))
+        update: dict[str, Any] = {
+            "status": FAILED if exhausted else PENDING,
+            "worker_id": None,
+            "lease_expires_at": None,
+            "last_error": (error or "")[:500] or None,
+            "updated_at": now,
+        }
+        poll = int(doc.get("poll_seconds", 0) or 0)
+        if poll > 0:
+            # A recurring source does not retry on the next tick just because it failed once; it
+            # waits for its cadence, then the next cycle makes it claimable again (#400).
+            update["next_run_at"] = now + poll
         self.jobs.update_one(
             {"_id": job_id, "worker_id": str(worker_id), "status": RUNNING},
-            {
-                "$set": {
-                    "status": FAILED if exhausted else PENDING,
-                    "worker_id": None,
-                    "lease_expires_at": None,
-                    "last_error": (error or "")[:500] or None,
-                    "updated_at": now,
-                }
-            },
+            {"$set": update},
         )
         return True
 
@@ -377,13 +462,20 @@ def dispatch_claim(
     on ``job_id``). What changes is who may take a job: ``claim`` filters browser kinds out for a
     Laskin-capable worker inside the query, so this host cannot be handed one.
     """
-    active_rows = [row for row in rows if row.get("enabled", row.get("active", True)) is not False]
     dispatch.enqueue(
-        [{**row, "job_id": job_identity(row)} for row in active_rows],
+        [{**row, "job_id": job_identity(row)} for row in rows if row.get("active", True) is not False],
         study_fingerprint=study_fingerprint,
     )
-    dispatch.retire_absent((job_identity(row) for row in active_rows),
-                           study_fingerprint=study_fingerprint)
+    # #400: the manifest also says what *stops* existing. Deactivated rows must not leave a
+    # claimable queue entry behind, and finished recurring jobs must become claimable again when
+    # their cadence elapses — otherwise the queue drains once and reports `ok` forever.
+    # Duck-typed dispatchers (test doubles, older adapters) may not implement these yet.
+    cancel_missing = getattr(dispatch, "cancel_missing", None)
+    if callable(cancel_missing):
+        cancel_missing(job_identity(row) for row in rows if row.get("active", True) is not False)
+    rearm_due = getattr(dispatch, "rearm_due", None)
+    if callable(rearm_due):
+        rearm_due()
     dispatch.reap_expired()
     # #378: the caller declares its capabilities. Defaulting to the Laskin set keeps the
     # original call site honest (a worker that says nothing gets the most restrictive role),

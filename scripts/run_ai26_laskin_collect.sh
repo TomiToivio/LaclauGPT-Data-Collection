@@ -100,16 +100,14 @@ fi
 if ! "${RUNTIME_CHECK[@]}" 2>&1; then
   echo "[$(date -Is)] AI26 runtime check reported drift (lines above); collecting anyway"
 fi
-# #401: visibility only. X collection requires an authorized browser on a
-# researcher workstation; the Laskin cron is not an X producer. Report actual
-# Mongo capture provenance rather than mistaking the replay bridge for capture.
-# Staleness is a warning here, never a reason to block RSS/non-browser ingestion.
+# #401: read-only Mongo capture provenance check. Laskin is not an X producer.
+# A stale/missing capture must be visible but must not block non-browser ingestion.
 if [[ -x "$ROOT_DIR/.venv/bin/python" ]]; then
   FRESHNESS_PY="$ROOT_DIR/.venv/bin/python"
 else
   FRESHNESS_PY=python3
 fi
-if ! "$FRESHNESS_PY" "$ROOT_DIR/scripts/check_ai26_capture_freshness.py" --mongo --max-age-hours "${LACLAUGPT_AI26_X_MAX_AGE_HOURS:-24}"; then
+if ! "$FRESHNESS_PY" "$ROOT_DIR/scripts/check_ai26_capture_freshness.py" --platforms x --max-age-hours "${LACLAUGPT_AI26_X_MAX_AGE_HOURS:-24}"; then
   echo "AI26 X capture freshness ALERT: browser capture missing or stale; X replay is not a producer" >&2
 fi
 
