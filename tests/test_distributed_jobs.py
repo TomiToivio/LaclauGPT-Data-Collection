@@ -369,3 +369,14 @@ def test_next_run_at_is_respected_for_pending_but_legacy_missing_is_due(store):
     assert [j["_id"] for j in store.claim("laskin", LASKIN_CAPABILITIES, limit=3)] == ["b"]
     store._clock.advance(7201)
     assert [j["_id"] for j in store.claim("laskin", LASKIN_CAPABILITIES, limit=3)] == ["a"]
+
+
+def test_claimable_backlog_counts_only_due_unclaimed_non_browser_jobs(store):
+    store.enqueue(jobs(("web", "web_source", 1),
+                       ("social", "bluesky_account", 1),
+                       ("browser", "x_account", 1)))
+    assert store.claimable_count(LASKIN_CAPABILITIES, kinds=NON_BROWSER_KINDS) == 2
+    store.claim("laskin", LASKIN_CAPABILITIES, limit=1, kinds=NON_BROWSER_KINDS)
+    assert store.claimable_count(LASKIN_CAPABILITIES, kinds=NON_BROWSER_KINDS) == 1
+    store.jobs.update_one({"_id": "social"}, {"$set": {"next_run_at": store._clock() + 60}})
+    assert store.claimable_count(LASKIN_CAPABILITIES, kinds=NON_BROWSER_KINDS) == 0
