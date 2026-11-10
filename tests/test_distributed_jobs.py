@@ -151,6 +151,9 @@ def test_release_returns_job_to_queue(store):
     store.claim("laskin", LASKIN_CAPABILITIES, limit=1)
     store.release("a", "laskin", error="network")
     assert store.jobs.find_one({"_id": "a"})["status"] == PENDING
+    # A failed recurring source waits for its cadence, rather than stealing a tick.
+    assert store.claim("desktop", LOCALHOST_CAPABILITIES, limit=1) == []
+    store._clock.advance(3601)
     assert [c["_id"] for c in store.claim("desktop", LOCALHOST_CAPABILITIES, limit=1)] == ["a"]
 
 
@@ -327,3 +330,42 @@ def test_worker_id_names_the_host_not_laskin(monkeypatch):
     assert default_worker_id() == "blazer-cron"
     monkeypatch.setenv("LACLAUGPT_WORKER_ID", "explicit-worker")
     assert default_worker_id() == "explicit-worker"
+
+
+def test_equal_priority_never_claimed_sources_precede_repeated_accounts(store):
+    """Regression for #406: web/scholarly must not starve behind rearmed accounts."""
+    rows = jobs(
+        ("bluesky:a", "bluesky_account", 1),
+        ("web:a", "web_source", 1),
+        ("scholarly:a", "scholarly_query", 1),
+        ("bluesky:b", "bluesky_account", 1),
+    )
+    store.enqueue(rows)
+    first = store.claim("laskin", LASKIN_CAPABILITIES, limit=1)[0]
+    assert first["_id"] == "bluesky:a"
+    store.complete(first["_id"], "laskin")
+    store._clock.advance(3601)
+    store.rearm_due()
+    claimed = store.claim("laskin", LASKIN_CAPABILITIES, limit=3)
+    assert {j["_id"] for j in claimed} == {"web:a", "scholarly:a", "bluesky:b"}
+    assert store.jobs.find_one({"_id": "bluesky:a"})["status"] == PENDING
+
+
+def test_equal_priority_jobs_rotate_after_claim_even_when_same_created_at(store):
+    """Regression for #405: a repeatedly claimed source cannot monopolise a 1-job tick."""
+    store.enqueue(jobs(("account:a", "bluesky_account", 1),
+                       ("account:b", "bluesky_account", 1)))
+    first = store.claim("laskin", LASKIN_CAPABILITIES, limit=1)[0]
+    store.release(first["_id"], "laskin", error="transient")
+    store._clock.advance(3601)
+    second = store.claim("laskin", LASKIN_CAPABILITIES, limit=1)[0]
+    assert second["_id"] != first["_id"]
+
+
+def test_next_run_at_is_respected_for_pending_but_legacy_missing_is_due(store):
+    store.enqueue(jobs(("a", "web_source", 1), ("b", "web_source", 1)))
+    store.jobs.update_one({"_id": "a"}, {"$set": {"next_run_at": store._clock() + 7200}})
+    store.jobs.update_one({"_id": "b"}, {"$unset": {"next_run_at": ""}})
+    assert [j["_id"] for j in store.claim("laskin", LASKIN_CAPABILITIES, limit=3)] == ["b"]
+    store._clock.advance(7201)
+    assert [j["_id"] for j in store.claim("laskin", LASKIN_CAPABILITIES, limit=3)] == ["a"]
