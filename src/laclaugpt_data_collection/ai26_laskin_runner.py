@@ -578,6 +578,13 @@ def run_phase1_laskin(
         )
     else:
         jobs = select_job_window(all_jobs, max_jobs=max_jobs, rotation=rotation * max_jobs)
+    # Count due, claimable work left outside the bounded selection. This catches
+    # silent stratum starvation even when the six selected jobs all succeed (#406).
+    claimable_but_unclaimed = (
+        dispatch.claimable_count(
+            capabilities or LASKIN_CAPABILITIES, kinds=NON_BROWSER_KINDS
+        ) if dispatch is not None else 0
+    )
     synced = 0
     collected = 0
     skipped_before_floor = 0
@@ -752,6 +759,7 @@ def run_phase1_laskin(
         "browser_sources_started": 0,
         "rss_records_synced": int(rss.get("records_synced", 0)),
         "non_browser_jobs_considered": len(jobs),
+        "claimable_but_unclaimed": claimable_but_unclaimed,
         "non_browser_records_collected": collected,
         "non_browser_records_synced": synced,
         # Issue #396: records stored while their raw object could not be uploaded. Non-zero
