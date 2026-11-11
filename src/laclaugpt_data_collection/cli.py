@@ -99,8 +99,12 @@ def _evaluation_frame(args: argparse.Namespace) -> int:
             query["handoff.status"] = "ready"
         records = list(database[args.mongodb_collection].find(query, {"_id": 0}))
         if args.analysis_collection:
+            # The readiness filter belongs to the frame collection; an analysis row has no
+            # `handoff.status`, so reusing the frame query here matches nothing and the formation
+            # axis silently reports as absent. #88
+            analysis_query = {"project_id": args.project} if args.project else {}
             for row in database[args.analysis_collection].find(
-                query, {"source_url": 1, "result.analysis.formations": 1}
+                analysis_query, {"source_url": 1, "result.analysis.formations": 1}
             ):
                 formations = (((row.get("result") or {}).get("analysis") or {}).get("formations")) or []
                 labels_by_url[str(row.get("source_url") or "")] = [
