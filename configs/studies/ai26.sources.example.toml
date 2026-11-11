@@ -882,6 +882,36 @@ arena = "elites"
 source_family = "Critical AI / language-model critique"
 priority = "P1"
 
+# ---- 2026-11-11: the existential-risk / evaluation sub-stratum had NO reachable
+# social source. Its three X handles (ESYudkowsky, MIRI_AI, FLI_org) are covered
+# only by the X replay bridge, and the X stratum is closed for Phase 1
+# (docs/ai26/X_STRATUM_DECISION_401.md, #401), so that half of the elites arena's
+# declared sampling_focus -- "AI safety, alignment, evaluation and pacing" -- was
+# absent from every platform the browser-free stage can actually collect.
+# Verified live 2026-11-11 via the public Bluesky API (getProfile +
+# getAuthorFeed, both read-only, public): handle metr.org resolves,
+# postsCount=323, followersCount=3447, and the 50 most recent posts run
+# 2026-10-15 .. 2026-11-06, i.e. active well inside the 2026-09-01 floor.
+# Inclusion is a SAMPLING decision -- institutional position (an evaluation
+# organisation whose measurements the surrounding discourse cites) and public
+# visibility -- and NEVER an ideological classification of the actor; positions
+# are inferred downstream from documents, not from source identity.
+#
+# Stated so the manifest is not read as coverage: this adds one institutional
+# voice to the evaluation sub-stratum, not the frontier labs or the
+# accelerationist layer (both unreachable on Bluesky, see the 2026-11-10 note
+# above). It is also P2, and today's Data-Analysis issue records that the
+# priority-ordered seeding spends each cycle finishing P1 first, so a new P2 row
+# joins a stratum that is already behind -- recorded, not hidden.
+[[bluesky_account]]
+name = "METR"
+handle = "metr.org"
+profile_url = "https://bsky.app/profile/metr.org"
+arena = "elites"
+source_family = "AI evaluation / frontier-model risk measurement"
+sampling_rationale = "Independent evaluation organisation measuring frontier-model capabilities and risks; supplies the evaluation-and-pacing voice that the X stratum's closure removed from the social layer. Verified live 2026-11-11: 323 posts, 3,447 followers, newest post 2026-11-06."
+priority = "P2"
+
 [[mastodon_account]]
 name = "Timnit Gebru"
 # Repointed 2026-10-09 (#239): the former mastodon.social account is dormant --

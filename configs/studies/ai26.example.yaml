@@ -304,9 +304,22 @@ groups:
   - id: xrisk_safety_x
     name: Existential-risk and AI-safety discourse
     arena: elites
-    notes: catastrophic risk, alignment, loss of control, evaluation and pacing; "doomer" remains a situated label rather than collection metadata
+    notes: >-
+      catastrophic risk, alignment, loss of control, evaluation and pacing;
+      "doomer" remains a situated label rather than collection metadata. Added
+      2026-11-11: METR on Bluesky, because the X stratum is closed for Phase 1
+      (X_STRATUM_DECISION_401.md) and this sub-stratum therefore had no
+      reachable social source at all on the browser-free stage. METR is an
+      evaluation organisation -- the arena's declared sampling_focus names
+      "AI safety, alignment, evaluation and pacing" -- so inclusion is a
+      SAMPLING decision (institutional position and public visibility) and
+      NEVER an ideological classification of the actor; positions are inferred
+      downstream from documents. Verified live 2026-11-11 via the public
+      Bluesky API: postsCount 323, followers 3447, 50 posts between
+      2026-10-15 and 2026-11-06, i.e. active inside the study window.
     accounts:
       x: [ESYudkowsky, MIRI_AI, FLI_org]
+      bluesky: [metr.org]
 
   - id: critical_ai_x
     name: Critical AI and political economy
