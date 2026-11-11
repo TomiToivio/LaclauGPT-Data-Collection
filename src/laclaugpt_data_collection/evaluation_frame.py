@@ -24,6 +24,8 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
+from datetime import date, datetime
+from email.utils import parsedate_to_datetime
 from typing import Any
 
 from .corpus_audit import (
@@ -56,12 +58,37 @@ def record_source_type(record: dict[str, Any]) -> str:
     return ""
 
 
+def publication_date(published: str) -> date | None:
+    """Parse the publication time the record carries, in either format the store uses.
+
+    ``source.created_at`` holds RFC 2822 (``Wed, 11 Nov 2026 12:49:12 +0000``) while
+    ``handoff.published_at`` holds ISO 8601, and a comparison on the first ten characters of the
+    string therefore reads every RFC 2822 record as out of window. The analysis side already
+    normalises both (``laclaugpt_data_analysis/canonical.py``); an audit that does not is not
+    measuring the frame the study declares.
+    """
+    text = (published or "").strip()
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).date()
+    except ValueError:
+        pass
+    try:
+        parsed = parsedate_to_datetime(text)
+    except (TypeError, ValueError):
+        return None
+    return parsed.date() if parsed else None
+
+
 def _in_window(published: str, start: str, end: str) -> bool:
-    """ISO 8601 comparison on the date part is enough: the window bounds are whole days."""
-    day = published[:10]
-    if not day or len(day) != 10:
+    """Whole-day window membership, in whichever format the timestamp arrived."""
+    day = publication_date(published)
+    if day is None:
         return False
-    return start[:10] <= day <= end[:10]
+    lower = publication_date(start)
+    upper = publication_date(end)
+    return bool(lower and upper and lower <= day <= upper)
 
 
 def frame_records(

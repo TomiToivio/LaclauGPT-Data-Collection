@@ -43,6 +43,21 @@ def test_the_frame_drops_documents_that_can_never_be_evaluated_and_says_why():
     assert frame["excluded"] == {"before_or_after_window": 2, "missing_publication_time": 1}
 
 
+def test_an_rfc_2822_publication_time_is_parsed_rather_than_read_as_out_of_window():
+    """The store carries both formats; comparing the first ten characters rejects one of them.
+
+    This is not hypothetical: on 2026-11-11 the live ready frame held 1,889 records whose
+    `source.created_at` is RFC 2822, and a string-prefix comparison silently moved all of them out
+    of the declared window.
+    """
+    rfc = record(url="rfc", published="Wed, 11 Nov 2026 12:49:12 +0000")
+    iso = record(url="iso", published="2026-11-11T12:49:12+00:00")
+    old = record(url="old", published="Sun, 30 Aug 2026 23:00:00 +0000")
+    frame = frame_records([rfc, iso, old], **WINDOW)
+    assert frame["in_window"] == 2, "both formats describe the same day and both are in the window"
+    assert frame["excluded"]["before_or_after_window"] == 1
+
+
 def test_an_arena_less_record_is_named_not_silently_dropped():
     rows = [record(url="a"), record(url="b", arena=""), record(url="c", arena="")]
     report = evaluation_frame_report(rows, **WINDOW)
