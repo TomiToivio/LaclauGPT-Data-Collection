@@ -176,6 +176,9 @@ def test_markdown_names_the_frame_and_the_four_options(tmp_path: Path):
 
 
 def test_the_loader_reads_the_ready_frame_only(monkeypatch):
+    # The audit imports pymongo lazily, so the pure functions run in a bare interpreter; this one
+    # case needs the driver installed to patch it.
+    pytest.importorskip("pymongo")
     seen = {}
 
     class FakeCursor(list):
