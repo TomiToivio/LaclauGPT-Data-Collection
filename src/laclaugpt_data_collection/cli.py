@@ -72,6 +72,66 @@ def _manifest_drift(args: argparse.Namespace) -> int:
     return 0
 
 
+def _evaluation_frame(args: argparse.Namespace) -> int:
+    """Read-only §4.2 stratification feasibility report (meta #88)."""
+    import json as _json
+    from pathlib import Path as _Path
+
+    from .evaluation_frame import evaluation_frame_report, summary
+
+    records: list[dict] = []
+    labels_by_url: dict[str, list[str]] = {}
+    if args.records:
+        for line in _Path(args.records).read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line:
+                record = _json.loads(line)
+                if args.ready_only and not _is_ready(record):
+                    continue
+                records.append(record)
+    elif args.mongodb_uri:
+        from pymongo import MongoClient
+
+        client = MongoClient(args.mongodb_uri, serverSelectionTimeoutMS=5000)
+        database = client[args.mongodb_database]
+        query = {"project_id": args.project} if args.project else {}
+        if args.ready_only:
+            query["handoff.status"] = "ready"
+        records = list(database[args.mongodb_collection].find(query, {"_id": 0}))
+        if args.analysis_collection:
+            for row in database[args.analysis_collection].find(
+                query, {"source_url": 1, "result.analysis.formations": 1}
+            ):
+                formations = (((row.get("result") or {}).get("analysis") or {}).get("formations")) or []
+                labels_by_url[str(row.get("source_url") or "")] = [
+                    str(item.get("label") or "") for item in formations if isinstance(item, dict)
+                ]
+    else:
+        print(_json.dumps({"status": "error", "error": "pass --records or --mongodb-uri"}))
+        return 2
+
+    report = evaluation_frame_report(
+        records,
+        window_start=args.window_start,
+        window_end=args.window_end,
+        labels_by_url=labels_by_url or None,
+        core_formations=[tag for tag in (args.core_formation or [])],
+        minimum_sizes=[int(value) for value in (args.minimum or "").split(",") if value.strip()],
+    )
+    if args.json_out:
+        _Path(args.json_out).write_text(_json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+    if args.json:
+        print(_json.dumps(report, indent=2, ensure_ascii=False))
+    else:
+        print(summary(report))
+    return 0
+
+
+def _is_ready(record: dict) -> bool:
+    return str(((record.get("handoff") or {}).get("status")) or "") == "ready"
+
+
+
 def _corpus_audit(args: argparse.Namespace) -> int:
     """Read-only coverage/concentration report over a record source."""
     import json as _json
@@ -252,6 +312,44 @@ def _build_parser() -> argparse.ArgumentParser:
              "platforms are not reported as unexplained coverage gaps (#207)",
     )
     audit.set_defaults(func=_corpus_audit)
+
+    frame = sub.add_parser(
+        "evaluation-frame",
+        help="read-only §4.2 stratification feasibility report (meta #88)",
+    )
+    frame.add_argument("--records", help="JSONL of canonical records (offline)")
+    frame.add_argument("--mongodb-uri", help="Mongo URI to read from (read-only)")
+    frame.add_argument("--mongodb-database", default="spectacleScraper")
+    frame.add_argument("--mongodb-collection", default="ai26__records")
+    frame.add_argument(
+        "--analysis-collection",
+        default="ai26__analysis_results",
+        help="collection to read predicted formations from; empty string skips the join",
+    )
+    frame.add_argument("--project", default="", help="project_id filter")
+    frame.add_argument("--window-start", default="2026-09-01", help="declared window start (ISO date)")
+    frame.add_argument("--window-end", default="2026-12-31", help="declared window end (ISO date)")
+    frame.add_argument(
+        "--ready-only",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="restrict the frame to handoff.status=ready (default: yes)",
+    )
+    frame.add_argument(
+        "--minimum",
+        default="2,3,5,10",
+        help="candidate minimum cell sizes, comma separated",
+    )
+    frame.add_argument(
+        "--core-formation",
+        action="append",
+        default=[],
+        metavar="LABEL",
+        help="codebook formation label to count as core (repeatable)",
+    )
+    frame.add_argument("--json", action="store_true", help="print the full report as JSON")
+    frame.add_argument("--json-out", help="write the full report to this path")
+    frame.set_defaults(func=_evaluation_frame)
 
     plugins = sub.add_parser("plugins", help="inspect the versioned collection-plugin registry")
     plugin_sub = plugins.add_subparsers(dest="plugins_command", required=True)
