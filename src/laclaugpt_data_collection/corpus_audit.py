@@ -121,6 +121,10 @@ def record_publication(record: dict[str, Any]) -> str:
         ("published_at",),
         ("source", "created_at"),
         ("content", "published_at"),
+        # The collection layer's normalised publication time, and the field the study's window
+        # query filters on (meta #88). Without it a record whose only timestamp is the handoff one
+        # reads as undated, which turns a dated record into an unexplained exclusion.
+        ("handoff", "published_at"),
     )
 
 
