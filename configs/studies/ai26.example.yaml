@@ -408,11 +408,23 @@ groups:
       becomes concrete; it is NOT an ideological classification, and the
       group is heterogeneous (local, environmental and ratepayer campaigns
       that are not necessarily anti-AI in general). Handles verified live on
-      Bluesky 2026-10-02.
+      Bluesky 2026-10-02. Added 2026-11-12: the Danish Folkebevægelsen Stop
+      datacentre (stopdatacentre.dk), because the group held only US/UK actors
+      while the November mobilisation wave is European (the 6 November Microsoft
+      Sloterdijk occupation in Amsterdam, the 7 November #StopDirtyDataCentres
+      actions in several countries). Verified live 2026-11-12 through the public
+      Bluesky API: 46 posts, 26 followers, account created 2026-05-25, newest
+      post 2026-11-11T10:38Z, posting in Danish - a language the frame barely
+      holds and the first Danish-language source in the study. Inclusion is a
+      SAMPLING decision and never an ideological classification: the group
+      organises against data-centre construction pending environmental
+      guarantees, and downstream analysis must infer positions from documents,
+      not from source identity.
     accounts:
       bluesky:
         - foxglovelegal.bsky.social
         - nodesertdatacenter.com
+        - stopdatacentre.dk
 
   - id: governance_institutions_x
     name: Public governance institutions
