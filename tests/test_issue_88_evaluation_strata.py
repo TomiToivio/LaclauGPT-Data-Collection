@@ -220,3 +220,55 @@ def test_the_loader_reads_the_ready_frame_only(monkeypatch):
     assert query["handoff.status"] == "ready"
     assert "handoff.published_at" in query, "the window is part of the frame, not a filter applied later"
     assert query["project_id"] == "ai26"
+
+
+class TestSourceConcentration424:
+    """#424: a cell's n is an upper bound on its independence."""
+
+    def test_thirty_documents_from_one_feed_are_one_cell_and_one_voice(self):
+        documents = [
+            document(f"https://etla.fi/{i}", arena="elites", language="fi", source_name="etla")
+            for i in range(30)
+        ]
+        rows = audit.rows_from_documents(documents)
+        concentration = audit.source_concentration(rows)
+
+        cell = next(c for c in concentration["cells"] if c["cell"] == "elites x fi")
+        assert cell["documents"] == 30
+        assert cell["sources"] == 1
+        assert cell["single_source"] is True
+        assert cell["dominant_share"] == 1.0
+        assert [c["cell"] for c in concentration["single_source_cells"]] == ["elites x fi"]
+
+    def test_a_second_source_makes_the_cell_multi_voice(self):
+        documents = [
+            document(f"https://etla.fi/{i}", arena="elites", language="fi", source_name="etla")
+            for i in range(29)
+        ] + [document("https://aalto.fi/1", arena="elites", language="fi", source_name="aalto")]
+        concentration = audit.source_concentration(audit.rows_from_documents(documents))
+
+        cell = next(c for c in concentration["cells"] if c["cell"] == "elites x fi")
+        assert cell["sources"] == 2
+        assert cell["single_source"] is False
+        assert cell["dominant_source"] == "etla"
+        assert cell["dominant_share"] == round(29 / 30, 3)
+        assert concentration["single_source_cells"] == []
+
+    def test_every_cell_carries_the_rule_that_applies_to_it(self):
+        concentration = audit.source_concentration(
+            audit.rows_from_documents([document("https://a.fi/1", arena="grassroots", language="fi", source_name="sak")])
+        )
+        assert "no separate agreement estimate" in concentration["rule"]
+        assert concentration["dimensions"] == ["arena", "language"]
+
+    def test_the_report_carries_concentration_and_the_markdown_renders_it(self):
+        documents = [
+            document(f"https://etla.fi/{i}", arena="elites", language="fi", source_name="etla")
+            for i in range(6)
+        ]
+        report = audit.build_report(audit.rows_from_documents(documents))
+        assert report["source_concentration"]["single_source_cells"]
+        markdown = audit.render_markdown(report)
+        assert "## Source concentration (#424)" in markdown
+        assert "| elites x fi | 6 | 1 | etla | 100.0% | **yes** |" in markdown
+

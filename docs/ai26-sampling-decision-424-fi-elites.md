@@ -1,6 +1,6 @@
 # AI26 Phase 1 sampling decision: Finnish elite cell (#424)
 
-Date: 2026-11-15. Status: provisional reporting decision; re-audit before final freeze.
+Date: 2026-11-15. Status: **decided** — option 2 (report descriptively/exploratorily). Re-audit before the final freeze; adding sources is deferred to the next cycle's preregistration, not to this window.
 
 ## Observed frame
 
@@ -45,6 +45,24 @@ Three costs are real: arena assignment is a claim about institutional position r
 ## Revisit conditions
 
 If new, independently justified Finnish elite sources become available, verify actual access and collection permissions, document the institutional/visibility rationale, and update the tracked study plan and deployed source manifest together. Do not reopen the X stratum (#396) as an ad hoc sampling repair. Audit language provenance and duplicated items before reclassifying the cell. Re-measure the frame and independent double-coding coverage before claiming separate agreement.
+
+## That the decision is checked, not just written
+
+`scripts/audit_evaluation_strata_88.py` now measures source concentration per arena × language cell and
+prints the cells that rest on a single voice, with the rule attached:
+
+```
+single-source cells: 15 of 28        (2026-11-15, ready frame 2026-09-01..2026-12-31)
+  parliamentary x sv     31   rkp_press_releases   100%
+  elites x fi            30   etla                 100%
+  grassroots x de        11   algorithmwatch       100%
+  grassroots x da         4   Folkebevægelsen Stop datacentre (Denmark)  100%
+```
+
+`elites × fi` is therefore not a footnote anyone can forget: every run of the audit restates that it is
+one voice, and the rule it prints is the rule this record adopts. The audit found the same defect in
+`parliamentary × sv` (31 RKP press releases), which is the same class of problem and now visible without
+anyone asking.
 
 ## Verification still required
 

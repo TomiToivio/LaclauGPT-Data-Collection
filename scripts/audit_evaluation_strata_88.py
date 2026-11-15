@@ -206,6 +206,47 @@ def language_profile(rows: Sequence) -> dict[str, Any]:
     }
 
 
+def source_concentration(
+    rows: Sequence[StratumRow], *, dimensions: Sequence[str] = ("arena", "language")
+) -> dict[str, Any]:
+    """#424: how many *voices* a cell actually has, not how many documents it holds.
+
+    A cell's n is an upper bound on its independence. Thirty documents from one feed are one
+    editorial line sampled thirty times, so the cell cannot carry a separate agreement estimate
+    however large it looks. This measures that directly instead of leaving it to a footnote.
+    """
+    cells: dict[tuple[str, ...], Counter[str]] = defaultdict(Counter)
+    for row in rows:
+        key = tuple(str(getattr(row, name)) for name in dimensions)
+        cells[key][row.source_type or "(unattributed)"] += 1
+    out: list[dict[str, Any]] = []
+    for key, counter in cells.items():
+        total = sum(counter.values())
+        name, count = counter.most_common(1)[0]
+        out.append(
+            {
+                "cell": " x ".join(key),
+                "documents": total,
+                "sources": len(counter),
+                "dominant_source": name,
+                "dominant_share": round(count / total, 3) if total else 0.0,
+                "single_source": len(counter) == 1,
+                "source_counts": dict(sorted(counter.items(), key=lambda item: -item[1])),
+            }
+        )
+    out.sort(key=lambda item: (-item["documents"], item["cell"]))
+    single = [cell for cell in out if cell["single_source"]]
+    return {
+        "dimensions": list(dimensions),
+        "cells": out,
+        "single_source_cells": single,
+        "rule": (
+            "A single-source cell is reported descriptively only: no separate agreement estimate, "
+            "and no pooling into a larger cell that would hide the single voice (#424, §4.2)."
+        ),
+    }
+
+
 def arena_profile(rows: Sequence) -> dict[str, Any]:
     by_arena = Counter(row.arena for row in rows)
     return {
@@ -268,6 +309,7 @@ def build_report(
         "language": language_profile(rows),
         "inflow": weekly_inflow(rows),
         "min_cell": min_cell_feasibility(rows, thresholds=thresholds),
+        "source_concentration": source_concentration(rows),
         "uncertainty": {
             "uncertain": sum(1 for row in rows if row.uncertain),
             "abstained": sum(1 for row in rows if row.abstained),
@@ -412,6 +454,29 @@ def render_markdown(report: Mapping[str, Any]) -> str:
             f"{row['documents_in_cells_at_or_above']:,} | {row['share_of_frame']:.1%} |"
         )
     option_four = report["option_checks"]["option_4_restrict_to_en_elites"]
+    concentration = report["source_concentration"]
+    lines += [
+        "",
+        "## Source concentration (#424)",
+        "",
+        "A cell's document count is an upper bound on its independence: thirty documents from one",
+        "feed are one editorial line sampled thirty times.",
+        "",
+        "| cell | documents | sources | dominant source | share | single source |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    for cell in concentration["cells"][:12]:
+        lines.append(
+            f"| {cell['cell']} | {cell['documents']:,} | {cell['sources']} | "
+            f"{cell['dominant_source']} | {cell['dominant_share']:.1%} | "
+            f"{'**yes**' if cell['single_source'] else 'no'} |"
+        )
+    lines += [
+        "",
+        f"{len(concentration['single_source_cells'])} of {len(concentration['cells'])} cells rest on "
+        f"one source. {concentration['rule']}",
+        "",
+    ]
     lines += [
         "",
         "## Options",
