@@ -1,14 +1,9 @@
 """Regression contracts for AI26 headline-only RSS reporting (#416)."""
-# ruff: noqa: I001
-
-from __future__ import annotations
-
-import pathlib
+from pathlib import Path
 
 import yaml
 
-
-CODEBOOK = pathlib.Path(__file__).resolve().parents[1] / "configs/studies/ai26.collection-codebook.yaml"
+CODEBOOK = Path(__file__).resolve().parents[1] / "configs/studies/ai26.collection-codebook.yaml"
 
 
 def test_rss_content_adequacy_audit_is_explicit():
