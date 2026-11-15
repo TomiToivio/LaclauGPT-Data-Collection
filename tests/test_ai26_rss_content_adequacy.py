@@ -1,4 +1,5 @@
 """Regression contracts for AI26 headline-only RSS reporting (#416)."""
+# ruff: noqa: I001  # Existing test-module import grouping; unrelated to the queue fix.
 
 from __future__ import annotations
 
