@@ -260,15 +260,15 @@ class JobLeaseStore:
 
 
     # -- claim ordering and fairness ------------------------------------------------------------
-    #: Deterministic claim order (#406). ``next_run_at`` ascending puts jobs that have never run
-    #: (no field, which Mongo sorts before numbers) first, then the ones whose turn came longest
-    #: ago; ``_id`` ends the sort, so the answer no longer depends on which index the planner
-    #: chooses. The previous key was ``(priority, created_at)`` and every job in the AI26 store
-    #: shares one ``created_at`` to the microsecond, so a whole queue was ordered by plan choice —
-    #: ``(status, kind, ...)`` puts ``bluesky_account`` first and ``web_source`` last, every cycle.
+    #: Fairness across *priorities* as well as kinds (#413). The oldest due job wins
+    #: within each kind; manifest priority breaks ties but cannot repeatedly let hourly
+    #: P1 re-polls overtake P2 sources that have never been attempted. Deterministic
+    #: creation time and identity break the remaining ties (#406). A manifest row
+    #: entering the queue receives next_run_at=created_at, so once recurring P1 jobs
+    #: complete, the new P2 row stays ahead until it gets its first claim.
     CLAIM_SORT: tuple[tuple[str, int], ...] = (
-        ("priority", 1),
         ("next_run_at", 1),
+        ("priority", 1),
         ("created_at", 1),
         ("_id", 1),
     )
@@ -352,10 +352,10 @@ class JobLeaseStore:
         """Atomically claim up to ``limit`` jobs this worker is allowed to do.
 
         Claims round-robin *across kinds* rather than taking the cheapest ``limit`` in one order
-        (#405, #406). With one flat order, six slots per cycle and fifteen claimable jobs, the same
-        strata can be selected forever: the web stratum never ran once in twelve days, and two P1
-        Bluesky sources were admitted in 1 and 3 of 16 cycles. Kinds within a priority are served
-        in turn, so a source that has waited longest always gets its slot.
+        (#405, #406, #413). With one flat order, six slots per cycle and fifteen claimable jobs,
+        the same strata can be selected forever. Round-robin gives each eligible kind a slot;
+        oldest-due ordering *within* each kind prevents recurring P1 jobs from indefinitely
+        overtaking unattempted P2 jobs. Priority only decides among equally due jobs.
         """
         if limit < 1:
             raise ValueError("limit must be at least 1")
