@@ -42,15 +42,28 @@ SOURCE_TABLES: tuple[str, ...] = (
 #: The identity field for each kind, tried in order. The first present wins.
 #: `feed`/`web_source` are keyed on their URL; accounts on their handle/acct;
 #: queries on their name, because a query has no URL.
+#:
+#: `web_source` accepts both spellings its rows use in practice: the AI26 plan
+#: and the deployed manifest write `homepage`, while older manifests wrote
+#: `url`. Keying on `url` alone made every `web_source` row invisible to this
+#: comparison (issue #414), so the gate reported "in sync" over a whole kind.
 _IDENTITY_FIELDS: dict[str, tuple[str, ...]] = {
     "feed": ("feed_url",),
-    "web_source": ("url",),
+    "web_source": ("homepage", "url"),
     "bluesky_account": ("handle", "acct", "actor"),
     "mastodon_account": ("acct", "actor", "handle"),
     "youtube_source": ("channel_url", "channel_id", "url", "name"),
     "scholarly_query": ("name",),
     "x_account": ("handle", "name"),
     "browser_source": ("url", "name"),
+}
+
+#: Field aliases that denote the *same* identity for a kind. A `web_source`'s
+#: homepage is its URL, so both spellings must produce one label -- otherwise a
+#: manifest that switched spelling would read as one source removed and another
+#: added, which is exactly the false drift this module exists to avoid.
+_IDENTITY_LABELS: dict[str, dict[str, str]] = {
+    "web_source": {"homepage": "url", "url": "url"},
 }
 
 
@@ -60,10 +73,12 @@ def _identity(kind: str, row: dict[str, Any]) -> str:
     A trailing slash is ignored so the #205 redirect class does not read as a
     source change.
     """
+    labels = _IDENTITY_LABELS.get(kind, {})
     for field in _IDENTITY_FIELDS.get(kind, ("name", "url")):
         value = row.get(field)
         if isinstance(value, str) and value.strip():
-            return row_identity(kind, field, value.strip().rstrip("/"))
+            label = labels.get(field, field)
+            return row_identity(kind, label, value.strip().rstrip("/"))
     return ""
 
 
