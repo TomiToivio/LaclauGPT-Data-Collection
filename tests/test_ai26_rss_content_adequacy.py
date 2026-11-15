@@ -3,7 +3,6 @@ from pathlib import Path
 
 import yaml
 
-
 CODEBOOK = Path(__file__).resolve().parents[1] / "configs/studies/ai26.collection-codebook.yaml"
 
 
