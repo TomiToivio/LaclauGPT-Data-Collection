@@ -1,12 +1,12 @@
 """Regression contracts for AI26 headline-only RSS reporting (#416)."""
 from __future__ import annotations
 
-from pathlib import Path
+import pathlib
 
 import yaml
 
 
-CODEBOOK = Path(__file__).resolve().parents[1] / "configs/studies/ai26.collection-codebook.yaml"
+CODEBOOK = pathlib.Path(__file__).resolve().parents[1] / "configs/studies/ai26.collection-codebook.yaml"
 
 
 def test_rss_content_adequacy_audit_is_explicit():
