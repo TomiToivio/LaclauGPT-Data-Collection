@@ -265,18 +265,29 @@ class MongoRecordStore:
     def reconcile_waiting_media(self, *, collection_id: str | None = None, limit: int = 100) -> int:
         """Repair stale waiting_media envelopes without re-downloading or re-ingesting.
 
-        Only update the handoff field, preserving the canonical record and its
-        resolved object references. A compare-and-set avoids overwriting a
-        handoff that another worker has already changed.
+        Two classes reach this method, and both are stale *envelopes*, not pending work:
+
+        * the #287 case — media is resolved but the envelope still says waiting;
+        * the #412 case — the record carries no media reference at all, so it can never produce a
+          download job. 59 AI26 records sat in that state for three weeks: scanned every cycle,
+          reported as ``skipped``, and never eligible for analysis. ``media_ready()`` answers
+          ``no_media_required`` for a record with no references, so recomputing such an envelope
+          promotes it to ready on its text alone.
+
+        The method therefore recomputes **every** waiting_media envelope in the collection rather
+        than filtering for the shapes it knows how to repair: a record that still needs media
+        recomputes to waiting_media and is left untouched, so the filter was only ever an
+        optimisation that also hid the second class.
+
+        Only the handoff field is updated, preserving the canonical record and its resolved object
+        references. A compare-and-set avoids overwriting a handoff that another worker has already
+        changed.
         """
         if limit < 1:
             raise ValueError("limit must be at least 1")
         query: dict[str, Any] = {
             "project_id": self.project_id,
             "handoff.status": "waiting_media",
-            "content.media_references": {
-                "$elemMatch": {"object_ref": {"$exists": True, "$nin": ["", None]}}
-            },
         }
         if collection_id:
             query["collection_id"] = collection_id
