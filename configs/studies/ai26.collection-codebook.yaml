@@ -141,3 +141,62 @@ collection_boundary:
     - running Laclau/Mouffe/Palonen interpretation in Collection
     - inferring an Us/Frontier relation from sentiment or polarity
     - copying private target lists, corpus-derived labels, credentials or secrets into exported provenance
+
+# Issue #416: classify *content adequacy*, not the ideology of a source.
+# This is a study-level reporting contract; it does not enrich or relabel records.
+# Source-level classifications are based on the 2026-11-14 ready-stratum audit.
+rss_content_adequacy:
+  audit_date: "2026-11-14"
+  audit_scope: "handoff.status=ready, platform=rss"
+  audited_ready_records: 2070
+  short_text_threshold_chars: 300
+  short_text_records: 708
+  measurement_field: content.text
+  classification_unit: record
+  headline_only_sources:
+    tech_policy_press:
+      audited_ready: 196
+      audited_short: 196
+      reason: "Publisher feed supplies titles, not article bodies; parliamentary source"
+    datacenterdynamics:
+      audited_ready: 142
+      audited_short: 141
+      reason: "Feed supplies short excerpts, not full article bodies"
+    openai_news:
+      audited_ready: 118
+      audited_short: 118
+      reason: "Feed descriptions are short; no full article bodies"
+    datacenterknowledge:
+      audited_ready: 62
+      audited_short: 62
+      reason: "Feed descriptions are short; no full article bodies"
+    gary_marcus:
+      audited_ready: 45
+      audited_short: 45
+      reason: "Feed excerpts are insufficient for articulation-level interpretation"
+    works_in_progress:
+      audited_ready: 19
+      audited_short: 19
+      reason: "Feed is headline/excerpt only in audited ready sample"
+    deepmind_blog_rss:
+      audited_ready: 15
+      audited_short: 15
+      reason: "Feed is excerpt only in audited ready sample"
+    interconnects:
+      audited_ready: 15
+      audited_short: 15
+      reason: "Feed is excerpt only in audited ready sample"
+  reporting_rules:
+    - "Calculate content adequacy per record using content.text length, not source identity alone"
+    - "For discourse/articulation analysis, report records below 300 characters separately as insufficient context unless manually validated"
+    - "Do not treat headline-only records as equivalent to article-level argumentative evidence"
+    - "Report arena-by-language counts with missing language as a separate category and disclose denominators"
+    - "Do not infer language from the source or the parliamentary arena; preserve unknown labels"
+    - "Re-audit after changing feeds, collectors, or any enrichment policy; classifications are provisional"
+  parliamentary_language_gap_at_audit:
+    records_in_arena: 865
+    records_without_language: 221
+    tech_policy_press_without_language: 185
+  limitations:
+    - "Source labels describe the observed feed payload, not a permanent property of publisher websites"
+    - "This option does not fetch full articles, fill missing languages, or retroactively update stored rows"
