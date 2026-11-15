@@ -68,6 +68,7 @@ def main(argv: list[str] | None = None) -> int:
         "source_url": 1,
         "handoff.status": 1,
         "source.platform": 1,
+        "source.language": 1,  # do not overwrite declared language tags
         "source.raw_metadata.source_name": 1,
         "content.text": 1,
         "human_readable": 1,
