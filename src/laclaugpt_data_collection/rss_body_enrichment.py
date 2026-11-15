@@ -168,13 +168,30 @@ def build_patch(
     # The collection-stage summary is derived from content.text; keep it derived rather than stale.
     human_readable["summary"] = text[:500] + ("…" if len(text) > 500 else "")
     human_readable["generated_at"] = fetched_at
-    return {
+    patch: dict[str, Any] = {
         "content.text": text,
         "human_readable.summary": human_readable["summary"],
         "human_readable.generated_at": human_readable["generated_at"],
         "provenance": provenance,
         "updated_at": fetched_at,
     }
+
+    # #423: the body is precisely the evidence a language label needs. A record enriched from a
+    # headline keeps its blank `source.language` otherwise, so the arena x language cells stay
+    # computed over indeterminate cases even though the material to resolve them is now stored.
+    # Existing labels are never overwritten, and an unknown answer stays blank with its reason.
+    source = dict(record.get("source") or {})
+    if not str(source.get("language") or "").strip():
+        from .language import resolve_language
+
+        tag, method = resolve_language(text)
+        raw_metadata = dict(source.get("raw_metadata") or {})
+        raw_metadata["language_method"] = method
+        raw_metadata["language_backfill"] = ""
+        patch["source.raw_metadata"] = raw_metadata
+        if tag:
+            patch["source.language"] = tag
+    return patch
 
 
 def enrich_record(

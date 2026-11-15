@@ -76,3 +76,24 @@ It does not re-fetch records that already have text, rewrite any identity field,
 behaviour. It also does not repair the missing `source.language` labels directly: those are assigned by
 the analysis side, and the issue's hypothesis is that `insufficient_text` was the reason they were
 missing. Enriching the text removes that reason; it does not relabel anything retroactively.
+
+## Language labels follow the text (#423)
+
+A record enriched from a headline used to keep its blank `source.language`, so the arena × language
+cells stayed computed over indeterminate cases even though the evidence to resolve them was now stored.
+The enrichment therefore resolves the language from the body it just fetched:
+
+- only when `source.language` is blank — an explicit source label always outranks a detection;
+- through the collector's existing `resolve_language()`, which refuses to guess: under 80 characters,
+  low detector confidence, or an unavailable detector all leave the label blank and record why in
+  `source.raw_metadata.language_method`;
+- with `source.raw_metadata.language_backfill` set to the previous (blank) value, so the change is
+  reversible per record.
+
+For records enriched before this behaviour existed, `scripts/backfill_ai26_language.py` is the repair
+path, and it targets exactly this population: analysis-grade records with a blank label and enough
+stored text.
+
+Measured on Laskin after the first backfill run (2026-11-15): **70 labels written**, 222 still blank,
+all of them `insufficient_text`. `tech_policy_press` blanks fell from 185 to 133 — the 52 records the
+#423 measurement identified as "blank *and* now holding a body of 300+ characters".
