@@ -128,13 +128,16 @@ def test_a_patch_keeps_identity_fields_out_of_the_update():
     patch = build_patch(record(), body_text="x" * 900, final_url="https://example.org/a", fetched_at="2026-11-14T00:00:00+00:00")
     assert "source_url" not in json_keys(patch)
     assert "handoff.status" not in json_keys(patch)
-    assert set(patch) == {
+    expected = {
         "content.text",
         "human_readable.summary",
         "human_readable.generated_at",
         "provenance",
         "updated_at",
     }
+    # #423: a fresh body is also the evidence a blank language label needed.
+    assert set(patch) - expected <= {"source.language", "source.raw_metadata"}
+    assert "source.language" not in patch or patch["source.language"]
 
 
 def json_keys(patch: dict[str, Any]) -> set[str]:
@@ -180,3 +183,43 @@ def test_enrichment_is_idempotent_across_runs():
     again, again_patch = enrich_record(enriched, fetch=lambda url: (url, ARTICLE_HTML))
     assert again.status == "not_needed"
     assert again_patch is None
+
+
+class TestLanguageDetectionOnEnrichment:
+    """#423: a record that gains a body must not keep a blank language label."""
+
+    def test_an_english_body_labels_the_record(self):
+        # The detector is an optional extra (`.[feeds]`); without it the enrichment correctly leaves
+        # the label blank and records `detector_unavailable`, which the third test covers.
+        pytest.importorskip("langdetect")
+        from laclaugpt_data_collection.rss_body_enrichment import enrich_record
+
+        _, patch = enrich_record(record(), fetch=lambda url: (url, ARTICLE_HTML))
+        assert patch is not None
+        assert patch["source.language"] == "en"
+        assert patch["source.raw_metadata"]["language_method"] == "detected_langdetect"
+        assert patch["source.raw_metadata"]["language_backfill"] == ""
+
+    def test_an_existing_label_is_never_overwritten(self):
+        from laclaugpt_data_collection.rss_body_enrichment import enrich_record
+
+        labelled = record(source={
+            "platform": "rss",
+            "language": "fi",
+            "raw_metadata": {"source_name": "tech_policy_press"},
+        })
+        _, patch = enrich_record(labelled, fetch=lambda url: (url, ARTICLE_HTML))
+        assert patch is not None
+        assert "source.language" not in patch, "a source label outranks a detection"
+
+    def test_an_undetectable_body_stays_blank_with_its_reason(self):
+        from laclaugpt_data_collection.rss_body_enrichment import enrich_record
+
+        # Long enough to pass the gain rule, but no detectable language signal.
+        numeric = "<html><body>" + ("1234 5678 90 " * 60) + "</body></html>"
+        _, patch = enrich_record(record(), fetch=lambda url: (url, numeric))
+        assert patch is not None
+        assert "source.language" not in patch
+        assert patch["source.raw_metadata"]["language_method"] in {
+            "undetectable", "low_confidence", "insufficient_text", "detector_unavailable"
+        }
