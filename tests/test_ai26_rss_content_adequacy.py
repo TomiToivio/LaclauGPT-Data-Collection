@@ -1,4 +1,5 @@
 """Regression contracts for AI26 headline-only RSS reporting (#416)."""
+from __future__ import annotations
 
 from pathlib import Path
 
