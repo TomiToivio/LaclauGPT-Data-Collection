@@ -189,6 +189,9 @@ class TestLanguageDetectionOnEnrichment:
     """#423: a record that gains a body must not keep a blank language label."""
 
     def test_an_english_body_labels_the_record(self):
+        # The detector is an optional extra (`.[feeds]`); without it the enrichment correctly leaves
+        # the label blank and records `detector_unavailable`, which the third test covers.
+        pytest.importorskip("langdetect")
         from laclaugpt_data_collection.rss_body_enrichment import enrich_record
 
         _, patch = enrich_record(record(), fetch=lambda url: (url, ARTICLE_HTML))
