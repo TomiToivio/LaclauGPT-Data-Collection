@@ -137,7 +137,38 @@ def test_a_patch_keeps_identity_fields_out_of_the_update():
     }
     # #423: a fresh body is also the evidence a blank language label needed.
     assert set(patch) - expected <= {"source.language", "source.raw_metadata"}
-    assert "source.language" not in patch or patch["source.language"]
+
+
+def test_language_is_redetected_after_body_enrichment(monkeypatch):
+    """Pins #423 without needing the optional detector: the seam, not the implementation."""
+    monkeypatch.setattr(
+        "laclaugpt_data_collection.language.resolve_language",
+        lambda text: ("en", "detected_langdetect"),
+    )
+    patch = build_patch(
+        record(),
+        body_text="substantive article " * 60,
+        final_url="https://example.org/a",
+        fetched_at="2026-11-15T00:00:00+00:00",
+    )
+    assert patch["source.language"] == "en"
+    assert patch["source.raw_metadata"]["language_method"] == "detected_langdetect"
+    assert patch["source.raw_metadata"]["language_backfill"] == ""
+
+
+def test_existing_language_is_not_overwritten(monkeypatch):
+    def fail(text):  # pragma: no cover - called only if the guard is missing
+        raise AssertionError("should not re-detect an existing tag")
+
+    monkeypatch.setattr("laclaugpt_data_collection.language.resolve_language", fail)
+    original = record(source={"platform": "rss", "language": "fi"})
+    patch = build_patch(
+        original,
+        body_text="substantive article " * 60,
+        final_url="https://example.org/a",
+        fetched_at="2026-11-15T00:00:00+00:00",
+    )
+    assert "source.language" not in patch
 
 
 def json_keys(patch: dict[str, Any]) -> set[str]:
