@@ -75,7 +75,9 @@ def test_backlogged_p2_bluesky_accounts_are_all_attempted_within_bounded_cycles(
     ]
     sources.extend(p2_sources)
     seen = set()
-    for _ in range(4):
+    # Six older due P1 jobs consume the first three two-slot cycles;
+    # all four newly enrolled P2 accounts are admitted within five cycles.
+    for _ in range(5):
         clock.advance(3600)
         claimed = dispatch_claim(store, sources, worker_id="laskin", max_jobs=2)
         for row in claimed:
