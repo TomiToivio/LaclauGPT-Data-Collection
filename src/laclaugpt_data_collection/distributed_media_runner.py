@@ -186,15 +186,24 @@ def apply_media_results(
     return list(touched.values())
 
 
-def _allowed_platforms(study_config: str | Path, data_root: str | Path) -> frozenset[str] | None:
-    """Return the platform allowlist for a study, or None when unconstrained.
+def _study_slug(study_config: str | Path) -> str:
+    """The study id implied by its config path: ``data/config/ai26.yaml`` → ``ai26``."""
+    return Path(study_config).stem.strip().lower()
 
-    Issue #233: Brazil26 media may only be downloaded for X/Instagram/TikTok. The
-    policy lives in the study's source manifest. Resolution mirrors the shell
-    wrappers: ``LACLAUGPT_SOURCE_MANIFEST`` wins, else
-    ``<data_root>/config/brazil26.sources.toml``. A missing manifest is not an
-    error here (the local-first path may not have one); an unreadable or
-    policy-violating one is.
+
+def _allowed_platforms(study_config: str | Path, data_root: str | Path) -> frozenset[str] | None:
+    """Return the platform allowlist for **the study being run**, or None when unconstrained.
+
+    Issue #233 gave Brazil26 a media policy: only X/Instagram/TikTok may be downloaded. The
+    resolution here used to hardcode ``brazil26.sources.toml`` for *every* study, so the AI26 media
+    cycle ran under Brazil's allowlist and skipped every arXiv, mastodon, bluesky and rss object.
+    That is #412: 59 records sat in ``waiting_media`` for three weeks because the downloader was
+    never allowed to fetch the media they named, while the summary reported a healthy
+    ``failed: 0``.
+
+    The manifest is therefore resolved from the study slug. A manifest that declares no platform
+    policy leaves the study unconstrained (``None``); only Brazil26 keeps the hard intersection,
+    because that is the study the policy was written for.
     """
     from .source_allowlist import (
         BRAZIL26_PLATFORMS,
@@ -203,15 +212,22 @@ def _allowed_platforms(study_config: str | Path, data_root: str | Path) -> froze
         load_manifest,
     )
 
+    study = _study_slug(study_config)
     manifest_path = os.environ.get("LACLAUGPT_SOURCE_MANIFEST", "")
     candidates = [Path(manifest_path)] if manifest_path else []
-    candidates.append(Path(data_root) / "config" / "brazil26.sources.toml")
+    candidates.append(Path(data_root) / "config" / f"{study}.sources.toml")
     for path in candidates:
         if not path.is_file():
             continue
         manifest = load_manifest(path)
-        assert_brazil26_only(manifest)
-        return frozenset(enabled_platforms(manifest) & set(BRAZIL26_PLATFORMS))
+        platforms = enabled_platforms(manifest)
+        # The Brazil guard belongs to the Brazil manifest, not to the study slug: an operator may
+        # point LACLAUGPT_SOURCE_MANIFEST at brazil26.sources.toml from any study file, and that
+        # manifest must still be refused if it names a platform Brazil's policy forbids.
+        if study.startswith("brazil") or path.stem.lower().startswith("brazil"):
+            assert_brazil26_only(manifest)
+            return frozenset(platforms & set(BRAZIL26_PLATFORMS))
+        return frozenset(platforms) if platforms else None
     return None
 
 
@@ -279,11 +295,24 @@ def _run_local_media_unlocked(
             "failed": sum(row.get("status") == "failed" for row in results),
             "access_restricted": sum(row.get("status") == "access_restricted" for row in results),
             "skipped": max(len(records) - len(jobs), 0),
+            # #412: name why a record produced no job, instead of folding it into a silent skip.
+            "skipped_no_media": sum(1 for record in records if not _has_media_reference(record)),
             "mongo_refreshed": 0,
             "failures": _failure_details(results),
         }
     finally:
         store.close()
+
+
+def _has_media_reference(record: dict[str, Any]) -> bool:
+    """True when the record names at least one media URL for the downloader to fetch.
+
+    Mirrors ``handoff._media_references``: the canonical list may sit at the top level or under
+    ``content``. A record without one cannot produce a job, so counting it as a generic ``skipped``
+    is what let #412 hide for three weeks behind a healthy-looking summary.
+    """
+    refs = record.get("media_references") or (record.get("content") or {}).get("media_references") or []
+    return any(isinstance(ref, dict) and ref.get("url") for ref in refs)
 
 
 def _run_distributed_media_unlocked(
@@ -395,6 +424,8 @@ def _run_distributed_media_unlocked(
             "failed": sum(row.get("status") == "failed" for row in results),
             "access_restricted": sum(row.get("status") == "access_restricted" for row in results),
             "skipped": max(len(records) - len(jobs), 0),
+            # #412: a record with no media reference can never be queued; say so.
+            "skipped_no_media": sum(1 for record in records if not _has_media_reference(record)),
             "mongo_refreshed": len(touched),
             "media_refs_repaired": len(repaired),
             "handoffs_reconciled": handoffs_reconciled,

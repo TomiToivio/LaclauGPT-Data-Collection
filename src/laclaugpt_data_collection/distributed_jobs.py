@@ -260,16 +260,28 @@ class JobLeaseStore:
 
 
     # -- claim ordering and fairness ------------------------------------------------------------
-    #: Fairness across *priorities* as well as kinds (#413). The oldest due job wins
-    #: within each kind; manifest priority breaks ties but cannot repeatedly let hourly
-    #: P1 re-polls overtake P2 sources that have never been attempted. Deterministic
-    #: creation time and identity break the remaining ties (#406). A manifest row
-    #: entering the queue receives next_run_at=created_at, so once recurring P1 jobs
-    #: complete, the new P2 row stays ahead until it gets its first claim.
+    #: Deterministic claim order (#406). ``next_run_at`` ascending puts jobs that have never run
+    #: (no field, which Mongo sorts before numbers) first, then the ones whose turn came longest
+    #: ago; ``_id`` ends the sort, so the answer no longer depends on which index the planner
+    #: chooses. The previous key was ``(priority, created_at)`` and every job in the AI26 store
+    #: shares one ``created_at`` to the microsecond, so a whole queue was ordered by plan choice —
+    #: ``(status, kind, ...)`` puts ``bluesky_account`` first and ``web_source`` last, every cycle.
     CLAIM_SORT: tuple[tuple[str, int], ...] = (
-        ("next_run_at", 1),
         ("priority", 1),
+        ("last_claimed_at", 1),
+        ("next_run_at", 1),
         ("created_at", 1),
+        ("_id", 1),
+    )
+
+    #: Order for the starvation pass (#413): oldest claim first, never-claimed (missing field) before
+    #: everything. Priority is deliberately absent — a source added yesterday must not wait behind a
+    #: P1 tier that refills every hour, which is exactly how the Denmark row produced 0 records in
+    #: 24 h while 18-23 jobs sat claimable-but-unclaimed every cycle.
+    STARVATION_SORT: tuple[tuple[str, int], ...] = (
+        ("last_claimed_at", 1),
+        ("attempts", 1),
+        ("created_at", -1),
         ("_id", 1),
     )
 
@@ -348,14 +360,15 @@ class JobLeaseStore:
         limit: int = 1,
         lease_seconds: int = 900,
         kinds: Iterable[str] | None = None,
+        starvation_slots: int | None = None,
     ) -> list[dict[str, Any]]:
         """Atomically claim up to ``limit`` jobs this worker is allowed to do.
 
         Claims round-robin *across kinds* rather than taking the cheapest ``limit`` in one order
-        (#405, #406, #413). With one flat order, six slots per cycle and fifteen claimable jobs,
-        the same strata can be selected forever. Round-robin gives each eligible kind a slot;
-        oldest-due ordering *within* each kind prevents recurring P1 jobs from indefinitely
-        overtaking unattempted P2 jobs. Priority only decides among equally due jobs.
+        (#405, #406). With one flat order, six slots per cycle and fifteen claimable jobs, the same
+        strata can be selected forever: the web stratum never ran once in twelve days, and two P1
+        Bluesky sources were admitted in 1 and 3 of 16 cycles. Kinds within a priority are served
+        in turn, so a source that has waited longest always gets its slot.
         """
         if limit < 1:
             raise ValueError("limit must be at least 1")
@@ -364,21 +377,51 @@ class JobLeaseStore:
             return []
         caps = {str(c) for c in capabilities}
         claimed: list[dict[str, Any]] = []
+        # A third of the budget by default: enough that a newly added source runs within a cycle or
+        # two, small enough that the priority order still governs the rest. `0` restores the old
+        # behaviour, which is useful for a test that has to show what the defect looked like.
+        if starvation_slots is None:
+            starvation_slots = max(1, limit // 3)
+        starvation = min(max(starvation_slots, 0), limit)
+
+        def claim_one(doc: dict[str, Any]) -> None:
+            claimed.append(doc)
+
+        def lease_update(now: float) -> dict[str, dict[str, Any]]:
+            return {
+                "$set": {
+                    "status": RUNNING,
+                    "worker_id": str(worker_id),
+                    "lease_expires_at": now + int(lease_seconds),
+                    "updated_at": now,
+                    "last_claimed_at": now,
+                },
+                "$inc": {"attempts": 1},
+            }
+
+        # Pass 1 (#413): the stalest job first, ignoring priority. One slot of the cycle is enough to
+        # guarantee that a newly added source runs within its poll interval, and that no source can
+        # sit at attempts=0 for a day while the same tier is served every hour.
+        while len(claimed) < starvation:
+            now = self._clock()
+            query = self._claim_query(caps, kinds=allowed_kinds, now=now)
+            doc = self.jobs.find_one_and_update(
+                query,
+                lease_update(now),
+                sort=list(self.STARVATION_SORT),
+                return_document=True,
+            )
+            if doc is None:
+                break
+            claim_one(doc)
+
         while len(claimed) < limit:
             now = self._clock()
             query = self._claim_query(caps, kinds=allowed_kinds, now=now)
             pending_kinds = self._claimable_kinds(query)
             if not pending_kinds:
                 break
-            update = {
-                "$set": {
-                    "status": RUNNING,
-                    "worker_id": str(worker_id),
-                    "lease_expires_at": now + int(lease_seconds),
-                    "updated_at": now,
-                },
-                "$inc": {"attempts": 1},
-            }
+            update = lease_update(now)
             progressed = False
             for kind in pending_kinds:
                 if len(claimed) >= limit:
