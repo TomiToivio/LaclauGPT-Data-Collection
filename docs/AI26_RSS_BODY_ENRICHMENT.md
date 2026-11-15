@@ -73,6 +73,31 @@ carried them. 887 ready RSS records were still under 300 characters after that b
 ## What it does not do
 
 It does not re-fetch records that already have text, rewrite any identity field, or change collection
-behaviour. It also does not repair the missing `source.language` labels directly: those are assigned by
-the analysis side, and the issue's hypothesis is that `insufficient_text` was the reason they were
-missing. Enriching the text removes that reason; it does not relabel anything retroactively.
+behaviour.
+
+## The language label the body makes possible (#423)
+
+Enriching the text did not relabel anything retroactively, and that turned out to matter: `resolve_language`
+had already run while the record held a 62-character title, so it returned `insufficient_text` and the
+blank stayed. Fifty-two `tech_policy_press` records moved from "title, no language" to "full article
+body, still no language" — the evidence to label them sat in the document, unused.
+
+Two changes close that:
+
+* **Live enrichment labels the body it stores.** When a record's `source.language` is blank, the same
+  patch that writes `content.text` now resolves the language from that body, writing
+  `source.language`, `source.raw_metadata.language_method` and a blank `language_backfill` (the previous
+  value, for reversibility — the same contract `scripts/backfill_ai26_language.py` writes). A label that
+  already exists is never replaced, and a failed detection leaves the label blank, records the refusal
+  reason in the enrichment provenance (`language_from_body`), and still applies the body.
+* **The existing population is repaired by the backfill tool**, which was already written for exactly
+  this: `scripts/backfill_ai26_language.py` fills blanks from the stored text, dry-run by default, and
+  never guesses (short text, missing detector and low confidence all stay blank).
+
+```bash
+.venv/bin/python scripts/backfill_ai26_language.py              # dry run: how many are labelable now
+.venv/bin/python scripts/backfill_ai26_language.py --apply      # write labels + method + previous value
+```
+
+The cycle's own summary now carries `languages_resolved` and `language_methods`, so an enrichment run
+that gains text but cannot label says so instead of looking complete.

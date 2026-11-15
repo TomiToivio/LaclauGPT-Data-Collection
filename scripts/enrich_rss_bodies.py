@@ -87,8 +87,9 @@ def main(argv: list[str] | None = None) -> int:
         result, patch = enrich_record(document, fetch=fetch_html_page, max_chars=args.max_chars)
         results.append(result)
         source_name = (document.get("source") or {}).get("raw_metadata", {}).get("source_name", "")
+        language = f" lang={result.language}({result.language_method})" if result.language else ""
         print(
-            f"  {result.status:9} {result.chars_before:>6} -> {result.chars_after:>7} chars  "
+            f"  {result.status:9} {result.chars_before:>6} -> {result.chars_after:>7} chars{language}  "
             f"[{source_name}] {result.url[:90]} {result.detail}",
             file=sys.stderr,
         )

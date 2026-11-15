@@ -20,6 +20,11 @@ Two decisions worth stating:
 * **No silent wins.** A fetch that returns less than `MIN_GAIN_FACTOR` times the stored text, or fewer
   than `MIN_GAIN_CHARS` characters, is recorded as `skipped` rather than applied — otherwise a cookie
   banner counts as an article and the corpus fills with boilerplate.
+* **A gained body is a gained language label (#423).** `source.language` was resolved while the record
+  still held a 62-character title, so a record that gained a body kept a blank label and its evidence
+  to resolve one. When the stored label is blank, the enrichment now detects the language of the body
+  it just stored and writes it in the same patch, with the method and the previous value. A label that
+  already exists is never replaced, and a detection that fails leaves the label blank and records why.
 """
 from __future__ import annotations
 
@@ -110,6 +115,9 @@ class EnrichmentResult:
     chars_after: int = 0
     detail: str = ""
     final_url: str = ""
+    #: Language resolved from the stored body, when the record arrived without one (#423).
+    language: str = ""
+    language_method: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -119,10 +127,44 @@ class EnrichmentResult:
             "chars_after": self.chars_after,
             "detail": self.detail,
             "final_url": self.final_url,
+            "language": self.language,
+            "language_method": self.language_method,
         }
 
 
-def enrichment_provenance(*, final_url: str, visited_url: str, fetched_at: str, chars: int) -> dict[str, Any]:
+def resolved_language_for_body(record: Mapping[str, Any], body_text: str) -> tuple[str, str]:
+    """Detect the language of the body the enrichment just stored (#423).
+
+    #416 gave headline-only records an article body but left ``source.language`` blank, because the
+    label was resolved when the record still held a 62-character title: 52 records moved from
+    "title, no language" to "full article body, still no language", and the arena-by-language cells
+    stayed computed over indeterminate cases even though the evidence to resolve them was now stored.
+
+    Two constraints, both from #294:
+
+    * a label that already exists is never replaced — a platform value (Bluesky ``langs``, a feed's
+      ``xml:lang``, arXiv metadata) or a declared row language wins over a detection;
+    * unknown stays unknown. ``resolve_language`` returns an empty tag when the text is short, the
+      detector is missing, or no candidate reaches its confidence floor, and the patch is then
+      applied without a language rather than with a guess.
+    """
+    source = record.get("source")
+    if isinstance(source, Mapping) and str(source.get("language") or "").strip():
+        return "", ""
+    from .language import resolve_language
+
+    return resolve_language(body_text)
+
+
+def enrichment_provenance(
+    *,
+    final_url: str,
+    visited_url: str,
+    fetched_at: str,
+    chars: int,
+    language: str = "",
+    language_method: str = "",
+) -> dict[str, Any]:
     """The provenance entry that makes the enrichment visible and idempotent."""
     return {
         "provenance_id": "",
@@ -146,6 +188,10 @@ def enrichment_provenance(*, final_url: str, visited_url: str, fetched_at: str, 
         "metadata": {
             "chars_stored": chars,
             "reason": "feed syndicated no article body (#416)",
+            # #423: the outcome of resolving a label from this body — a method when a label was
+            # written, the refusal reason ("detector_unavailable", "low_confidence", …) when it was
+            # not, and "" when nothing was attempted because the record arrived labelled.
+            "language_from_body": language_method,
         },
     }
 
@@ -156,25 +202,43 @@ def build_patch(
     body_text: str,
     final_url: str,
     fetched_at: str,
+    language: str = "",
+    language_method: str = "",
 ) -> dict[str, Any]:
     """The MongoDB update document for one enriched record. Pure, so the tests can inspect it."""
     url = source_url(record)
     text = body_text.strip()
     provenance = list(record.get("provenance") or [])
     provenance.append(
-        enrichment_provenance(final_url=final_url, visited_url=url, fetched_at=fetched_at, chars=len(text))
+        enrichment_provenance(
+            final_url=final_url,
+            visited_url=url,
+            fetched_at=fetched_at,
+            chars=len(text),
+            language=language,
+            language_method=language_method,
+        )
     )
     human_readable = dict(record.get("human_readable") or {})
     # The collection-stage summary is derived from content.text; keep it derived rather than stale.
     human_readable["summary"] = text[:500] + ("…" if len(text) > 500 else "")
     human_readable["generated_at"] = fetched_at
-    return {
+    patch: dict[str, Any] = {
         "content.text": text,
         "human_readable.summary": human_readable["summary"],
         "human_readable.generated_at": human_readable["generated_at"],
         "provenance": provenance,
         "updated_at": fetched_at,
     }
+    if language:
+        # #423: the body that made this record labelable is now stored, so the label is resolved
+        # from it in the same write. Only a blank is filled — a declared or platform-observed tag is
+        # never replaced — and the previous value is kept for reversibility, exactly as
+        # scripts/backfill_ai26_language.py writes it.
+        patch["source.language"] = language
+        patch["source.raw_metadata.language_method"] = language_method
+        patch["source.raw_metadata.language_backfill"] = ""
+    return patch
 
 
 def enrich_record(
@@ -208,8 +272,28 @@ def enrich_record(
             ),
             None,
         )
-    patch = build_patch(record, body_text=body, final_url=final_url, fetched_at=stamp)
-    return (EnrichmentResult(url, "enriched", before, after, final_url=final_url), patch)
+    # #423: the body is now the labelable text, so resolve the language from it in the same pass.
+    language, language_method = resolved_language_for_body(record, body)
+    patch = build_patch(
+        record,
+        body_text=body,
+        final_url=final_url,
+        fetched_at=stamp,
+        language=language,
+        language_method=language_method,
+    )
+    return (
+        EnrichmentResult(
+            url,
+            "enriched",
+            before,
+            after,
+            final_url=final_url,
+            language=language,
+            language_method=language_method,
+        ),
+        patch,
+    )
 
 
 def summarise(results: Iterable[EnrichmentResult]) -> dict[str, Any]:
@@ -218,12 +302,22 @@ def summarise(results: Iterable[EnrichmentResult]) -> dict[str, Any]:
     for row in rows:
         counts[row.status] = counts.get(row.status, 0) + 1
     enriched = [row for row in rows if row.status == "enriched"]
+    labelled = [row for row in enriched if row.language]
     return {
         "schema_version": "ai26.rss_body_enrichment/1",
         "examined": len(rows),
         "counts": dict(sorted(counts.items())),
         "chars_before": sum(row.chars_before for row in rows),
         "chars_after": sum(row.chars_after for row in enriched),
+        # #423: an enriched record that gained a language label is the repair of the "new body, old
+        # blank label" population; count it, so a cycle that enriches but still cannot label says so.
+        "languages_resolved": len(labelled),
+        "language_methods": dict(
+            sorted(
+                (method, sum(1 for row in labelled if row.language_method == method))
+                for method in {row.language_method for row in labelled}
+            )
+        ),
         "enriched": [row.as_dict() for row in enriched],
         "failures": [row.as_dict() for row in rows if row.status == "failed"],
         "skipped": [row.as_dict() for row in rows if row.status == "skipped"],
