@@ -93,6 +93,43 @@ Then verify what landed, read-only, and record: records written vs seen, duplica
 `provenance`/`run_id` written with each record, and that a second identical cycle writes nothing new
 (idempotency). Row-level detail stays in the private repository; the issue gets counts only.
 
+### 6a. The ingest half of that smoke test, executed 2026-11-16
+
+The RSS CLI path needs no browser, so it was run — bounded, against the centralized store, and read
+back. This does not stand in for the browser half in §4; it proves that what the browser will hand to
+the same sink lands, deduplicates and reads back.
+
+```
+$ laclaugpt-server-rss --study-config data/config/ai26.yaml \
+    --source-manifest data/config/ai26.sources.toml \
+    --max-feeds 4 --per-feed-limit 4 --limit 4 --json
+{"status": "ok", "collection_id": "ai26", "feeds_polled": 4,
+ "records_collected": 14, "records_synced": 4, "records_new": 1, "records_updated": 3,
+ "skipped_before_publication_floor": 10,
+ "storage_mode": "distributed", "storage_target": "ai26__records", "errors": []}
+```
+
+Read back afterwards: `ai26__records` went **11,190 → 11,191**, and the inserted rows carry
+`handoff.status=ready`, a `revision`, `project=ai26`, `collection=ai26`, `schema=1.1.0`.
+
+The same command run again immediately:
+
+```
+{"records_collected": 14, "records_synced": 4, "records_new": 0, "records_updated": 4}
+```
+
+Zero new. Across the whole collection at that moment: **0 duplicated `handoff_key` values** — the
+`handoff_key` and `routing_source_unique` indexes are what make that structural rather than hopeful.
+
+Two operational numbers from the same session, because they change how the start path is read:
+
+* **The port on this host is 8765**, not the 8766 default — `LACLAUGPT_BROWSER_PORT` in the private
+  runtime env decides, exactly as §4 says.
+* **A healthy start looks like a hang.** Constructing the distributed sink takes ~33 s here, then the
+  backend replays its local mirror before binding: the first `/status` answered ~90 s after `start`.
+  A wrapper that gives up at 60 s reports a working backend as a failure. The script prints
+  `still starting (Ns): mirror offset …`, so wait for `3/3`.
+
 ## 7. Stop and resume
 
 ```bash
@@ -111,7 +148,10 @@ the collector keeps its own state under the data root, and the queue leases expi
 - **The running capture backend predates the current code**: it has been up 22 days, `/status` reports
   an empty `git_commit`, and `GET /ping` — present in the checkout — returns 404 from the running
   process. Treat it as *merged but not deployed*: restart it from the reviewed checkout before
-  drawing conclusions about capture behaviour.
+  drawing conclusions about capture behaviour. *Updated 2026-11-16: it has since been restarted from
+  the reviewed checkout and `/status` now reports `git_commit=6b2e9f4`, `active=true`, `study=ai26`,
+  with `/status` and `/tour` both 200. Note that this SHA is the checkout's, so it still does not prove
+  a clean tree — keep the working tree clean before a session or the reported commit proves nothing.*
 - **Bind address**: the unit binds the Tailscale interface. The general guide says the backend must
   bind loopback only; that discrepancy is a decision for Tomi (loopback breaks capture if Firefox runs
   on another machine).
@@ -120,3 +160,7 @@ the collector keeps its own state under the data root, and the queue leases expi
 
 No browser-dependent capture has been executed here. The smoke test in §6 is **BLOCKED** until Tomi
 confirms Firefox, and this runbook reports it as blocked rather than as passed.
+
+What *is* claimed is §6a: the ingest path was exercised against the centralized store with a bounded
+run, a record was inserted and read back, and an identical re-run added nothing. Browser capture
+remains the one unverified link, and it needs the handoff in §5 to happen first.
