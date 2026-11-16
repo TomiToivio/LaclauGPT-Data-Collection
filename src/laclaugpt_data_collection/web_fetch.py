@@ -68,15 +68,21 @@ _MAX_CONTROL_SHARE = 0.01
 
 
 def _compressed_magic(body: bytes) -> str | None:
-    if body.startswith(b"\\x1f\\x8b"):
+    if body.startswith(b"\x1f\x8b"):
         return "gzip"
-    if body.startswith(b"\\x28\\xb5\\x2f\\xfd") or body.startswith(b"\\x50\\x2a\\x4d\\x18"):
+    if body.startswith(b"\x28\xb5\x2f\xfd") or body.startswith(b"\x50\x2a\x4d\x18"):
         return "zstd"
     if len(body) >= 2 and body[0] & 15 == 8 and (body[0] >> 4) <= 7 and (body[0] * 256 + body[1]) % 31 == 0:
         return "zlib"
     # Brotli has no reliable fixed magic header; the text plausibility test
     # below catches undecodable Brotli bodies without false positives on Unicode.
     return None
+
+
+def _declared_charset(response: httpx.Response) -> str:
+    """Use only explicit charset; HTTPX may otherwise default HTML to latin-1."""
+    match = re.search(r"charset\\s*=\\s*[\'\\"]?([^;\\s\'\\"]+)", response.headers.get("content-type", ""), re.I)
+    return match.group(1) if match else "utf-8"
 
 
 def _decode_text_body(body: bytes, encoding: str, *, max_bytes: int) -> tuple[str | None, dict[str, str | int | float]]:
@@ -106,10 +112,10 @@ def _decode_text_body(body: bytes, encoding: str, *, max_bytes: int) -> tuple[st
             decoded = body.decode(encoding, errors="replace")
         except LookupError:
             decoded = body.decode("utf-8", errors="replace")
-        details["replacement_count"] = decoded.count("\\ufffd")
+        details["replacement_count"] = decoded.count("\ufffd")
     count = max(1, len(decoded))
-    replacements = decoded.count("\\ufffd")
-    controls = sum(ord(char) < 32 and char not in "\\n\\r\\t" or ord(char) == 127 for char in decoded)
+    replacements = decoded.count("\ufffd")
+    controls = sum(ord(char) < 32 and char not in "\n\r\t" or ord(char) == 127 for char in decoded)
     details.update(replacement_count=replacements, replacement_share=round(replacements / count, 4), control_count=controls, control_share=round(controls / count, 4))
     if replacements / count > _MAX_REPLACEMENT_SHARE or controls / count > _MAX_CONTROL_SHARE or controls >= 5:
         return None, {**details, "reason": "binary_body_rejected"}
@@ -214,7 +220,7 @@ def fetch_html_page(
                 body = response.content[: max_bytes + 1]
                 if len(body) > max_bytes:
                     return None
-                decoded, _details = _decode_text_body(body, response.encoding or "utf-8", max_bytes=max_bytes)
+                decoded, _details = _decode_text_body(body, _declared_charset(response), max_bytes=max_bytes)
                 return (current, decoded) if decoded is not None else None
     except Exception:  # noqa: BLE001 - discovery must never fail collection
         return None
