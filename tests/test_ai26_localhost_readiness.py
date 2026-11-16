@@ -110,6 +110,12 @@ def test_blocked_alone_does_not_fail_the_run(monkeypatch, tmp_path, capsys):
     module = _module()
     monkeypatch.setattr(module, "_read_json", lambda url, timeout=5.0: {"active": True, "study": "ai26"})
     monkeypatch.setattr(module, "service_state", lambda unit: ("active", "user"))
+    # CI has no Firefox and no profile: the fixture supplies both so the test measures the exit
+    # contract rather than the runner's installed software.
+    monkeypatch.setattr(module.shutil, "which", lambda name: "/usr/bin/firefox")
+    profiles = tmp_path / "profiles.ini"
+    profiles.write_text("[Profile0]\nPath=abc.default\n", encoding="utf-8")
+    monkeypatch.setattr(module, "PROFILE_PATTERNS", (str(profiles),))
     manifest = tmp_path / "manifest.json"
     manifest.write_text("{}", encoding="utf-8")
     monkeypatch.setenv("LACLAUGPT_MONGODB_URI", "mongodb://hidden.invalid")
