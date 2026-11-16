@@ -80,9 +80,12 @@ def _compressed_magic(body: bytes) -> str | None:
 
 
 def _declared_charset(response: httpx.Response) -> str:
-    """Use only explicit charset; HTTPX may otherwise default HTML to latin-1."""
-    match = re.search(r"charset\\s*=\\s*[\'\\"]?([^;\\s\'\\"]+)", response.headers.get("content-type", ""), re.I)
-    return match.group(1) if match else "utf-8"
+    """Prefer an explicit HTTP charset, otherwise UTF-8 (never guessed latin-1)."""
+    for parameter in response.headers.get("content-type", "").split(";")[1:]:
+        key, separator, value = parameter.strip().partition("=")
+        if separator and key.casefold() == "charset":
+            return value.strip().strip(chr(34) + chr(39)) or "utf-8"
+    return "utf-8"
 
 
 def _decode_text_body(body: bytes, encoding: str, *, max_bytes: int) -> tuple[str | None, dict[str, str | int | float]]:
