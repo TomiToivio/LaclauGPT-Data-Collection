@@ -1,7 +1,7 @@
+from __future__ import annotations
+
 import gzip
 import zlib
-
-from __future__ import annotations
 
 import httpx
 
