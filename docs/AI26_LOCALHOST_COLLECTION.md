@@ -270,6 +270,10 @@ Keep the ignored runtime copies synchronized with the public templates when the 
 
 ## 9. Smoke test
 
+Run the read-only handoff preflight first — it reports the env, store, backend, profile and extension
+state without writing anything, and exits non-zero while a prerequisite is missing:
+[`AI26_ISSUE_433_LOCAL_HANDOFF.md`](AI26_ISSUE_433_LOCAL_HANDOFF.md).
+
 Use only public-safe/synthetic material when testing:
 
 1. `laclaugpt-collect doctor --profile configs/ai26.localhost-remote.example.toml` succeeds.
