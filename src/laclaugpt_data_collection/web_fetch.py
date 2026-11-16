@@ -58,6 +58,95 @@ class WebFetchOutcome:
     status_code: int | None = None
 
 
+
+#: Compression signatures a `text/*` body should never start with. If one appears the origin (or a
+#: cache in front of it) served compressed bytes under a text label, or httpx could not decode the
+#: `content-encoding`; either way the bytes are not text yet.
+_MAGIC_ENCODINGS = (
+    (b"\x1f\x8b", "gzip"),
+    (b"\x28\xb5\x2f\xfd", "zstd"),
+    (b"\x78\x01", "zlib"),
+    (b"\x78\x9c", "zlib"),
+    (b"\x78\xda", "zlib"),
+)
+
+#: A decoded body is refused as text when it is this broken. Measured against the AI26 store: the one
+#: bad record is 43.8 % U+FFFD and carries 896 control characters, while legitimate Finnish and
+#: Japanese pages contain neither — so these thresholds separate the two without touching a script.
+MAX_REPLACEMENT_SHARE = 0.10
+MAX_CONTROL_CHARS = 5
+
+
+def _looks_compressed(body: bytes) -> str:
+    """The compression the body starts with, or an empty string."""
+    for magic, name in _MAGIC_ENCODINGS:
+        if body.startswith(magic):
+            return name
+    return ""
+
+
+def _decompress(body: bytes, kind: str) -> bytes | None:
+    """Undo a compression layer, or None when it cannot be undone here."""
+    try:
+        if kind == "gzip":
+            import gzip
+
+            return gzip.decompress(body)
+        if kind == "zlib":
+            import zlib
+
+            return zlib.decompress(body)
+        if kind == "zstd":
+            import zstandard  # optional dependency
+
+            return zstandard.ZstdDecompressor().decompress(body)
+    except Exception:  # noqa: BLE001 - an undecodable body is a rejection, not a crash
+        return None
+    return None
+
+
+def decode_text_body(body: bytes, encoding: str | None = None) -> tuple[str, dict[str, object]]:
+    """Decode a fetched body as text, and say how trustworthy the result is.
+
+    ``errors="replace"`` is kept — refusing to decode would lose the legitimate-but-imperfect pages —
+    but the count is returned so the caller can refuse the ones that are not text at all. Without this,
+    a compressed body becomes a valid ``str`` full of U+FFFD, the record is stored as ``ready``, and
+    the analysis stage codes mojibake as discourse (issue #429).
+    """
+    diagnostics: dict[str, object] = {"byte_size": len(body), "decompressed_from": ""}
+    compressed = _looks_compressed(body)
+    if compressed:
+        expanded = _decompress(body, compressed)
+        diagnostics["compressed_as"] = compressed
+        if expanded is not None:
+            body = expanded
+            diagnostics["decompressed_from"] = compressed
+            diagnostics["decoded_byte_size"] = len(expanded)
+    text = body.decode(encoding or "utf-8", errors="replace")
+    replacements = text.count("\ufffd")
+    control = sum(1 for character in text
+                  if (ord(character) < 32 and character not in "\n\r\t") or ord(character) == 127)
+    diagnostics.update({
+        "characters": len(text),
+        "replacement_characters": replacements,
+        "replacement_share": round(replacements / len(text), 4) if text else 0.0,
+        "control_characters": control,
+    })
+    return text, diagnostics
+
+
+def text_is_plausible(diagnostics: dict[str, object]) -> tuple[bool, str]:
+    """Whether a decoded body may be stored as text, with the reason when it may not."""
+    share = float(diagnostics.get("replacement_share") or 0.0)
+    control = int(diagnostics.get("control_characters") or 0)
+    if share > MAX_REPLACEMENT_SHARE:
+        return False, (f"replacement_share={share:.3f} exceeds {MAX_REPLACEMENT_SHARE:.2f} "
+                       f"({diagnostics.get('replacement_characters')} of "
+                       f"{diagnostics.get('characters')} characters)")
+    if control > MAX_CONTROL_CHARS:
+        return False, f"control_characters={control} exceeds {MAX_CONTROL_CHARS}"
+    return True, ""
+
 def external_urls_for_record(record: CanonicalRecord) -> list[str]:
     """Return preserved expanded links plus links visible in normalized text."""
     candidates = list(record.source.raw_metadata.get("external_urls") or [])
@@ -156,7 +245,9 @@ def fetch_html_page(
                 body = response.content[: max_bytes + 1]
                 if len(body) > max_bytes:
                     return None
-                return current, body.decode(response.encoding or "utf-8", errors="replace")
+                candidate, diagnostics = decode_text_body(body, response.encoding)
+                plausible, _ = text_is_plausible(diagnostics)
+                return (current, candidate) if plausible else None
     except Exception:  # noqa: BLE001 - discovery must never fail collection
         return None
     return None
@@ -229,17 +320,27 @@ def fetch_web_child(
     text = ""
     title = None
     published_at = None
+    body_metadata: dict[str, object] = {}
     media: list[MediaReference] = []
     if content_type == "application/pdf":
         media.append(MediaReference(kind="pdf", url=current, media_index=0))
     else:
-        decoded = body.decode(response.encoding or "utf-8", errors="replace")
+        decoded, body_diagnostics = decode_text_body(body, response.encoding)
+        plausible, refusal = text_is_plausible(body_diagnostics)
+        if not plausible:
+            # Store the refusal, not the mojibake: the row is visibly absent with a reason, instead of
+            # present with prose that is really compressed bytes (#429).
+            return WebFetchOutcome(
+                current, None,
+                f"binary_body_rejected:{refusal}",
+            )
         if "html" in content_type:
             title = _title(decoded)
             published_at = _published(decoded)
             text = _html_text(decoded)[:200_000]
         else:
             text = decoded[:200_000]
+        body_metadata = body_diagnostics
 
     fetched_at = datetime.now(UTC).isoformat()
     source = SourceSection(
@@ -265,7 +366,8 @@ def fetch_web_child(
             payload=None,
             content_type=content_type,
             captured_at=fetched_at,
-            metadata={"byte_size": len(body), "body_not_inlined": True},
+            metadata={"byte_size": len(body), "body_not_inlined": True,
+                      "text_decode": body_metadata},
         ),
         source=source,
         content=ContentSection(text=text, title=title, media_references=media),
