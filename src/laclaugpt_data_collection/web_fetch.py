@@ -9,6 +9,7 @@ from __future__ import annotations
 import ipaddress
 import re
 import socket
+import zlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from html import unescape
@@ -56,6 +57,60 @@ class WebFetchOutcome:
     record: CanonicalRecord | None
     error: str = ""
     status_code: int | None = None
+    diagnostics: dict[str, str | int | float] | None = None
+
+
+# Body checks apply to HTTPX's already-decoded response.content, since HTTPX
+# normally processes Content-Encoding automatically. A remaining compressed
+# signature indicates double encoding or a mislabeled origin/WAF response.
+_MAX_REPLACEMENT_SHARE = 0.10
+_MAX_CONTROL_SHARE = 0.01
+
+
+def _compressed_magic(body: bytes) -> str | None:
+    if body.startswith(b"\\x1f\\x8b"):
+        return "gzip"
+    if body.startswith(b"\\x28\\xb5\\x2f\\xfd") or body.startswith(b"\\x50\\x2a\\x4d\\x18"):
+        return "zstd"
+    if len(body) >= 2 and body[0] & 15 == 8 and (body[0] >> 4) <= 7 and (body[0] * 256 + body[1]) % 31 == 0:
+        return "zlib"
+    # Brotli has no reliable fixed magic header; the text plausibility test
+    # below catches undecodable Brotli bodies without false positives on Unicode.
+    return None
+
+
+def _decode_text_body(body: bytes, encoding: str, *, max_bytes: int) -> tuple[str | None, dict[str, str | int | float]]:
+    details: dict[str, str | int | float] = {"byte_length": len(body)}
+    magic = _compressed_magic(body)
+    if magic:
+        details["compressed_magic"] = magic
+        if magic == "zstd":
+            return None, {**details, "reason": "binary_body_rejected"}
+        try:
+            inflater = zlib.decompressobj(16 + zlib.MAX_WBITS if magic == "gzip" else zlib.MAX_WBITS)
+            inflated = inflater.decompress(body, max_bytes + 1)
+            if len(inflated) > max_bytes or not inflater.eof or inflater.unused_data:
+                return None, {**details, "reason": "binary_body_rejected"}
+            inflated += inflater.flush()
+            if len(inflated) > max_bytes:
+                return None, {**details, "reason": "binary_body_rejected"}
+            body = inflated
+            details["decompressed_bytes"] = len(body)
+        except zlib.error:
+            return None, {**details, "reason": "binary_body_rejected"}
+    try:
+        decoded = body.decode(encoding, errors="strict")
+        details["replacement_count"] = 0
+    except (UnicodeError, LookupError):
+        decoded = body.decode("utf-8" if not encoding else encoding, errors="replace") if encoding.lower() in ("utf-8", "utf8", "ascii", "latin-1", "iso-8859-1") else body.decode("utf-8", errors="replace")
+        details["replacement_count"] = decoded.count("\\ufffd")
+    count = max(1, len(decoded))
+    replacements = decoded.count("\\ufffd")
+    controls = sum(ord(char) < 32 and char not in "\\n\\r\\t" or ord(char) == 127 for char in decoded)
+    details.update(replacement_count=replacements, replacement_share=round(replacements / count, 4), control_count=controls, control_share=round(controls / count, 4))
+    if replacements / count > _MAX_REPLACEMENT_SHARE or controls / count > _MAX_CONTROL_SHARE or controls >= 5:
+        return None, {**details, "reason": "binary_body_rejected"}
+    return decoded, details
 
 
 def external_urls_for_record(record: CanonicalRecord) -> list[str]:
@@ -156,7 +211,8 @@ def fetch_html_page(
                 body = response.content[: max_bytes + 1]
                 if len(body) > max_bytes:
                     return None
-                return current, body.decode(response.encoding or "utf-8", errors="replace")
+                decoded, _details = _decode_text_body(body, response.encoding or "utf-8", max_bytes=max_bytes)
+                return (current, decoded) if decoded is not None else None
     except Exception:  # noqa: BLE001 - discovery must never fail collection
         return None
     return None
@@ -230,10 +286,14 @@ def fetch_web_child(
     title = None
     published_at = None
     media: list[MediaReference] = []
+    diagnostics: dict[str, str | int | float] = {"byte_length": len(body), "replacement_count": 0}
     if content_type == "application/pdf":
         media.append(MediaReference(kind="pdf", url=current, media_index=0))
     else:
-        decoded = body.decode(response.encoding or "utf-8", errors="replace")
+        decoded, diagnostics = _decode_text_body(body, response.encoding or "utf-8", max_bytes=max_bytes)
+        if decoded is None:
+            diagnostics["http_content_type"] = content_type
+            return WebFetchOutcome(current, None, "binary_body_rejected", diagnostics=diagnostics)
         if "html" in content_type:
             title = _title(decoded)
             published_at = _published(decoded)
@@ -257,6 +317,7 @@ def fetch_web_child(
             "original_link": original,
             "final_url": current,
             "http_content_type": content_type,
+            "text_decode": diagnostics,
         },
     )
     child = CanonicalRecord(
@@ -265,7 +326,7 @@ def fetch_web_child(
             payload=None,
             content_type=content_type,
             captured_at=fetched_at,
-            metadata={"byte_size": len(body), "body_not_inlined": True},
+            metadata={"byte_size": len(body), "body_not_inlined": True, "text_decode": diagnostics},
         ),
         source=source,
         content=ContentSection(text=text, title=title, media_references=media),
@@ -279,6 +340,7 @@ def fetch_web_child(
                     "collection_id": collection_id,
                     "arena": arena,
                     "parent_source_url": parent.source_url,
+                    "text_decode": diagnostics,
                 },
             )
         ],
