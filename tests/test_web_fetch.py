@@ -1,3 +1,6 @@
+import gzip
+import zlib
+
 from __future__ import annotations
 
 import httpx
@@ -164,3 +167,52 @@ def test_genuine_redirect_loop_is_still_detected() -> None:
     assert outcome.error == "redirect_loop"
     assert calls == ["https://example.org/a", "https://example.org/b"]
 
+
+
+def _mock_body(body: bytes, content_type: str = "text/html"):
+    return fetch_web_child(
+        "https://example.org/suspicious", _parent(),
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, headers={"content-type": content_type}, content=body)),
+        host_validator=lambda _url: True,
+    )
+
+
+def test_binary_gzip_under_html_is_never_stored_as_garbled_text() -> None:
+    outcome = _mock_body(gzip.compress(b"\\x00" * 50 + b"broken text" * 20))
+    assert outcome.record is None
+    assert outcome.error == "binary_body_rejected"
+    assert outcome.diagnostics["compressed_magic"] == "gzip"
+    assert outcome.diagnostics["http_content_type"] == "text/html"
+    assert outcome.diagnostics["byte_length"] > 0
+
+
+def test_zlib_magic_with_binary_payload_is_rejected() -> None:
+    outcome = _mock_body(zlib.compress(b"\\x00" * 100))
+    assert outcome.error == "binary_body_rejected"
+    assert outcome.diagnostics["compressed_magic"] == "zlib"
+
+
+def test_mojibake_replacement_share_is_rejected() -> None:
+    outcome = _mock_body(b"\\xff" * 40 + b"valid" * 10)
+    assert outcome.record is None
+    assert outcome.error == "binary_body_rejected"
+    assert outcome.diagnostics["replacement_share"] > 0.1
+
+
+def test_valid_finnish_and_japanese_unicode_pass() -> None:
+    for text in ("Hyvää päivää, yhteiskunta ja demokratia.", "日本語の文章、社会と民主主義。"):
+        outcome = _mock_body(("<html><body>" + text + "</body></html>").encode("utf-8"))
+        assert outcome.error == ""
+        assert outcome.record is not None
+        assert text in outcome.record.content.text
+        assert outcome.record.source.raw_metadata["text_decode"]["replacement_count"] == 0
+
+
+def test_ordinary_html_discovery_rejects_binary() -> None:
+    from laclaugpt_data_collection.web_fetch import fetch_html_page
+    page = fetch_html_page(
+        "https://example.org/suspicious",
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, headers={"content-type": "text/html"}, content=b"\\xff" * 60)),
+        host_validator=lambda _url: True,
+    )
+    assert page is None
