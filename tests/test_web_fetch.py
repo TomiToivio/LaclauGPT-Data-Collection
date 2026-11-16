@@ -178,7 +178,7 @@ def _mock_body(body: bytes, content_type: str = "text/html"):
 
 
 def test_binary_gzip_under_html_is_never_stored_as_garbled_text() -> None:
-    outcome = _mock_body(gzip.compress(b"\\x00" * 50 + b"broken text" * 20))
+    outcome = _mock_body(gzip.compress(b"\x00" * 50 + b"broken text" * 20))
     assert outcome.record is None
     assert outcome.error == "binary_body_rejected"
     assert outcome.diagnostics["compressed_magic"] == "gzip"
@@ -187,13 +187,13 @@ def test_binary_gzip_under_html_is_never_stored_as_garbled_text() -> None:
 
 
 def test_zlib_magic_with_binary_payload_is_rejected() -> None:
-    outcome = _mock_body(zlib.compress(b"\\x00" * 100))
+    outcome = _mock_body(zlib.compress(b"\x00" * 100))
     assert outcome.error == "binary_body_rejected"
     assert outcome.diagnostics["compressed_magic"] == "zlib"
 
 
 def test_mojibake_replacement_share_is_rejected() -> None:
-    outcome = _mock_body(b"\\xff" * 40 + b"valid" * 10)
+    outcome = _mock_body(b"\xff" * 40 + b"valid" * 10)
     assert outcome.record is None
     assert outcome.error == "binary_body_rejected"
     assert outcome.diagnostics["replacement_share"] > 0.1
@@ -212,7 +212,7 @@ def test_ordinary_html_discovery_rejects_binary() -> None:
     from laclaugpt_data_collection.web_fetch import fetch_html_page
     page = fetch_html_page(
         "https://example.org/suspicious",
-        transport=httpx.MockTransport(lambda _request: httpx.Response(200, headers={"content-type": "text/html"}, content=b"\\xff" * 60)),
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, headers={"content-type": "text/html"}, content=b"\xff" * 60)),
         host_validator=lambda _url: True,
     )
     assert page is None
