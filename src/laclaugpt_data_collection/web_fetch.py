@@ -102,7 +102,10 @@ def _decode_text_body(body: bytes, encoding: str, *, max_bytes: int) -> tuple[st
         decoded = body.decode(encoding, errors="strict")
         details["replacement_count"] = 0
     except (UnicodeError, LookupError):
-        decoded = body.decode("utf-8" if not encoding else encoding, errors="replace") if encoding.lower() in ("utf-8", "utf8", "ascii", "latin-1", "iso-8859-1") else body.decode("utf-8", errors="replace")
+        try:
+            decoded = body.decode(encoding, errors="replace")
+        except LookupError:
+            decoded = body.decode("utf-8", errors="replace")
         details["replacement_count"] = decoded.count("\\ufffd")
     count = max(1, len(decoded))
     replacements = decoded.count("\\ufffd")
@@ -279,6 +282,8 @@ def fetch_web_child(
                 return WebFetchOutcome(current, None, "response_too_large")
     except httpx.HTTPStatusError as exc:
         return WebFetchOutcome(current, None, "http_error", exc.response.status_code)
+    except httpx.DecodingError:
+        return WebFetchOutcome(current, None, "binary_body_rejected", diagnostics={"reason": "content_encoding_decode_failed"})
     except Exception as exc:  # noqa: BLE001
         return WebFetchOutcome(current, None, str(exc)[:300])
 
