@@ -44,6 +44,25 @@ from .web_discovery import discover_article_urls, discover_feed_urls
 from .web_fetch import fetch_html_page, fetch_web_child
 
 _BROWSER_ONLY_TABLES = {"x_account", "browser_source", "instagram_account", "tiktok_account"}
+
+# A store outage is a declared degradation, not a crash (#440). These are the errors that
+# mean "the canonical store is not reachable right now", as opposed to a record that failed
+# to write for a reason worth a traceback.
+try:  # pymongo is a core dependency; the guard keeps the module importable without it.
+    from pymongo.errors import (
+        AutoReconnect,
+        ConnectionFailure,
+        ServerSelectionTimeoutError,
+    )
+
+    STORE_UNAVAILABLE_ERRORS: tuple[type[BaseException], ...] = (
+        ServerSelectionTimeoutError,
+        ConnectionFailure,
+        AutoReconnect,
+    )
+except ImportError:  # pragma: no cover - exercised only in a pymongo-less environment
+    STORE_UNAVAILABLE_ERRORS = ()
+
 _WEB_SOURCE_FEED_FALLBACKS = {
     "https://openai.com/news": "https://openai.com/news/rss.xml",
     # Microsoft AI blog (#251): the blog page has no scrapeable feed discovery on the
@@ -931,25 +950,51 @@ def main(argv: list[str] | None = None) -> int:
         dispatch = JobLeaseStore(collection)
         dispatch.ensure_indexes()
 
-    result = run_phase1_laskin(
-        settings,
-        study_config=args.study_config,
-        source_manifest=args.source_manifest,
-        collection_id=args.collection_id,
-        worker_id=args.worker_id,
-        max_feeds=args.max_feeds,
-        max_jobs=args.max_jobs,
-        per_source_limit=args.per_source_limit,
-        limit=args.limit,
-        tracked_plan=args.tracked_plan,
-        enforce_source_budgets=args.enforce_source_budgets,
-        dispatch=dispatch,
-        dispatch_lease_seconds=args.dispatch_lease_seconds,
-        capabilities=(
-            LOCALHOST_CAPABILITIES if args.capabilities in {"localhost", "all"}
-            else LASKIN_CAPABILITIES
-        ),
-    )
+    try:
+        result = run_phase1_laskin(
+            settings,
+            study_config=args.study_config,
+            source_manifest=args.source_manifest,
+            collection_id=args.collection_id,
+            worker_id=args.worker_id,
+            max_feeds=args.max_feeds,
+            max_jobs=args.max_jobs,
+            per_source_limit=args.per_source_limit,
+            limit=args.limit,
+            tracked_plan=args.tracked_plan,
+            enforce_source_budgets=args.enforce_source_budgets,
+            dispatch=dispatch,
+            dispatch_lease_seconds=args.dispatch_lease_seconds,
+            capabilities=(
+                LOCALHOST_CAPABILITIES if args.capabilities in {"localhost", "all"}
+                else LASKIN_CAPABILITIES
+            ),
+        )
+    except STORE_UNAVAILABLE_ERRORS as exc:
+        # A store outage should degrade the pipeline and say so, not vanish into a
+        # traceback: when MongoDB was unreachable for four days in November 2026 the
+        # cron log carried a stack trace per tick and nothing that stated how many
+        # observation windows were lost (#440). The declaration below is that
+        # statement, and the non-zero exit keeps the failure visible.
+        result = {
+            "status": "store_unavailable",
+            "collection_id": args.collection_id or settings.project_id,
+            "worker_id": args.worker_id,
+            "records_synced": 0,
+            "records_new": 0,
+            "errors": [f"{type(exc).__name__}: {exc}"],
+            "windows_missed": 1,
+            "missed_windows_recoverable": False,
+            "declaration": (
+                "this tick captured nothing: the canonical record store was unreachable. "
+                "Window-driven sources (RSS, scholarly, web) can be partly backfilled from "
+                "their own published windows; social timelines (bluesky, mastodon) scroll "
+                "out of the collector's reach and this window is lost."
+            ),
+        }
+        print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+        return 3
+
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     return 0 if not result["errors"] else 1
 
