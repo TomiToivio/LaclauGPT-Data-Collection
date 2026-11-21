@@ -23,6 +23,7 @@ import yaml
 from .collectors.arxiv import ArxivCollector
 from .collectors.bluesky import BlueskyCollector
 from .collectors.mastodon import MastodonCollectionError, MastodonCollector
+from .collectors.openalex import OpenAlexCollector
 from .collectors.rss import RSSCollector
 from .collectors.youtube import YouTubeCollector
 from .config import Settings
@@ -80,15 +81,27 @@ class SourceJobError(RuntimeError):
 def preflight_optional_dependencies(jobs: list[dict[str, Any]]) -> list[str]:
     """Return loud setup errors for configured job kinds missing optional packages."""
     configured: dict[str, list[str]] = {}
+    arxiv_configured = False
     for row in jobs:
         kind = str(row.get("kind") or "")
         if kind in _OPTIONAL_DEPENDENCY_CONTRACT:
             configured.setdefault(kind, []).append(str(row.get("name") or "unnamed"))
+            if kind == "scholarly_query":
+                services = {str(v).lower() for v in row.get("services") or []}
+                arxiv_configured = arxiv_configured or "arxiv" in services
 
     errors: list[str] = []
     for kind, names in sorted(configured.items()):
         extra, modules = _OPTIONAL_DEPENDENCY_CONTRACT[kind]
-        missing = [module for module in modules if importlib.util.find_spec(module) is None]
+        required = modules
+        if kind == "scholarly_query":
+            # Only the arXiv backend needs the 'documents' extra; the OpenAlex
+            # backend is stdlib HTTP, so a manifest that declares openalex alone
+            # must not be blocked by a missing arxiv package (#442).
+            required = tuple(m for m in modules if m == "arxiv" and arxiv_configured)
+            if not required:
+                continue
+        missing = [module for module in required if importlib.util.find_spec(module) is None]
         if missing:
             errors.append(
                 f"missing optional extra '{extra}' for job kind '{kind}' "
@@ -271,11 +284,26 @@ def _records_for_job(
 
     if kind == "scholarly_query":
         services = {str(v).lower() for v in row.get("services") or []}
-        if "arxiv" not in services:
-            raise SourceJobError("unsupported_scholarly_backend")
         query = str(row.get("query") or "").strip()
         if not query:
             raise SourceJobError("missing_query")
+        # #442: the left_techno_optimism stratum declares openalex/semantic_scholar/
+        # socArXiv and had no backend for any of them, so the formation could never
+        # collect. OpenAlex needs no key and no extra, so it is the executable path.
+        if "openalex" in services:
+            # OpenAlex search is relevance-ranked full text: it does not honour `AND`/`OR`
+            # (the declared Boolean returns ~2M works, i.e. it matches on words alone), so a
+            # stratum that needs a precise sample carries the executable form in
+            # `openalex_query` and keeps the original Boolean as documentation (#442).
+            openalex_query = str(row.get("openalex_query") or query).strip()
+            result = _call_with_retry(
+                lambda: OpenAlexCollector(openalex_query, max_results=per_source_limit).collect(),
+                policy=retry_policy or RetryPolicy(),
+                is_retryable=lambda exc: _retryable_http_status(exc) in (429, 500, 502, 503, 504),
+            )
+            return [_stamp(r, row, collection_id=collection_id, worker_id=worker_id) for r in result.records], list(result.warnings)
+        if "arxiv" not in services:
+            raise SourceJobError("unsupported_scholarly_backend")
         # The arXiv endpoint rate-limits (HTTP 429) and occasionally 5xx's. The
         # library retries quickly and then gives up; without a bounded, backed-off
         # retry at this boundary a single transient status silently costs a tick's
