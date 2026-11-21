@@ -730,6 +730,9 @@ def run_phase1_laskin(
 
     tick_budget = {
         "limit": limit,
+        # #441: the per-source sampling window is a decision, so each cycle records the value it
+        # actually used. A clipped burst is then visible in the log as a window, not as a mystery.
+        "per_source_limit": per_source_limit,
         "rss_allocation": rss_limit,
         "non_browser_reserved": non_browser_reserve,
         "rss_synced": int(rss.get("records_synced", 0)),
@@ -794,6 +797,31 @@ def run_phase1_laskin(
     }
 
 
+def per_source_limit_default(environment: dict[str, str] | None = None) -> int:
+    """How many newest items one platform poll asks for (#441).
+
+    This is a sampling window, not a feed property: the collector returns the newest N, so a burst that
+    lands between two polls is clipped exactly at N. Five was neither the feed nor the study intent — a
+    1-2 h interval on a busy account carried 7-16 posts, and the 75-100/day per-source caps imply 15-20
+    polls/day. The default therefore covers a burst while keeping four polls inside the daily cap, and the
+    environment variable exists so a study can widen it without a code change.
+
+    Bounded on purpose: a runaway value turns one poll into a full timeline download, which is a different
+    (and much more expensive) collection decision.
+    """
+    raw = (environment if environment is not None else os.environ).get(
+        "LACLAUGPT_AI26_PER_SOURCE_LIMIT", "")
+    try:
+        value = int(raw) if str(raw).strip() else 25
+    except ValueError:
+        value = 25
+    if value < 1:
+        # A zero or negative window would silently poll one item; that is a broken configuration,
+        # not a decision, so it falls back to the documented default instead of clamping to 1.
+        value = 25
+    return min(value, 200)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="laclaugpt-ai26-laskin")
     parser.add_argument("--study-config", required=True)
@@ -803,7 +831,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-feeds", type=int, default=8)
 
     parser.add_argument("--max-jobs", type=int, default=6)
-    parser.add_argument("--per-source-limit", type=int, default=5)
+    parser.add_argument("--per-source-limit", type=int, default=per_source_limit_default())
     parser.add_argument("--limit", type=int, default=40)
     # Three-state deliberately: `store_true` would make an ABSENT flag pass
     # False and thereby force the caps OFF, silently overriding a study that
