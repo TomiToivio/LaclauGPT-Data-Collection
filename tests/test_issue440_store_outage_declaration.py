@@ -28,13 +28,19 @@ def _argv(tmp_path):
 
 
 def test_store_outage_prints_a_declaration_and_exits_three(tmp_path, monkeypatch, capsys):
+    class StoreDown(RuntimeError):
+        pass
+
     monkeypatch.setattr(runner, "Settings", lambda: type("S", (), {
         "project_id": "ai26", "mongodb_uri": "", "mongodb_database": "x",
         "mongodb_connect_timeout_ms": 1000,
     })())
+    # The tuple is empty when pymongo is absent (the stable-core test env), so the
+    # classifier is injected rather than assumed.
+    monkeypatch.setattr(runner, "STORE_UNAVAILABLE_ERRORS", (StoreDown,))
 
     def boom(*_a, **_kw):
-        raise runner.STORE_UNAVAILABLE_ERRORS[0]("86.50.228.141:27017 timed out")
+        raise StoreDown("86.50.228.141:27017 timed out")
 
     monkeypatch.setattr(runner, "run_phase1_laskin", boom)
 
@@ -50,10 +56,14 @@ def test_store_outage_prints_a_declaration_and_exits_three(tmp_path, monkeypatch
 
 
 def test_a_non_store_error_is_not_declared_as_a_lost_window(tmp_path, monkeypatch, capsys):
+    class StoreDown(RuntimeError):
+        pass
+
     monkeypatch.setattr(runner, "Settings", lambda: type("S", (), {
         "project_id": "ai26", "mongodb_uri": "", "mongodb_database": "x",
         "mongodb_connect_timeout_ms": 1000,
     })())
+    monkeypatch.setattr(runner, "STORE_UNAVAILABLE_ERRORS", (StoreDown,))
 
     def boom(*_a, **_kw):
         raise ValueError("a real bug, not an outage")
