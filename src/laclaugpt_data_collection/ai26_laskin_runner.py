@@ -412,7 +412,7 @@ def _declared_budgets_bind(study_config: str | Path) -> bool:
 
 
 def _rss_window(
-    max_feeds: int, rss_limit: int, per_source_limit: int = 5
+    max_feeds: int, rss_limit: int, declared_depth: int = 5
 ) -> tuple[int, int]:
     """How many feeds to poll and how deep, so the window fits the allocation (#293).
 
@@ -433,7 +433,7 @@ def _rss_window(
     """
     if rss_limit <= 0:
         return (0, 0)
-    depth = max(1, min(per_source_limit, rss_limit))
+    depth = max(1, min(declared_depth, rss_limit))
     feeds = min(max(1, max_feeds), max(1, rss_limit // depth))
     return (feeds, depth)
 
@@ -509,7 +509,10 @@ def run_phase1_laskin(
     rss_limit = limit - non_browser_reserve
     # Never fetch more feed candidates than can be persisted in this tick (#293).
     # Preserve the total tick cap and the non-browser reservation.
-    rss_feeds, rss_feed_depth = _rss_window(max_feeds, rss_limit, per_source_limit)
+    # The RSS depth stays the declared five. It is budget-shaped, not the platform
+    # polling window (#441), so raising per_source_limit must not collapse the feed
+    # rotation to one feed per tick -- the starvation #293 fixed.
+    rss_feeds, rss_feed_depth = _rss_window(max_feeds, rss_limit)
     rss = run_phase1_rss(
         settings,
         study_config=study_config,
