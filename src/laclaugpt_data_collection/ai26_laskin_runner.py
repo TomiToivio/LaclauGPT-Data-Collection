@@ -412,7 +412,7 @@ def _declared_budgets_bind(study_config: str | Path) -> bool:
 
 
 def _rss_window(
-    max_feeds: int, rss_limit: int, per_source_limit: int = 5
+    max_feeds: int, rss_limit: int, declared_depth: int = 5
 ) -> tuple[int, int]:
     """How many feeds to poll and how deep, so the window fits the allocation (#293).
 
@@ -433,7 +433,7 @@ def _rss_window(
     """
     if rss_limit <= 0:
         return (0, 0)
-    depth = max(1, min(per_source_limit, rss_limit))
+    depth = max(1, min(declared_depth, rss_limit))
     feeds = min(max(1, max_feeds), max(1, rss_limit // depth))
     return (feeds, depth)
 
@@ -460,7 +460,15 @@ def run_phase1_laskin(
     worker_id: str = "laskin-cron",  # callers pass a host-derived id; see default_worker_id
     max_feeds: int = 8,
     max_jobs: int = 6,
-    per_source_limit: int = 5,
+    # How many items a platform collector may return per poll (#441). Five was the old cap
+    # and it clipped bursts: every high-volume platform row returned exactly 5 records in
+    # 100 % of polls, so a 1-2 h interval holding 7-16 posts lost everything above the
+    # window (40 % of Timnit Gebru's posts, 17 % of EFF's). A burst is the part of a
+    # timeline where an actor says something at volume, so clipping it drops the
+    # high-salience moments. 50 covers any realistic interval between admissions while
+    # staying inside every collector's per-request maximum (Bluesky 100, YouTube 50).
+    # The RSS depth is NOT this number: it is budget-shaped by _rss_window (#293).
+    per_source_limit: int = 50,
     limit: int = 40,
     rotation: int | None = None,
     tracked_plan: str | Path | None = None,
@@ -508,8 +516,10 @@ def run_phase1_laskin(
     non_browser_reserve = min(limit // 2, max_jobs * per_source_limit) if all_jobs else 0
     rss_limit = limit - non_browser_reserve
     # Never fetch more feed candidates than can be persisted in this tick (#293).
-    # Preserve the total tick cap and the non-browser reservation.
-    rss_feeds, rss_feed_depth = _rss_window(max_feeds, rss_limit, per_source_limit)
+    # Preserve the total tick cap and the non-browser reservation. The RSS depth stays the
+    # declared five: it is a budget-shaped quantity, not the platform polling window (#441),
+    # so raising per_source_limit must not collapse the feed count to one.
+    rss_feeds, rss_feed_depth = _rss_window(max_feeds, rss_limit)
     rss = run_phase1_rss(
         settings,
         study_config=study_config,
@@ -794,7 +804,8 @@ def run_phase1_laskin(
     }
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_arg_parser() -> argparse.ArgumentParser:
+    """The CLI surface, extracted so the defaults are testable (#441)."""
     parser = argparse.ArgumentParser(prog="laclaugpt-ai26-laskin")
     parser.add_argument("--study-config", required=True)
     parser.add_argument("--source-manifest", required=True)
@@ -803,7 +814,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-feeds", type=int, default=8)
 
     parser.add_argument("--max-jobs", type=int, default=6)
-    parser.add_argument("--per-source-limit", type=int, default=5)
+    parser.add_argument("--per-source-limit", type=int, default=50)
     parser.add_argument("--limit", type=int, default=40)
     # Three-state deliberately: `store_true` would make an ABSENT flag pass
     # False and thereby force the caps OFF, silently overriding a study that
@@ -846,6 +857,11 @@ def main(argv: list[str] | None = None) -> int:
         default=1800,
         help="lease length for claimed jobs; must exceed one collection cycle",
     )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_arg_parser()
     args = parser.parse_args(argv)
 
     settings = Settings()
