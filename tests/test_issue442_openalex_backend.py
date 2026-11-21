@@ -109,3 +109,15 @@ def test_an_openalex_only_manifest_does_not_demand_the_arxiv_package():
     jobs = [{"kind": "scholarly_query", "name": "left_techno_optimism",
              "services": ["openalex"]}]
     assert preflight_optional_dependencies(jobs) == []
+
+
+def test_a_scholarly_job_that_names_no_backend_keeps_the_arxiv_requirement(monkeypatch):
+    """Silence about the backend is not a claim that arXiv is unused."""
+    monkeypatch.setattr(
+        "laclaugpt_data_collection.ai26_laskin_runner.importlib.util.find_spec",
+        lambda _name: None,
+    )
+    errors = preflight_optional_dependencies(
+        [{"kind": "scholarly_query", "name": "frontier_ai_safety"}]
+    )
+    assert any("'documents'" in error for error in errors)

@@ -81,24 +81,27 @@ class SourceJobError(RuntimeError):
 def preflight_optional_dependencies(jobs: list[dict[str, Any]]) -> list[str]:
     """Return loud setup errors for configured job kinds missing optional packages."""
     configured: dict[str, list[str]] = {}
-    arxiv_configured = False
+    needs_arxiv = False
     for row in jobs:
         kind = str(row.get("kind") or "")
         if kind in _OPTIONAL_DEPENDENCY_CONTRACT:
             configured.setdefault(kind, []).append(str(row.get("name") or "unnamed"))
             if kind == "scholarly_query":
                 services = {str(v).lower() for v in row.get("services") or []}
-                arxiv_configured = arxiv_configured or "arxiv" in services
+                # A job that names no backend at all keeps the historical requirement:
+                # nothing says it will not fall through to the arXiv path.
+                if not services or "arxiv" in services:
+                    needs_arxiv = True
 
     errors: list[str] = []
     for kind, names in sorted(configured.items()):
         extra, modules = _OPTIONAL_DEPENDENCY_CONTRACT[kind]
         required = modules
         if kind == "scholarly_query":
-            # Only the arXiv backend needs the 'documents' extra; the OpenAlex
-            # backend is stdlib HTTP, so a manifest that declares openalex alone
-            # must not be blocked by a missing arxiv package (#442).
-            required = tuple(m for m in modules if m == "arxiv" and arxiv_configured)
+            # Only the arXiv backend needs the 'documents' extra; the OpenAlex backend is
+            # stdlib HTTP, so a manifest that declares openalex alone must not be blocked
+            # by a package it does not use (#442).
+            required = tuple(m for m in modules if m == "arxiv" and needs_arxiv)
             if not required:
                 continue
         missing = [module for module in required if importlib.util.find_spec(module) is None]
