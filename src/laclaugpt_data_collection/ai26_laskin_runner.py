@@ -802,13 +802,26 @@ def run_phase1_laskin(
         # actually used. A clipped burst is then visible in the log as a window, not as a mystery.
         "per_source_limit": per_source_limit,
         "rss_allocation": rss_limit,
+        # #458: this is a RECORD budget, never a job count. A worker claiming
+        # six jobs can fill it after four five-record sources; this is not idle capacity.
+        "budget_unit": "records",
         "non_browser_reserved": non_browser_reserve,
+        "non_browser_full_source_windows": non_browser_reserve // per_source_limit,
         "rss_synced": int(rss.get("records_synced", 0)),
         "non_browser_synced": synced,
+        "non_browser_records_remaining": max(remaining - synced, 0),
         "unused": max(limit - int(rss.get("records_synced", 0)) - synced, 0),
+        "unused_unit": "records",
         "jobs_admitted": [o["name"] for o in source_outcomes if o["reason"] != "tick_record_limit"],
         "jobs_deferred": [o["name"] for o in source_outcomes if o["reason"] == "tick_record_limit"],
         "deferred_jobs_tick_limit": deferred_by_tick_limit,
+        "jobs_claimed": len(jobs),
+        "claimable_jobs_after_claim": claimable_not_claimed,
+        # The dispatcher owns lease scheduling; its claimable count is not a
+        # deterministic round-robin position and cannot yield an honest ETA.
+        "next_claim_eta_cycles": None if dispatch is not None else (
+            (len(all_jobs) + max_jobs - 1) // max_jobs if all_jobs else 0
+        ),
         "rotation": rotation,
         # #293: what the RSS window actually was and which feeds it polled. The
         # rotation is a position in the priority-ordered manifest; the window is
