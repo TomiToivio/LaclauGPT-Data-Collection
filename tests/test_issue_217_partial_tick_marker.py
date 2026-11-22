@@ -33,7 +33,7 @@ def _setup_checkout(tmp_path: Path) -> tuple[Path, dict[str, str]]:
     stub.write_text(
         "#!/bin/bash\n"
         'printf "%s\\n" "$@" >> "$RUNNER_CALL_LOG"\n'
-        '[[ "$1" == *check_ai26_runtime.py ]] && exit 0\n'
+        '[[ "$1" == *check_ai26_runtime.py ]] && { echo \'{"stale":false,"blocking":false,"status":"in_sync"}\'; exit 0; }\n'
         'exit "${STUB_RUNNER_STATUS:-0}"\n',
         encoding="utf-8",
     )

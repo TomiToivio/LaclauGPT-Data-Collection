@@ -44,12 +44,17 @@ def test_a_substantive_text_is_detected_so_the_marker_is_not_written():
     assert method != "insufficient_text"
 
 
-def test_the_runner_records_the_abstention_and_its_reason():
-    """The marker is written on the path that finalises a record before storage."""
-    import inspect
+def test_the_shared_stamp_records_an_abstention_and_no_language():
+    """main's stamp_language_status is the single writer of these keys; assert its contract."""
+    from types import SimpleNamespace
 
-    from laclaugpt_data_collection import ai26_laskin_runner
+    from laclaugpt_data_collection.language import stamp_language_status
 
-    source = inspect.getsource(ai26_laskin_runner)
-    assert '"language_status"] = "undetermined"' in source
-    assert '"language_reason"' in source
+    record = SimpleNamespace(
+        source=SimpleNamespace(language="", raw_metadata={}),
+        provenance=[],
+    )
+    stamp_language_status(record)
+    assert record.source.raw_metadata["language_status"] == "undetermined"
+    assert record.source.raw_metadata["language_reason"]
+    assert record.source.language == "", "a blank language must stay blank"
