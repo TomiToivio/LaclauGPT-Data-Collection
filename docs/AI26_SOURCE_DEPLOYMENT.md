@@ -59,6 +59,28 @@ Guards, so a deployment cannot silently drop coverage:
 > helper reports that as a removal because the identity key includes the kind. The
 > source is not lost.
 
+## Canonical roster and recovery (#456)
+
+The **tracked** `configs/studies/ai26.sources.example.toml` is the public audited
+source roster. The live `data/config/ai26.sources.toml` remains an ignored,
+recoverable deployment copy, **not** a second source of truth. Do not edit it to
+introduce lasting source additions without first auditing those rows in Git.
+If a host is lost, redeploy from the tracked plan using the dry-run and guarded
+apply steps above; preserve any separate private-only source overlays in the
+private configuration repository, not in this public checkout. No host-only
+roster is guaranteed to be recoverable without such an audit.
+
+On 2026-11-22 issue #456 recorded two intentionally deployed but unaudited
+Network School `web_source` rows. Those are now declared in the tracked plan:
+`https://ns.com/podcast` and `https://ns.com/podcast/roy` (text-first; no
+media downloads). **Before applying on Laskin**, compare the two live rows to
+the audited metadata (particularly `arena`, `priority`, and `transcript`),
+review the full diff, and keep the live configuration backed up. This repository
+change does not itself change the currently running host. After deployment,
+run `manifest-drift --fail-on-drift` against the two actual files and confirm
+`in_sync: true` in a new cycle log. Any remaining drift is an unresolved
+sampling or deployment decision, not permission to suppress the alarm.
+
 ## Recommended cadence
 
 Redeploy **whenever `configs/studies/ai26.sources.example.toml` changes** — the
