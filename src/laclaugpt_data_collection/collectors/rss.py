@@ -4,8 +4,14 @@ from __future__ import annotations
 import hashlib
 from typing import Any
 
+from ..extraction.html import extract_visible_text
 from ..models import CollectionProvenance, NormalizedRecord
 from .base import CollectionResult
+
+# A feed that ships full article bodies is a legitimate full-text source, but one
+# pathological feed must not store a book. The cap is deliberately far above any real
+# article; when it bites, `metadata.text_truncated` says so (#450).
+MAX_FEED_TEXT_CHARS = 200_000
 
 
 class RSSCollector:
@@ -96,20 +102,31 @@ def _entry_to_record(feed_url: str, entry: Any, *, feed_language: str = "") -> N
         publisher_name = str(syndication.get("title") or "")
     from ..language import resolve_language
 
-    # Prefer full publisher-provided article content to a short RSS excerpt
-    # when detecting language. Preserve source declarations and stored text.
+    # Prefer full publisher-provided article content to a short RSS excerpt (#450): a
+    # feed that ships the article body is a legitimate full-text source, and storing only
+    # its summary would silently make an excerpt look like the article. The body arrives as
+    # HTML, so it is reduced to visible text before it becomes record text.
     parts = getattr(entry, "content", None) or []
-    full_text = "\n\n".join(
+    raw_body = "\n\n".join(
         str(part.get("value") or "") for part in parts if hasattr(part, "get")
     )
+    body = extract_visible_text(raw_body).text.strip() if raw_body.strip() else ""
     excerpt = "\n\n".join(part for part in (title, summary) if part)
+    use_body = len(body) > len(excerpt)
+    richest = body if use_body else excerpt
     language, language_method = resolve_language(
-        max((excerpt, full_text), key=len),
+        richest,
         declared=str(getattr(entry, "language", "") or feed_language),
     )
+    text = richest[:MAX_FEED_TEXT_CHARS]
     metadata: dict[str, Any] = {
         "source_publication_time_present": bool(published),
         "language_method": language_method,
+        # Which text this record carries, and whether the cap bit. Without these a
+        # truncated record is indistinguishable from a complete one.
+        "text_source": "feed-content" if use_body else "feed-excerpt",
+        "text_chars": len(text),
+        "text_truncated": len(richest) > len(text),
     }
     if publisher_url or publisher_name:
         metadata["publisher_url"] = publisher_url
@@ -121,14 +138,15 @@ def _entry_to_record(feed_url: str, entry: Any, *, feed_language: str = "") -> N
         language=language,
         timestamp=published,
         source_url=link,
-        text="\n\n".join(part for part in (title, summary) if part),
+        text=text,
         raw_payload=raw_entry,
         raw_content_type="application/feed+json",
         collection_provenance=CollectionProvenance(
             module="rss-feedparser",
             visited_url=feed_url,
             api_url=link,
-            transformations=["rss-atom-parse", "map-entry"],
+            transformations=["rss-atom-parse", "map-entry"]
+            + (["feed-content-to-text"] if use_body else []),
             metadata=metadata,
         ),
     )
