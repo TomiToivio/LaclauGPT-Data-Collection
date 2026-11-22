@@ -91,10 +91,20 @@ if [[ -n "${LACLAUGPT_RUNTIME_EXTRA_CHECKOUTS:-}" ]]; then
     [[ -n "$checkout" ]] && RUNTIME_CHECK+=(--checkout "$checkout")
   done < <(printf '%s\\n' "${LACLAUGPT_RUNTIME_EXTRA_CHECKOUTS//:/$'\\n'}")
 fi
-if ! "${RUNTIME_CHECK[@]}" 2>&1; then
-  echo "[$(date -Is)] AI26 runtime verification failed; collection stopped" >&2
+# Preserve the machine-readable verdict in every actual cycle summary.
+# A checked-out schema change or an unverifiable runtime fails closed; harmless
+# source-manifest / non-schema drift remains visible and may collect.
+set +e
+runtime_json=$("${RUNTIME_CHECK[@]}" --json)
+runtime_check_status=$?
+set -e
+if [[ "$runtime_check_status" -gt 1 ]] || [[ -z "$runtime_json" ]]; then
+  echo "[$(date -Is)] AI26 runtime verification failed closed; collection stopped" >&2
   exit 2
 fi
+printf '%s\n' "$runtime_json"
+export LACLAUGPT_AI26_RUNTIME_VERDICT_JSON="$runtime_json"
+
 # #401: read-only Mongo capture provenance check. Laskin is not an X producer.
 # A stale/missing capture must be visible but must not block non-browser ingestion.
 if [[ -x "$ROOT_DIR/.venv/bin/python" ]]; then

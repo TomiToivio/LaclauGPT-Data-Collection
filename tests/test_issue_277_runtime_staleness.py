@@ -81,7 +81,7 @@ def test_matching_config_is_in_sync(root: Path, repo: Path) -> None:
     result = run("--root", str(root), "--checkout", str(repo))
 
     assert result.returncode == 0, result.stdout
-    assert "runtime result: in sync" in result.stdout
+    assert "runtime result: in_sync" in result.stdout
 
 
 def test_drifted_config_is_stale_and_names_both_digests(root: Path, repo: Path) -> None:
@@ -90,7 +90,7 @@ def test_drifted_config_is_stale_and_names_both_digests(root: Path, repo: Path) 
 
     result = run("--root", str(root), "--checkout", str(repo))
 
-    assert result.returncode == 1
+    assert result.returncode == 2
     assert "ai26.sources.toml" in result.stdout
     assert "drift: tracked" in result.stdout and "!= deployed" in result.stdout
 
@@ -100,14 +100,14 @@ def test_undeployed_config_is_stale_rather_than_an_error(root: Path, repo: Path)
 
     result = run("--root", str(root), "--checkout", str(repo))
 
-    assert result.returncode == 1
+    assert result.returncode == 2
     assert "not deployed" in result.stdout
 
 
 def test_missing_tracked_config_is_reported(root: Path, repo: Path) -> None:
     result = run("--root", str(root), "--checkout", str(repo))
 
-    assert result.returncode == 1
+    assert result.returncode == 2
     assert "tracked file is missing" in result.stdout
 
 
@@ -116,7 +116,7 @@ def test_missing_tracked_config_is_reported(root: Path, repo: Path) -> None:
 def test_checkout_behind_origin_main_reports_the_exact_lag(root: Path, checkout: Path) -> None:
     result = run("--root", str(root), "--checkout", str(checkout))
 
-    assert result.returncode == 1
+    assert result.returncode == 2
     assert "2 commit(s) behind origin/main" in result.stdout
 
 
@@ -130,7 +130,7 @@ def test_clean_checkout_at_origin_main_is_in_sync(root: Path, checkout: Path) ->
     result = run("--root", str(root), "--checkout", str(checkout))
 
     assert result.returncode == 0, result.stdout
-    assert "runtime result: in sync" in result.stdout
+    assert "runtime result: in_sync" in result.stdout
 
 
 def test_uncommitted_operator_changes_are_visible_and_do_not_hide_the_lag(
@@ -140,7 +140,7 @@ def test_uncommitted_operator_changes_are_visible_and_do_not_hide_the_lag(
 
     result = run("--root", str(root), "--checkout", str(checkout))
 
-    assert result.returncode == 1
+    assert result.returncode == 2
     assert "uncommitted path(s)" in result.stdout
     assert "behind origin/main" in result.stdout
 
@@ -148,14 +148,14 @@ def test_uncommitted_operator_changes_are_visible_and_do_not_hide_the_lag(
 def test_non_checkout_is_reported_not_crashed(root: Path, tmp_path: Path) -> None:
     result = run("--root", str(root), "--checkout", str(tmp_path / "elsewhere"))
 
-    assert result.returncode == 1
+    assert result.returncode == 2
     assert "not a Git checkout" in result.stdout
 
 
 def test_several_checkouts_can_be_checked_in_one_call(root: Path, repo: Path, checkout: Path) -> None:
     result = run("--root", str(root), "--checkout", str(checkout), "--checkout", str(repo))
 
-    assert result.returncode == 1
+    assert result.returncode == 2
     assert f"code ({checkout.name})" in result.stdout
     assert f"code ({repo.name})" in result.stdout
 
@@ -166,7 +166,7 @@ def test_json_output_is_machine_readable(root: Path, repo: Path) -> None:
     result = run("--root", str(root), "--json")
 
     payload = json.loads(result.stdout)
-    assert result.returncode == 1
+    assert result.returncode == 2
     assert payload["stale"] is True
     assert {finding["name"] for finding in payload["findings"]} >= {"ai26.sources.toml", "ai26.yaml"}
 
@@ -199,7 +199,7 @@ def test_the_collect_wrapper_reports_drift_without_applying_it() -> None:
     wrapper = (ROOT / "scripts" / "run_ai26_laskin_collect.sh").read_text(encoding="utf-8")
 
     assert "check_ai26_runtime.py" in wrapper
-    assert "if ! \"${RUNTIME_CHECK[@]}\"" in wrapper, "the check must be guarded, or set -e aborts the cycle"
+    assert 'runtime_json=$("${RUNTIME_CHECK[@]}" --json)' in wrapper, "read the runtime verdict before collection"
     assert "--fetch" in wrapper
     assert "collection stopped" in wrapper
     assert "--apply" not in wrapper

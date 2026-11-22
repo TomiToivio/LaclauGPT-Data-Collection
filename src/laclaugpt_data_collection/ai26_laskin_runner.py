@@ -285,6 +285,9 @@ def _stamp(record: CanonicalRecord, row: dict[str, Any], *, collection_id: str, 
         if detected:
             record.source.language = detected
             record.source.raw_metadata["language_method"] = method
+    from .language import stamp_language_status
+
+    stamp_language_status(record)
     record.refresh_human_readable()
     return record
 
@@ -647,6 +650,7 @@ def run_phase1_laskin(
     else:
         jobs = select_job_window(all_jobs, max_jobs=max_jobs, rotation=rotation * max_jobs)
     synced = 0
+    undetermined_non_browser = 0
     collected = 0
     skipped_before_floor = 0
     warnings = list(rss.get("warnings") or [])
@@ -735,6 +739,8 @@ def run_phase1_laskin(
                     continue
                 _, record_created = sink.ingest_with_status(payload)
                 synced += 1
+                if record.source.raw_metadata.get("language_status") == "undetermined":
+                    undetermined_non_browser += 1
                 outcome["records_synced"] += 1
                 if record_created:
                     created += 1
@@ -796,6 +802,8 @@ def run_phase1_laskin(
         except Exception as exc:  # noqa: BLE001 - a report must not fail the cycle
             manifest_drift = {"in_sync": None, "error": str(exc)[:180]}
 
+    # Count actual successfully stored records, rather than warning strings that
+    # may include records rejected by date floors or sampling budgets.
     tick_budget = {
         "limit": limit,
         # #441: the per-source sampling window is a decision, so each cycle records the value it
@@ -874,6 +882,8 @@ def run_phase1_laskin(
         "source_budget": (budget.summary() if budget is not None else None),
         "deferred_by_source_budget": deferred_by_budget,
         "manifest_drift": manifest_drift,
+        "runtime_drift": json.loads(os.environ.get("LACLAUGPT_AI26_RUNTIME_VERDICT_JSON") or "null"),
+        "language_undetermined_stored": int(rss.get("language_undetermined_stored", 0)) + undetermined_non_browser,
         "notification_errors": list(rss.get("notification_errors") or []) + list(sink.notification_errors),
     }
 
