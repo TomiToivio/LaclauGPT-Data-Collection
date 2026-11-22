@@ -21,6 +21,31 @@ This file is the canonical shared contract. Agent-specific files such as `CLAUDE
 Keep this repository limited to data collection: source/browser/network capture, platform parsers, normalization, provenance, collection state, media/raw persistence, scheduling, and storage adapters. Analysis, dashboards, simulations and other module responsibilities belong elsewhere.
 
 
+## AI26 text-first collection directive (issue #450, 2026-11-22)
+
+**Until Tomi explicitly reauthorizes multimodal collection, AI26 is TEXT ONLY.**
+Do not fetch, download, capture, persist, queue for download, or upload audio,
+video, images, or other media binaries on AI26 workers. Existing AI26 Laskin
+and localhost media cron launchers intentionally exit as no-ops. Do not
+reactivate the media stage to work around quota errors.
+
+**Prioritize substantial original text**: complete blog posts, long-form essays,
+newsletters, policy/technical publications and available podcast transcripts.
+For podcasts and videos, collect *existing text transcripts* and provenance,
+not audio/video bytes; do not automatically download audio to create transcripts.
+Do not confuse a short RSS excerpt with the full article. Retain source URLs,
+authors, publication dates, language, collection provenance and valid canonical
+text-only records. Remain within study sampling, copyright/access and privacy
+constraints; don't bypass paywalls or fabricate transcripts.
+
+Preserve multimodal interfaces and historical code for future work, but make
+media downloads opt-in only after a separately documented policy decision.
+S3 quota recovery is an infrastructure task, **not a reason to restart media**.
+Where canonical text/raw persistence requires the object store, separate
+text-storage failures from optional media and do not silently drop required
+reproducibility/provenance. Validate on deployed machines before declaring
+quota/analysis integration solved.
+
 ## AI26 active pipeline scope
 
 **This repository's `main` branch contains the continuous AI26 implementation.**
