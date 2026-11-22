@@ -81,7 +81,7 @@ def test_matching_config_is_in_sync(root: Path, repo: Path) -> None:
     result = run("--root", str(root), "--checkout", str(repo))
 
     assert result.returncode == 0, result.stdout
-    assert "runtime result: in sync" in result.stdout
+    assert "runtime result: in_sync" in result.stdout
 
 
 def test_drifted_config_is_stale_and_names_both_digests(root: Path, repo: Path) -> None:
@@ -90,7 +90,7 @@ def test_drifted_config_is_stale_and_names_both_digests(root: Path, repo: Path) 
 
     result = run("--root", str(root), "--checkout", str(repo))
 
-    assert result.returncode == 1
+    assert result.returncode == 2
     assert "ai26.sources.toml" in result.stdout
     assert "drift: tracked" in result.stdout and "!= deployed" in result.stdout
 
@@ -100,14 +100,14 @@ def test_undeployed_config_is_stale_rather_than_an_error(root: Path, repo: Path)
 
     result = run("--root", str(root), "--checkout", str(repo))
 
-    assert result.returncode == 1
+    assert result.returncode == 2
     assert "not deployed" in result.stdout
 
 
 def test_missing_tracked_config_is_reported(root: Path, repo: Path) -> None:
     result = run("--root", str(root), "--checkout", str(repo))
 
-    assert result.returncode == 1
+    assert result.returncode == 2
     assert "tracked file is missing" in result.stdout
 
 
@@ -116,7 +116,7 @@ def test_missing_tracked_config_is_reported(root: Path, repo: Path) -> None:
 def test_checkout_behind_origin_main_reports_the_exact_lag(root: Path, checkout: Path) -> None:
     result = run("--root", str(root), "--checkout", str(checkout))
 
-    assert result.returncode == 1
+    assert result.returncode == 2
     assert "2 commit(s) behind origin/main" in result.stdout
 
 
@@ -130,7 +130,7 @@ def test_clean_checkout_at_origin_main_is_in_sync(root: Path, checkout: Path) ->
     result = run("--root", str(root), "--checkout", str(checkout))
 
     assert result.returncode == 0, result.stdout
-    assert "runtime result: in sync" in result.stdout
+    assert "runtime result: in_sync" in result.stdout
 
 
 def test_uncommitted_operator_changes_are_visible_and_do_not_hide_the_lag(
@@ -140,7 +140,7 @@ def test_uncommitted_operator_changes_are_visible_and_do_not_hide_the_lag(
 
     result = run("--root", str(root), "--checkout", str(checkout))
 
-    assert result.returncode == 1
+    assert result.returncode == 2
     assert "uncommitted path(s)" in result.stdout
     assert "behind origin/main" in result.stdout
 
@@ -148,14 +148,14 @@ def test_uncommitted_operator_changes_are_visible_and_do_not_hide_the_lag(
 def test_non_checkout_is_reported_not_crashed(root: Path, tmp_path: Path) -> None:
     result = run("--root", str(root), "--checkout", str(tmp_path / "elsewhere"))
 
-    assert result.returncode == 1
+    assert result.returncode == 2
     assert "not a Git checkout" in result.stdout
 
 
 def test_several_checkouts_can_be_checked_in_one_call(root: Path, repo: Path, checkout: Path) -> None:
     result = run("--root", str(root), "--checkout", str(checkout), "--checkout", str(repo))
 
-    assert result.returncode == 1
+    assert result.returncode == 2
     assert f"code ({checkout.name})" in result.stdout
     assert f"code ({repo.name})" in result.stdout
 
@@ -166,7 +166,7 @@ def test_json_output_is_machine_readable(root: Path, repo: Path) -> None:
     result = run("--root", str(root), "--json")
 
     payload = json.loads(result.stdout)
-    assert result.returncode == 1
+    assert result.returncode == 2
     assert payload["stale"] is True
     assert {finding["name"] for finding in payload["findings"]} >= {"ai26.sources.toml", "ai26.yaml"}
 
@@ -195,21 +195,13 @@ def test_a_sibling_checkout_without_the_package_is_not_called_stale(
 
 
 def test_the_collect_wrapper_reports_drift_without_applying_it() -> None:
-    """The hourly stage reports a stale runtime; it must never fetch, apply or migrate one.
-
-    #277 said "reported, never enforced". #457 refines that: a drift that can change the
-    shape of a stored record is fail-closed, because collecting old-shaped records is not a
-    smaller problem than collecting late. The read-only half of the contract is unchanged --
-    the check still writes nothing, and the wrapper still never applies or migrates.
-    """
+    """The hourly stage may report a stale runtime; it must never enforce or fetch one."""
     wrapper = (ROOT / "scripts" / "run_ai26_laskin_collect.sh").read_text(encoding="utf-8")
 
     assert "check_ai26_runtime.py" in wrapper
-    assert "LACLAUGPT_RUNTIME_DRIFT_JSON" in wrapper, "the verdict must reach the cycle summary"
-    assert "RUNTIME_CHECK_FAILED" in wrapper, "a check that cannot run must not look compatible"
+    assert 'runtime_json=$("${RUNTIME_CHECK[@]}" --json)' in wrapper, "read the runtime verdict before collection"
     assert "--fetch" in wrapper
     assert "collection stopped" in wrapper
-    assert "exit 78" in wrapper, "schema-affecting drift is fail-closed (#457)"
     assert "--apply" not in wrapper
 
 
@@ -224,3 +216,80 @@ def test_the_check_writes_nothing(root: Path, checkout: Path) -> None:
     after = {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
     assert after == before
     assert sorted(item.name for item in checkout.iterdir()) == before_checkout
+
+
+# ---------------------------------------------------------------- #457 safe/unsafe drift
+
+def _sync_synthetic_configs(root: Path) -> None:
+    """Give the gate matching private config so only code drift is at issue."""
+    for tracked, deployed, contents in (
+        ("configs/studies/ai26.sources.example.toml",
+         "data/config/ai26.sources.toml", b"[[feed]]\nname = 'synthetic'\n"),
+        ("configs/studies/ai26.example.yaml",
+         "data/config/ai26.yaml", b"project: ai26\n"),
+    ):
+        (root / tracked).write_bytes(contents)
+        (root / deployed).write_bytes(contents)
+
+
+def _one_upstream_change(repo: Path, path: str) -> None:
+    """Create an upstream-only commit, then restore the old deployed HEAD."""
+    target = repo / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("synthetic upstream update\n", encoding="utf-8")
+    git("add", path, cwd=repo)
+    git("commit", "--quiet", "-m", "upstream-only fixture", cwd=repo)
+    git("update-ref", "refs/remotes/origin/main", "HEAD", cwd=repo)
+    git("reset", "--quiet", "--hard", "HEAD~1", cwd=repo)
+
+
+def test_457_ordinary_upstream_change_is_compatible(root: Path, repo: Path) -> None:
+    _sync_synthetic_configs(root)
+    _one_upstream_change(repo, "docs/synthetic-release-note.md")
+    result = run("--root", str(root), "--checkout", str(repo), "--json")
+    verdict = json.loads(result.stdout)
+    assert result.returncode == 1
+    assert verdict["status"] == "stale_compatible"
+    assert verdict["stale"] is True
+    assert verdict["blocking"] is False
+    assert verdict["schema_changed_paths"] == []
+
+
+@pytest.mark.parametrize(
+    "changed_path",
+    [
+        "src/laclaugpt_data_collection/models.py",
+        "src/laclaugpt_data_collection/canonical.py",
+        "src/laclaugpt_data_collection/analysis_schema_compat.py",
+        "schemas/research-record.schema.json",
+    ],
+)
+def test_457_schema_affecting_upstream_change_blocks(
+    root: Path, repo: Path, changed_path: str
+) -> None:
+    _sync_synthetic_configs(root)
+    _one_upstream_change(repo, changed_path)
+    result = run("--root", str(root), "--checkout", str(repo), "--json")
+    verdict = json.loads(result.stdout)
+    assert result.returncode == 2
+    assert verdict["status"] == "blocked"
+    assert verdict["blocking"] is True
+    assert verdict["schema_changed_paths"] == [f"{repo.name}/{changed_path}"]
+
+
+def test_457_source_manifest_drift_is_reported_but_does_not_block(
+    root: Path, repo: Path
+) -> None:
+    _sync_synthetic_configs(root)
+    (root / "data/config/ai26.sources.toml").write_text(
+        "[[feed]]\nname = 'different'\n", encoding="utf-8"
+    )
+    result = run("--root", str(root), "--checkout", str(repo), "--json")
+    verdict = json.loads(result.stdout)
+    assert result.returncode == 1
+    assert verdict["status"] == "stale_compatible"
+    assert verdict["blocking"] is False
+    assert any(
+        not item["ok"] and item["name"] == "ai26.sources.toml"
+        for item in verdict["findings"]
+    )

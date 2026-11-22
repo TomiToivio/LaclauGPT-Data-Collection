@@ -324,3 +324,27 @@ Endpoint access is configured once with CSC's `allas-conf`; in S3 mode it writes
 - The browser role binds to loopback only and remains researcher-controlled.
 - Only the collector host is scheduled. If unattended collection is wanted, it belongs there, not on the researcher host.
 - Never enable a browser/X collector on the collector host.
+
+## Interpreting the Laskin tick budget (#458)
+
+`tick_budget.limit`, `rss_allocation`, `non_browser_reserved`,
+`rss_synced`, `non_browser_synced`, and `unused` are **records**, not
+source jobs. For example, with a 40-record tick, 20 are allocated to RSS and
+20 reserved for non-browser records. Four sources returning five records each
+can use all 20 non-browser record slots, even if twenty more jobs remain
+claimable; this is **not** evidence of twenty unused job slots. The fields
+`budget_unit` and `unused_unit` explicitly say `records`.
+
+`non_browser_full_source_windows` is the number of entire
+`per_source_limit` windows fitting in the reserved record allocation, **not**
+a limit on the number of jobs that can be claimed. Sources returning fewer
+records leave capacity for later jobs. `non_browser_records_remaining` reports
+actual remaining record slots after the RSS pass and non-browser writes.
+`jobs_claimed` and `claimable_jobs_after_claim` measure job counts, a
+separate unit. `next_claim_eta_cycles` is deliberately null in distributed
+mode: Mongo queue leases, priorities, concurrent workers and eligibility make
+an exact time-to-next-claim unknowable from this worker's local tick.
+With local manifest rotation, it reports the nominal full-pass cycle count,
+not a guarantee of a successful fetch. Monitor claimable jobs across cycles
+and the queue's oldest eligible job to investigate actual starvation; never
+infer starvation solely from one cycle's unclaimed count.

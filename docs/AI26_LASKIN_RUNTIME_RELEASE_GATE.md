@@ -19,8 +19,12 @@ compare against the real remote instead of the local ref) or touches the databas
 Collection #277: the same class (#206 → #246 → #270) had been repaired by hand three times,
 and the check exists so the fourth time is a line in a log rather than an investigation.
 
-The hourly collector wrapper runs exactly this check, report-only, before each cycle, so a
-stale runtime is visible in the collection log without anyone looking for it. Extra
+Since Collection #457 (PR #464), the hourly wrapper uses the read-only check as a
+**schema-safety gate**, not merely report-only: compatible stale revisions may
+collect with their JSON verdict in the cycle summary; a schema-affecting or
+unverifiable runtime is blocked before collection. See
+[the #457/#459 verification checklist](AI26_457_459_RUNTIME_VERIFICATION.md)
+for the new acceptance criteria. Extra
 checkouts can be added with `LACLAUGPT_RUNTIME_EXTRA_CHECKOUTS` (colon-separated). Config
 drift is *reported* by that line; the two deploy tools below remain the only things that
 change a deployed config, and they stay dry-run-first.

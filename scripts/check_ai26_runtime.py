@@ -57,10 +57,6 @@ class Finding:
     name: str
     ok: bool
     detail: str
-    #: True when the checkout is behind on files that define the stored record shape.
-    #: #457: "stale but compatible" and "stale and writing an old schema" are not the
-    #: same risk, and only the second should stop a collection cycle.
-    schema_affecting: bool = False
 
     def line(self) -> str:
         return f"runtime {self.name:<24} {'ok' if self.ok else 'STALE':<6} {self.detail}"
@@ -178,26 +174,6 @@ def git(*args: str, cwd: Path) -> str:
     return result.stdout.strip() if result.returncode == 0 else ""
 
 
-#: A changed file whose name carries one of these defines what a stored record looks like.
-SCHEMA_HINTS: tuple[str, ...] = ("canonical", "model", "schema")
-
-PACKAGE = "src/laclaugpt_data_collection/"
-
-
-def schema_affecting_changes(checkout: Path, head: str, upstream: str) -> list[str]:
-    """Files between HEAD and origin/main that can change the stored record shape.
-
-    Name-based on purpose: it is the only signal available offline, it over-reports rather
-    than under-reports, and over-reporting means a cycle refuses to write -- which is the
-    safe direction for a schema question.
-    """
-    changed = git("diff", "--name-only", f"{head}..{upstream}", cwd=checkout).splitlines()
-    return sorted(
-        path for path in changed
-        if path.startswith(PACKAGE) and any(hint in Path(path).name.lower() for hint in SCHEMA_HINTS)
-    )
-
-
 def compare_checkout(name: str, checkout: Path, *, fetch: bool) -> Finding:
     """Compare a working checkout with its own ``origin/main``.
 
@@ -237,11 +213,11 @@ def compare_checkout(name: str, checkout: Path, *, fetch: bool) -> Finding:
         )
     if behind.strip() in ("", "0"):
         return Finding(name, True, f"{head} == origin/main {upstream}{suffix}")
-    schema_files = schema_affecting_changes(checkout, head, upstream)
-    detail = f"{behind.strip()} commit(s) behind origin/main (HEAD {head}, origin/main {upstream}){suffix}"
-    if schema_files:
-        detail += f"; SCHEMA-AFFECTING: {', '.join(schema_files)}"
-    return Finding(name, False, detail, schema_affecting=bool(schema_files))
+    return Finding(
+        name,
+        False,
+        f"{behind.strip()} commit(s) behind origin/main (HEAD {head}, origin/main {upstream}){suffix}",
+    )
 
 
 def compare_import_path(name: str, checkout: Path) -> Finding:
@@ -306,6 +282,59 @@ def compare_dependencies(
         )
     return Finding("dependencies", True, f"{len(imports)} declared import(s) present")
 
+#: Files whose upstream change can alter what a stored record means or how it validates.
+#: A checkout that is behind on any of these must not write records (#457). Everything else
+#: is coverage or behaviour drift: visible, but not a reason to stop collecting.
+SCHEMA_AFFECTING_PREFIXES = (
+    "src/laclaugpt_data_collection/canonical",
+    "src/laclaugpt_data_collection/models",
+    "src/laclaugpt_data_collection/analysis_schema_compat",
+    "schemas/",
+)
+
+# Cover newly introduced package files that name their schema responsibilities
+# without living under one of the established prefixes (#468).
+SCHEMA_FILENAME_HINTS = ("canonical", "model", "schema")
+
+
+def is_schema_affecting_path(path: str) -> bool:
+    if path.startswith(SCHEMA_AFFECTING_PREFIXES):
+        return True
+    if not path.startswith("src/laclaugpt_data_collection/"):
+        return False
+    return any(hint in Path(path).name.lower() for hint in SCHEMA_FILENAME_HINTS)
+
+
+def code_drift_blockers(findings: list[Finding], checkouts: list[Path]) -> tuple[list[str], list[str]]:
+    """Decide whether code drift blocks a write: ``(schema_paths, blocking_reasons)``.
+
+    Split out of :func:`main` so the decision can be tested against synthetic repositories
+    instead of by editing the live checkout (#457).
+    """
+    schema_paths: list[str] = []
+    blocking_reasons: list[str] = []
+    for checkout in checkouts:
+        label = f"code ({checkout.name})"
+        finding = next((f for f in findings if f.name == label), None)
+        if finding is None or finding.ok:
+            continue
+        if "commit(s) behind origin/main" not in finding.detail or "ahead" in finding.detail or "uncommitted" in finding.detail:
+            blocking_reasons.append(f"{label}: unverified checkout state")
+            continue
+        changed = git("diff", "--name-only", "HEAD..refs/remotes/origin/main", cwd=checkout)
+        if not changed:
+            blocking_reasons.append(f"{label}: cannot inspect changed files")
+            continue
+        affected = [
+            name for name in changed.splitlines()
+            if is_schema_affecting_path(name)
+        ]
+        if affected:
+            schema_paths.extend(f"{checkout.name}/{name}" for name in affected)
+            blocking_reasons.append(f"{label}: schema-affecting changes upstream")
+    return schema_paths, blocking_reasons
+
+
 def collect(root: Path, checkouts: list[Path], *, fetch: bool) -> list[Finding]:
     findings = [
         compare_config(name, root / tracked, root / deployed)
@@ -338,20 +367,29 @@ def main(argv: list[str] | None = None) -> int:
     findings = collect(root, checkouts, fetch=args.fetch)
     stale = [finding for finding in findings if not finding.ok]
 
+    # #457: distinguish an out-of-date but schema-compatible checkout from
+    # a checkout whose record-writing contract could have changed.
+    schema_paths, blocking_reasons = code_drift_blockers(findings, checkouts)
+    for finding in stale:
+        if finding.name.startswith("code ("):
+            continue
+        if finding.name != "ai26.sources.toml":
+            blocking_reasons.append(f"{finding.name}: {finding.detail}")
+    verdict = {
+        "stale": bool(stale),
+        "blocking": bool(blocking_reasons),
+        "blocking_reasons": blocking_reasons,
+        "schema_changed_paths": sorted(set(schema_paths)),
+        "status": "blocked" if blocking_reasons else ("stale_compatible" if stale else "in_sync"),
+        "findings": [dict(name=f.name, ok=f.ok, detail=f.detail) for f in findings],
+    }
     if args.json:
-        # #457: the wrapper needs to tell "stale but compatible" from "stale and writing an
-        # old schema", so the verdict carries both flags rather than a single boolean.
-        print(json.dumps({
-            "stale": bool(stale),
-            "schema_affecting": any(f.schema_affecting for f in findings),
-            "findings": [dict(name=f.name, ok=f.ok, detail=f.detail,
-                              schema_affecting=f.schema_affecting) for f in findings],
-        }, indent=2))
+        print(json.dumps(verdict, indent=2))
     else:
         for finding in findings:
             print(finding.line())
-        print(f"runtime result: {'STALE' if stale else 'in sync'} ({len(stale)} of {len(findings)} checks)")
-    return 1 if stale else 0
+        print(f"runtime result: {verdict['status']} ({len(stale)} of {len(findings)} checks)")
+    return 2 if blocking_reasons else (1 if stale else 0)
 
 
 if __name__ == "__main__":

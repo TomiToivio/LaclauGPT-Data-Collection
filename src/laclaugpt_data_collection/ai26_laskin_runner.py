@@ -285,6 +285,9 @@ def _stamp(record: CanonicalRecord, row: dict[str, Any], *, collection_id: str, 
         if detected:
             record.source.language = detected
             record.source.raw_metadata["language_method"] = method
+    from .language import stamp_language_status
+
+    stamp_language_status(record)
     record.refresh_human_readable()
     return record
 
@@ -647,6 +650,7 @@ def run_phase1_laskin(
     else:
         jobs = select_job_window(all_jobs, max_jobs=max_jobs, rotation=rotation * max_jobs)
     synced = 0
+    undetermined_non_browser = 0
     collected = 0
     skipped_before_floor = 0
     warnings = list(rss.get("warnings") or [])
@@ -735,6 +739,8 @@ def run_phase1_laskin(
                     continue
                 _, record_created = sink.ingest_with_status(payload)
                 synced += 1
+                if record.source.raw_metadata.get("language_status") == "undetermined":
+                    undetermined_non_browser += 1
                 outcome["records_synced"] += 1
                 if record_created:
                     created += 1
@@ -796,19 +802,34 @@ def run_phase1_laskin(
         except Exception as exc:  # noqa: BLE001 - a report must not fail the cycle
             manifest_drift = {"in_sync": None, "error": str(exc)[:180]}
 
+    # Count actual successfully stored records, rather than warning strings that
+    # may include records rejected by date floors or sampling budgets.
     tick_budget = {
         "limit": limit,
         # #441: the per-source sampling window is a decision, so each cycle records the value it
         # actually used. A clipped burst is then visible in the log as a window, not as a mystery.
         "per_source_limit": per_source_limit,
         "rss_allocation": rss_limit,
+        # #458: this is a RECORD budget, never a job count. A worker claiming
+        # six jobs can fill it after four five-record sources; this is not idle capacity.
+        "budget_unit": "records",
         "non_browser_reserved": non_browser_reserve,
+        "non_browser_full_source_windows": non_browser_reserve // per_source_limit,
         "rss_synced": int(rss.get("records_synced", 0)),
         "non_browser_synced": synced,
+        "non_browser_records_remaining": max(remaining - synced, 0),
         "unused": max(limit - int(rss.get("records_synced", 0)) - synced, 0),
+        "unused_unit": "records",
         "jobs_admitted": [o["name"] for o in source_outcomes if o["reason"] != "tick_record_limit"],
         "jobs_deferred": [o["name"] for o in source_outcomes if o["reason"] == "tick_record_limit"],
         "deferred_jobs_tick_limit": deferred_by_tick_limit,
+        "jobs_claimed": len(jobs),
+        "claimable_jobs_after_claim": claimable_not_claimed,
+        # The dispatcher owns lease scheduling; its claimable count is not a
+        # deterministic round-robin position and cannot yield an honest ETA.
+        "next_claim_eta_cycles": None if dispatch is not None else (
+            (len(all_jobs) + max_jobs - 1) // max_jobs if all_jobs else 0
+        ),
         "rotation": rotation,
         # #293: what the RSS window actually was and which feeds it polled. The
         # rotation is a position in the priority-ordered manifest; the window is
@@ -861,28 +882,10 @@ def run_phase1_laskin(
         "source_budget": (budget.summary() if budget is not None else None),
         "deferred_by_source_budget": deferred_by_budget,
         "manifest_drift": manifest_drift,
-        # #457: the drift verdict belongs in the summary, not only in the log preamble.
-        "runtime_drift": runtime_drift_verdict(),
+        "runtime_drift": json.loads(os.environ.get("LACLAUGPT_AI26_RUNTIME_VERDICT_JSON") or "null"),
+        "language_undetermined_stored": int(rss.get("language_undetermined_stored", 0)) + undetermined_non_browser,
         "notification_errors": list(rss.get("notification_errors") or []) + list(sink.notification_errors),
     }
-
-
-def runtime_drift_verdict(environment: dict[str, str] | None = None) -> dict[str, object] | None:
-    """The wrapper's runtime-check verdict, parsed for the cycle summary (#457).
-
-    The wrapper already knows whether the checkout is stale and whether the drift touches
-    the stored record shape; without carrying it into the summary that knowledge lives only
-    in a log preamble nobody can query next to ``records_new`` and ``errors``. Absent or
-    unparseable input returns ``None`` or an explicit verdict rather than a fabricated "ok".
-    """
-    raw = (environment if environment is not None else os.environ).get("LACLAUGPT_RUNTIME_DRIFT_JSON", "")
-    if not raw.strip():
-        return None
-    try:
-        parsed = json.loads(raw)
-    except (TypeError, ValueError):
-        return {"verdict": "unparseable"}
-    return parsed if isinstance(parsed, dict) else {"verdict": "unparseable"}
 
 
 def per_source_limit_default(environment: dict[str, str] | None = None) -> int:

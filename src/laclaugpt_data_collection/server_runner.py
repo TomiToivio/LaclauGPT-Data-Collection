@@ -208,6 +208,9 @@ def _stamp_source_metadata(
         if language_method:
             metadata["language_method"] = language_method
             metadata["language_declared_by"] = "manifest_row"
+    from .language import stamp_language_status
+
+    stamp_language_status(record)
     record.refresh_human_readable()
     return record
 
@@ -464,6 +467,7 @@ def run_phase1_rss(
 
     synced = 0
     created = 0
+    undetermined_stored = 0
     skipped_before_floor = 0
     errors: list[str] = []
     notification_errors: list[str] = []
@@ -508,6 +512,8 @@ def run_phase1_rss(
                 assert store is not None
                 record_created = store.upsert(record)
             synced += 1
+            if record.source.raw_metadata.get("language_status") == "undetermined":
+                undetermined_stored += 1
             if record_created:
                 created += 1
         except Exception as exc:  # noqa: BLE001
@@ -533,6 +539,7 @@ def run_phase1_rss(
         "feeds_polled_names": list(fetch.get("feeds_polled_names") or []),
         "records_collected": len(records),
         "records_synced": synced,
+        "language_undetermined_stored": undetermined_stored,
         "records_new": created,
         "records_updated": synced - created,
         "skipped_before_publication_floor": skipped_before_floor,

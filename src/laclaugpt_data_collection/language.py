@@ -121,6 +121,34 @@ def unlabelled_language_warning(records: Iterable[Any]) -> str | None:
     return message
 
 
+def stamp_language_status(record: Any) -> None:
+    """Persist an explicit language decision on the canonical source metadata.
+
+    A blank language remains blank; absence of evidence is not evidence of English.
+    This metadata is additive and does not alter the canonical schema version.
+    """
+    source = getattr(record, "source", None)
+    if source is None:
+        return
+    provenance = list(getattr(record, "provenance", []) or [])
+    method = _language_method(provenance)
+    if method == "unreported":
+        method = str(source.raw_metadata.get("language_method") or "unreported")
+    labelled = bool(str(source.language or "").strip())
+    source.raw_metadata["language_status"] = "determined" if labelled else "undetermined"
+    source.raw_metadata["language_reason"] = method
+    if labelled and method == "source_metadata":
+        source.raw_metadata["language_provenance"] = (
+            "manifest_row" if provenance and
+            _as_mapping(_as_mapping(provenance[-1]).get("metadata")).get("language_declared_by") == "manifest_row"
+            else "platform_or_feed_metadata"
+        )
+    elif labelled:
+        source.raw_metadata["language_provenance"] = "detector" if method == "detected_langdetect" else "other"
+    else:
+        source.raw_metadata["language_provenance"] = "abstained"
+
+
 def apply_declared_language(record: object, declared: str) -> str:
     """Fill an EMPTY ``source.language`` from a manifest-row declaration (#294).
 
