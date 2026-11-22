@@ -83,22 +83,17 @@ trap emit_end_marker EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 echo "[$(date -Is)] AI26 Laskin collection start"
-# Runtime staleness is *reported*, never enforced (Collection #277). A merge that the
-# running checkout does not contain is otherwise invisible: the two config copies and the
-# code checkout all drift silently, and the same class has now been repaired by hand three
-# times (#206, #246, #270). Read-only, no network, applies nothing, and it must never abort
-# the cycle: a stale runtime is a risk to flag, not a reason to stop collecting.
-# Extras are opt-in so an operator can have one hourly line cover sibling checkouts too:
-#   LACLAUGPT_RUNTIME_EXTRA_CHECKOUTS=/mnt/workspace/LaclauGPT-Data-Analysis:...
-RUNTIME_CHECK=("$ROOT_DIR/.venv/bin/python" "$ROOT_DIR/scripts/check_ai26_runtime.py" --root "$ROOT_DIR")
-[[ -x "${RUNTIME_CHECK[0]}" ]] || RUNTIME_CHECK=(python3 "$ROOT_DIR/scripts/check_ai26_runtime.py" --root "$ROOT_DIR")
+# Verify deployed code and configuration before acquisition starts.
+RUNTIME_CHECK=("$ROOT_DIR/.venv/bin/python" "$ROOT_DIR/scripts/check_ai26_runtime.py" --root "$ROOT_DIR" --checkout "$ROOT_DIR" --fetch)
+[[ -x "${RUNTIME_CHECK[0]}" ]] || RUNTIME_CHECK=(python3 "$ROOT_DIR/scripts/check_ai26_runtime.py" --root "$ROOT_DIR" --checkout "$ROOT_DIR" --fetch)
 if [[ -n "${LACLAUGPT_RUNTIME_EXTRA_CHECKOUTS:-}" ]]; then
   while IFS= read -r checkout; do
     [[ -n "$checkout" ]] && RUNTIME_CHECK+=(--checkout "$checkout")
   done < <(printf '%s\\n' "${LACLAUGPT_RUNTIME_EXTRA_CHECKOUTS//:/$'\\n'}")
 fi
 if ! "${RUNTIME_CHECK[@]}" 2>&1; then
-  echo "[$(date -Is)] AI26 runtime check reported drift (lines above); collecting anyway"
+  echo "[$(date -Is)] AI26 runtime verification failed; collection stopped" >&2
+  exit 2
 fi
 # #401: read-only Mongo capture provenance check. Laskin is not an X producer.
 # A stale/missing capture must be visible but must not block non-browser ingestion.
