@@ -50,6 +50,12 @@ def test_rss_resync_cannot_starve_non_browser_p1(monkeypatch, tmp_path: Path):
     assert result["non_browser_records_synced"] == 6
     assert result["records_synced"] == 26
     assert result["tick_budget"]["non_browser_reserved"] == 20
+    assert result["tick_budget"]["budget_unit"] == "records"
+    assert result["tick_budget"]["unused_unit"] == "records"
+    assert result["tick_budget"]["non_browser_full_source_windows"] == 4
+    assert result["tick_budget"]["non_browser_records_remaining"] == 14
+    assert result["tick_budget"]["jobs_claimed"] == 6
+    assert result["tick_budget"]["next_claim_eta_cycles"] == 1
     assert result["tick_budget"]["unused"] == 14
     assert result["tick_budget"]["jobs_admitted"] == attempted
     assert result["tick_budget"]["jobs_deferred"] == []
@@ -80,4 +86,7 @@ def test_zero_non_browser_jobs_preserves_full_rss_budget(monkeypatch, tmp_path: 
     )
     assert limits == [40]
     assert result["tick_budget"]["non_browser_reserved"] == 0
+    assert result["tick_budget"]["budget_unit"] == "records"
+    assert result["tick_budget"]["non_browser_full_source_windows"] == 0
+    assert result["tick_budget"]["next_claim_eta_cycles"] == 0
     assert result["records_synced"] == 40
