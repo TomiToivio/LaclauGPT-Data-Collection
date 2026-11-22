@@ -285,6 +285,17 @@ def _stamp(record: CanonicalRecord, row: dict[str, Any], *, collection_id: str, 
         if detected:
             record.source.language = detected
             record.source.raw_metadata["language_method"] = method
+        else:
+            # #459: "we could not tell" and "we never asked" must not look alike in
+            # the stored record. A record stored with an absent language is now an
+            # explicit, machine-readable abstention: analysis can exclude it
+            # knowingly instead of discovering the hole later, and the reason
+            # separates a mapping gap (unreported) from a correct refusal to guess
+            # on a short text (insufficient_text).
+            record.source.raw_metadata["language_status"] = "undetermined"
+            record.source.raw_metadata["language_reason"] = (
+                method or language_method or "unreported"
+            )
     record.refresh_human_readable()
     return record
 
