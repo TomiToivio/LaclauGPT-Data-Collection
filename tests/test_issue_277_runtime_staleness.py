@@ -216,3 +216,80 @@ def test_the_check_writes_nothing(root: Path, checkout: Path) -> None:
     after = {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
     assert after == before
     assert sorted(item.name for item in checkout.iterdir()) == before_checkout
+
+
+# ---------------------------------------------------------------- #457 safe/unsafe drift
+
+def _sync_synthetic_configs(root: Path) -> None:
+    """Give the gate matching private config so only code drift is at issue."""
+    for tracked, deployed, contents in (
+        ("configs/studies/ai26.sources.example.toml",
+         "data/config/ai26.sources.toml", b"[[feed]]\nname = 'synthetic'\n"),
+        ("configs/studies/ai26.example.yaml",
+         "data/config/ai26.yaml", b"project: ai26\n"),
+    ):
+        (root / tracked).write_bytes(contents)
+        (root / deployed).write_bytes(contents)
+
+
+def _one_upstream_change(repo: Path, path: str) -> None:
+    """Create an upstream-only commit, then restore the old deployed HEAD."""
+    target = repo / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("synthetic upstream update\n", encoding="utf-8")
+    git("add", path, cwd=repo)
+    git("commit", "--quiet", "-m", "upstream-only fixture", cwd=repo)
+    git("update-ref", "refs/remotes/origin/main", "HEAD", cwd=repo)
+    git("reset", "--quiet", "--hard", "HEAD~1", cwd=repo)
+
+
+def test_457_ordinary_upstream_change_is_compatible(root: Path, repo: Path) -> None:
+    _sync_synthetic_configs(root)
+    _one_upstream_change(repo, "docs/synthetic-release-note.md")
+    result = run("--root", str(root), "--checkout", str(repo), "--json")
+    verdict = json.loads(result.stdout)
+    assert result.returncode == 1
+    assert verdict["status"] == "stale_compatible"
+    assert verdict["stale"] is True
+    assert verdict["blocking"] is False
+    assert verdict["schema_changed_paths"] == []
+
+
+@pytest.mark.parametrize(
+    "changed_path",
+    [
+        "src/laclaugpt_data_collection/models.py",
+        "src/laclaugpt_data_collection/canonical.py",
+        "src/laclaugpt_data_collection/analysis_schema_compat.py",
+        "schemas/research-record.schema.json",
+    ],
+)
+def test_457_schema_affecting_upstream_change_blocks(
+    root: Path, repo: Path, changed_path: str
+) -> None:
+    _sync_synthetic_configs(root)
+    _one_upstream_change(repo, changed_path)
+    result = run("--root", str(root), "--checkout", str(repo), "--json")
+    verdict = json.loads(result.stdout)
+    assert result.returncode == 2
+    assert verdict["status"] == "blocked"
+    assert verdict["blocking"] is True
+    assert verdict["schema_changed_paths"] == [f"{repo.name}/{changed_path}"]
+
+
+def test_457_source_manifest_drift_is_reported_but_does_not_block(
+    root: Path, repo: Path
+) -> None:
+    _sync_synthetic_configs(root)
+    (root / "data/config/ai26.sources.toml").write_text(
+        "[[feed]]\nname = 'different'\n", encoding="utf-8"
+    )
+    result = run("--root", str(root), "--checkout", str(repo), "--json")
+    verdict = json.loads(result.stdout)
+    assert result.returncode == 1
+    assert verdict["status"] == "stale_compatible"
+    assert verdict["blocking"] is False
+    assert any(
+        not item["ok"] and item["name"] == "ai26.sources.toml"
+        for item in verdict["findings"]
+    )
