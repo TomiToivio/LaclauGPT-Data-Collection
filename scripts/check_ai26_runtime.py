@@ -292,6 +292,18 @@ SCHEMA_AFFECTING_PREFIXES = (
     "schemas/",
 )
 
+# Cover newly introduced package files that name their schema responsibilities
+# without living under one of the established prefixes (#468).
+SCHEMA_FILENAME_HINTS = ("canonical", "model", "schema")
+
+
+def is_schema_affecting_path(path: str) -> bool:
+    if path.startswith(SCHEMA_AFFECTING_PREFIXES):
+        return True
+    if not path.startswith("src/laclaugpt_data_collection/"):
+        return False
+    return any(hint in Path(path).name.lower() for hint in SCHEMA_FILENAME_HINTS)
+
 
 def code_drift_blockers(findings: list[Finding], checkouts: list[Path]) -> tuple[list[str], list[str]]:
     """Decide whether code drift blocks a write: ``(schema_paths, blocking_reasons)``.
@@ -315,7 +327,7 @@ def code_drift_blockers(findings: list[Finding], checkouts: list[Path]) -> tuple
             continue
         affected = [
             name for name in changed.splitlines()
-            if name.startswith(SCHEMA_AFFECTING_PREFIXES)
+            if is_schema_affecting_path(name)
         ]
         if affected:
             schema_paths.extend(f"{checkout.name}/{name}" for name in affected)
