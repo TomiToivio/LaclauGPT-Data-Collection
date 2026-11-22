@@ -24,6 +24,7 @@ from .collectors.arxiv import ArxivCollector
 from .collectors.bluesky import BlueskyCollector
 from .collectors.mastodon import MastodonCollectionError, MastodonCollector
 from .collectors.openalex import OpenAlexCollector
+from .collectors.podcast import PodcastTranscriptCollector
 from .collectors.rss import RSSCollector
 from .collectors.youtube import YouTubeCollector
 from .config import Settings
@@ -348,6 +349,20 @@ def _records_for_job(
         url = str(row.get("homepage") or row.get("url") or "").strip()
         if not url:
             raise SourceJobError("missing_web_url")
+        if row.get("transcript"):
+            # #450: a page that publishes its own transcript is a text source, not a
+            # homepage to crawl. No audio or video is fetched -- the owner decision is
+            # text-first -- and an absent transcript yields a warning, never a
+            # synthesised stand-in.
+            result = _call_with_retry(
+                lambda: PodcastTranscriptCollector(url).collect(),
+                policy=retry_policy or RetryPolicy(),
+                is_retryable=lambda exc: _retryable_http_status(exc) in (429, 500, 502, 503, 504),
+            )
+            return [
+                _stamp(r, row, collection_id=collection_id, worker_id=worker_id)
+                for r in result.records
+            ], list(result.warnings)
         fallback_feed = _WEB_SOURCE_FEED_FALLBACKS.get(url.rstrip("/"))
         if fallback_feed:
             result = RSSCollector(
