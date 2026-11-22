@@ -282,6 +282,47 @@ def compare_dependencies(
         )
     return Finding("dependencies", True, f"{len(imports)} declared import(s) present")
 
+#: Files whose upstream change can alter what a stored record means or how it validates.
+#: A checkout that is behind on any of these must not write records (#457). Everything else
+#: is coverage or behaviour drift: visible, but not a reason to stop collecting.
+SCHEMA_AFFECTING_PREFIXES = (
+    "src/laclaugpt_data_collection/canonical",
+    "src/laclaugpt_data_collection/models",
+    "src/laclaugpt_data_collection/analysis_schema_compat",
+    "schemas/",
+)
+
+
+def code_drift_blockers(findings: list[Finding], checkouts: list[Path]) -> tuple[list[str], list[str]]:
+    """Decide whether code drift blocks a write: ``(schema_paths, blocking_reasons)``.
+
+    Split out of :func:`main` so the decision can be tested against synthetic repositories
+    instead of by editing the live checkout (#457).
+    """
+    schema_paths: list[str] = []
+    blocking_reasons: list[str] = []
+    for checkout in checkouts:
+        label = f"code ({checkout.name})"
+        finding = next((f for f in findings if f.name == label), None)
+        if finding is None or finding.ok:
+            continue
+        if "commit(s) behind origin/main" not in finding.detail or "ahead" in finding.detail or "uncommitted" in finding.detail:
+            blocking_reasons.append(f"{label}: unverified checkout state")
+            continue
+        changed = git("diff", "--name-only", "HEAD..refs/remotes/origin/main", cwd=checkout)
+        if not changed:
+            blocking_reasons.append(f"{label}: cannot inspect changed files")
+            continue
+        affected = [
+            name for name in changed.splitlines()
+            if name.startswith(SCHEMA_AFFECTING_PREFIXES)
+        ]
+        if affected:
+            schema_paths.extend(f"{checkout.name}/{name}" for name in affected)
+            blocking_reasons.append(f"{label}: schema-affecting changes upstream")
+    return schema_paths, blocking_reasons
+
+
 def collect(root: Path, checkouts: list[Path], *, fetch: bool) -> list[Finding]:
     findings = [
         compare_config(name, root / tracked, root / deployed)
@@ -316,29 +357,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # #457: distinguish an out-of-date but schema-compatible checkout from
     # a checkout whose record-writing contract could have changed.
-    schema_paths: list[str] = []
-    blocking_reasons: list[str] = []
-    for checkout in checkouts:
-        label = f"code ({checkout.name})"
-        finding = next((f for f in findings if f.name == label), None)
-        if finding is None or finding.ok:
-            continue
-        if "commit(s) behind origin/main" not in finding.detail or "ahead" in finding.detail or "uncommitted" in finding.detail:
-            blocking_reasons.append(f"{label}: unverified checkout state")
-            continue
-        changed = git("diff", "--name-only", "HEAD..refs/remotes/origin/main", cwd=checkout)
-        if not changed:
-            blocking_reasons.append(f"{label}: cannot inspect changed files")
-            continue
-        affected = [name for name in changed.splitlines() if (
-            name.startswith("src/laclaugpt_data_collection/canonical")
-            or name.startswith("src/laclaugpt_data_collection/models")
-            or name.startswith("schemas/")
-            or name.startswith("src/laclaugpt_data_collection/analysis_schema_compat")
-        )]
-        if affected:
-            schema_paths.extend(f"{checkout.name}/{name}" for name in affected)
-            blocking_reasons.append(f"{label}: schema-affecting changes upstream")
+    schema_paths, blocking_reasons = code_drift_blockers(findings, checkouts)
     for finding in stale:
         if finding.name.startswith("code ("):
             continue
