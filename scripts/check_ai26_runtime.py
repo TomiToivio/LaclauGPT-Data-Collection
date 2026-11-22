@@ -183,13 +183,25 @@ def compare_checkout(name: str, checkout: Path, *, fetch: bool) -> Finding:
     if not (checkout / ".git").exists():
         return Finding(name, False, f"not a Git checkout: {checkout}")
     if fetch:
-        git("fetch", "--quiet", "origin", "main", cwd=checkout)
+        try:
+            for args in (["fetch", "--quiet", "origin", "+refs/heads/main:refs/remotes/origin/main"],
+                         ["symbolic-ref", "--short", "HEAD"], ["status", "--porcelain"]):
+                result = subprocess.run(["git", *args], cwd=checkout, capture_output=True,
+                                        text=True, check=True, timeout=30)
+                if args[0] == "symbolic-ref" and result.stdout.strip() != "main":
+                    return Finding(name, False, "production checkout must be on main")
+                if args[0] == "status" and result.stdout.strip():
+                    return Finding(name, False, "production checkout contains local changes")
+        except (OSError, subprocess.SubprocessError):
+            return Finding(name, False, "cannot verify clean checkout against freshly fetched origin/main")
     head = git("rev-parse", "--short", "HEAD", cwd=checkout)
     upstream = git("rev-parse", "--short", "refs/remotes/origin/main", cwd=checkout)
     if not head or not upstream:
         return Finding(name, False, f"cannot resolve HEAD and origin/main in {checkout}")
     counts = git("rev-list", "--left-right", "--count", "HEAD...refs/remotes/origin/main", cwd=checkout)
-    ahead, _, behind = counts.partition("\t")
+    if len(counts.split()) != 2 or not all(n.isdigit() for n in counts.split()):
+        return Finding(name, False, "cannot verify revision counts")
+    ahead, behind = counts.split()
     dirty = len(git("status", "--porcelain", cwd=checkout).splitlines())
     suffix = f", {dirty} uncommitted path(s)" if dirty else ""
     if ahead.strip() not in ("", "0"):

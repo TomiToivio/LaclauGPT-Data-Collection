@@ -200,7 +200,8 @@ def test_the_collect_wrapper_reports_drift_without_applying_it() -> None:
 
     assert "check_ai26_runtime.py" in wrapper
     assert "if ! \"${RUNTIME_CHECK[@]}\"" in wrapper, "the check must be guarded, or set -e aborts the cycle"
-    assert "--fetch" not in wrapper, "cron must not depend on the network"
+    assert "--fetch" in wrapper
+    assert "collection stopped" in wrapper
     assert "--apply" not in wrapper
 
 
