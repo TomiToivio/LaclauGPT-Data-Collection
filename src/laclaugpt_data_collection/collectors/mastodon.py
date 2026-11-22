@@ -59,6 +59,9 @@ def map_status(status: dict[str, Any], *, instance_url: str) -> NormalizedRecord
                     metadata={"description": item.get("description")},
                 )
             )
+    from ..language import resolve_language
+
+    language, language_method = resolve_language(text, declared=str(status.get("language") or ""))
     return NormalizedRecord(
         document_id=status_id or source_url,
         platform="mastodon",
@@ -67,7 +70,7 @@ def map_status(status: dict[str, Any], *, instance_url: str) -> NormalizedRecord
         timestamp=str(status.get("created_at") or ""),
         source_url=source_url,
         text=text,
-        language=str(status.get("language") or ""),
+        language=language,
         engagement={
             "favourites_count": status.get("favourites_count"),
             "reblogs_count": status.get("reblogs_count"),
@@ -81,7 +84,8 @@ def map_status(status: dict[str, Any], *, instance_url: str) -> NormalizedRecord
             visited_url=source_url,
             api_url=instance_url,
             transformations=["mastodon-api", "html-to-text", "map-status"],
-            metadata={"account_url": account.get("url")},
+            metadata={"account_url": account.get("url"), "language_method": language_method,
+                      "language_declared_by": "mastodon_status" if language_method == "source_metadata" else ""},
         ),
     )
 
