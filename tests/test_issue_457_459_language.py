@@ -1,8 +1,8 @@
 """Regression coverage for #457 runtime risk and #459 language abstention."""
 from __future__ import annotations
 
-from laclaugpt_data_collection.collectors.mastodon import map_status
 from laclaugpt_data_collection.collectors.bluesky import _map_post
+from laclaugpt_data_collection.collectors.mastodon import map_status
 from laclaugpt_data_collection.language import stamp_language_status
 
 
