@@ -882,10 +882,32 @@ def run_phase1_laskin(
         "source_budget": (budget.summary() if budget is not None else None),
         "deferred_by_source_budget": deferred_by_budget,
         "manifest_drift": manifest_drift,
-        "runtime_drift": json.loads(os.environ.get("LACLAUGPT_AI26_RUNTIME_VERDICT_JSON") or "null"),
+        # #457: parsed defensively -- a malformed verdict must not cost the cycle its summary.
+        "runtime_drift": runtime_drift_verdict(),
         "language_undetermined_stored": int(rss.get("language_undetermined_stored", 0)) + undetermined_non_browser,
         "notification_errors": list(rss.get("notification_errors") or []) + list(sink.notification_errors),
     }
+
+
+def runtime_drift_verdict(environment: dict[str, str] | None = None) -> dict[str, object] | None:
+    """Parse the wrapper's runtime verdict without letting bad JSON cost the cycle its summary.
+
+    #457 puts the drift verdict in the cycle summary, which means the summary now depends on
+    an environment string written by a shell script. `json.loads` inline would raise there,
+    and a cycle that *did* collect would lose its whole summary -- turning a bad log line into
+    missing evidence. Unparseable input is recorded as exactly that, and an absent verdict
+    stays `None` rather than being dressed up as "in sync".
+    """
+    raw = (environment if environment is not None else os.environ).get(
+        "LACLAUGPT_AI26_RUNTIME_VERDICT_JSON", ""
+    )
+    if not str(raw).strip():
+        return None
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        return {"verdict": "unparseable"}
+    return parsed if isinstance(parsed, dict) else {"verdict": "unparseable"}
 
 
 def per_source_limit_default(environment: dict[str, str] | None = None) -> int:
