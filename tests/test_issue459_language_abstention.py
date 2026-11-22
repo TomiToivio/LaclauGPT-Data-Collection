@@ -36,6 +36,10 @@ def test_a_substantive_text_is_detected_so_the_marker_is_not_written():
     detected, method = resolve_language(
         "The European Parliament voted today on a binding framework for artificial intelligence systems."
     )
+    if method == "detector_unavailable":
+        # langdetect is an optional extra; without it resolve_language degrades to an empty
+        # tag by design (#294) and this assertion would be testing the environment.
+        pytest.skip("langdetect is not installed in this environment")
     assert detected
     assert method != "insufficient_text"
 
