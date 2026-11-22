@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# AI26 text-first collection policy (issue #450, 2026-11-22):
+# Intentionally do not download/upload video, audio, images or other media.
+# Preserve this launcher as a safe no-op for existing cron entries. Multimodal
+# code remains available for later, but requires a separate explicit decision.
+echo "AI26 media worker disabled by text-only collection policy (#450); no files downloaded or uploaded"
+exit 0
+
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 # shellcheck source=scripts/ai26_runtime.sh
 . "${ROOT}/scripts/ai26_runtime.sh"
