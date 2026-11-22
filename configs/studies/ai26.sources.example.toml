@@ -1348,3 +1348,24 @@ arena = "parliamentary"
 source_family = "Finnish party politics / electoral articulation"
 sampling_rationale = "First-party Finnish party stream (KD / Christian Democrats). Added 2026-10-25 under the study owner's ruling that the parliamentary arena carries the full major-party set rather than only parties currently publishing AI-relevant material: the zeros are the finding. A party press release is a situated partisan claim, not ground truth, and nothing is inferred about a party's position from its identity. Verified live 2026-10-25: HTTP 200 but the feed contains 0 items. As with the other empty feeds this is a reachability fact, not a silence finding; the row is kept so the gap is named rather than implied. NOT all items are AI-related; relevance filtering stays at the analysis stage."
 priority = "P2"
+
+# ---- 2026-11-22 (#456): the two Network School podcast entries were deployed to the live manifest on
+# 2026-11-21 but never added to this audited plan, so manifest_drift reported them every cycle as
+# "deployed source(s) no longer audited". They are audited here so the plan and the deployment agree;
+# they are public episode pages collected as already-published text (no audio or video fetched, #450).
+[[web_source]]
+name = "network_school_podcast"
+homepage = "https://ns.com/podcast"
+arena = "elites"
+source_family = "frontier AI / cryptographic verification / technology politics"
+sampling_rationale = "Long-form interviews about AI verification, cryptographic proof of what is real, and the politics of machine-generated content. Added 2026-11-21 at the study owner's request; the series has no RSS feed, so the index is collected and each dated episode page becomes a child record with its transcript."
+priority = "P1"
+
+[[web_source]]
+name = "network_state_podcast"
+homepage = "https://ns.com/podcast/roy"
+transcript = true
+arena = "elites"
+source_family = "network state / crypto-capital / AI defence"
+sampling_rationale = "Network State Podcast (Network School) publishes the full transcript on the episode page; this episode is the crypto/zero-knowledge framing of 'defending against AI' inside the network-state scene, i.e. the technological-elite competitor to the safety position the corpus already samples. Collected as already-published text: no audio or video is downloaded and an absent transcript stays absent (#450)."
+priority = "P2"
