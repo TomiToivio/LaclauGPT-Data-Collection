@@ -693,6 +693,26 @@ source_family = "data-centre opposition / local control / ratepayer politics"
 sampling_rationale = "A differently situated grassroots data-centre opposition source emphasizing local control, utility costs, land use and community consent."
 priority = "P2"
 
+# #456: These two Network School podcast pages are already live on Laskin.
+# Record their source identities in the audited plan, not only ignored runtime data.
+# This is a sampling declaration, not an ideological classification. Keep audio
+# downloads disabled under the AI26 text-first collection policy (#450).
+[[web_source]]
+name = "network_school_podcast"
+homepage = "https://ns.com/podcast"
+arena = "elites"
+source_family = "network state / technological governance / podcast discourse"
+sampling_rationale = "Network School's podcast landing page, tracked as a public source of extended technology and governance discourse (#456)."
+priority = "P2"
+
+[[web_source]]
+name = "network_state_podcast"
+homepage = "https://ns.com/podcast/roy"
+arena = "elites"
+source_family = "network state / technological governance / podcast discourse"
+sampling_rationale = "Network School podcast episode/page referenced by the deployed AI26 source roster, audited for text-first sampling (#456)."
+priority = "P2"
+
 # ---------------------------------------------------------------------------
 # Firefox/X browser-tour targets
 # ---------------------------------------------------------------------------
