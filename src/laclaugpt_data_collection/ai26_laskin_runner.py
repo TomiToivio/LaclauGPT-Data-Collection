@@ -285,6 +285,9 @@ def _stamp(record: CanonicalRecord, row: dict[str, Any], *, collection_id: str, 
         if detected:
             record.source.language = detected
             record.source.raw_metadata["language_method"] = method
+    from .language import stamp_language_status
+
+    stamp_language_status(record)
     record.refresh_human_readable()
     return record
 
@@ -796,6 +799,8 @@ def run_phase1_laskin(
         except Exception as exc:  # noqa: BLE001 - a report must not fail the cycle
             manifest_drift = {"in_sync": None, "error": str(exc)[:180]}
 
+    # Count actual successfully stored records, rather than warning strings that
+    # may include records rejected by date floors or sampling budgets.
     tick_budget = {
         "limit": limit,
         # #441: the per-source sampling window is a decision, so each cycle records the value it
