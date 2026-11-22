@@ -57,6 +57,10 @@ class Finding:
     name: str
     ok: bool
     detail: str
+    #: True when the checkout is behind on files that define the stored record shape.
+    #: #457: "stale but compatible" and "stale and writing an old schema" are not the
+    #: same risk, and only the second should stop a collection cycle.
+    schema_affecting: bool = False
 
     def line(self) -> str:
         return f"runtime {self.name:<24} {'ok' if self.ok else 'STALE':<6} {self.detail}"
@@ -174,6 +178,26 @@ def git(*args: str, cwd: Path) -> str:
     return result.stdout.strip() if result.returncode == 0 else ""
 
 
+#: A changed file whose name carries one of these defines what a stored record looks like.
+SCHEMA_HINTS: tuple[str, ...] = ("canonical", "model", "schema")
+
+PACKAGE = "src/laclaugpt_data_collection/"
+
+
+def schema_affecting_changes(checkout: Path, head: str, upstream: str) -> list[str]:
+    """Files between HEAD and origin/main that can change the stored record shape.
+
+    Name-based on purpose: it is the only signal available offline, it over-reports rather
+    than under-reports, and over-reporting means a cycle refuses to write -- which is the
+    safe direction for a schema question.
+    """
+    changed = git("diff", "--name-only", f"{head}..{upstream}", cwd=checkout).splitlines()
+    return sorted(
+        path for path in changed
+        if path.startswith(PACKAGE) and any(hint in Path(path).name.lower() for hint in SCHEMA_HINTS)
+    )
+
+
 def compare_checkout(name: str, checkout: Path, *, fetch: bool) -> Finding:
     """Compare a working checkout with its own ``origin/main``.
 
@@ -213,11 +237,11 @@ def compare_checkout(name: str, checkout: Path, *, fetch: bool) -> Finding:
         )
     if behind.strip() in ("", "0"):
         return Finding(name, True, f"{head} == origin/main {upstream}{suffix}")
-    return Finding(
-        name,
-        False,
-        f"{behind.strip()} commit(s) behind origin/main (HEAD {head}, origin/main {upstream}){suffix}",
-    )
+    schema_files = schema_affecting_changes(checkout, head, upstream)
+    detail = f"{behind.strip()} commit(s) behind origin/main (HEAD {head}, origin/main {upstream}){suffix}"
+    if schema_files:
+        detail += f"; SCHEMA-AFFECTING: {', '.join(schema_files)}"
+    return Finding(name, False, detail, schema_affecting=bool(schema_files))
 
 
 def compare_import_path(name: str, checkout: Path) -> Finding:
@@ -315,8 +339,14 @@ def main(argv: list[str] | None = None) -> int:
     stale = [finding for finding in findings if not finding.ok]
 
     if args.json:
-        print(json.dumps({"stale": bool(stale), "findings":
-                          [dict(name=f.name, ok=f.ok, detail=f.detail) for f in findings]}, indent=2))
+        # #457: the wrapper needs to tell "stale but compatible" from "stale and writing an
+        # old schema", so the verdict carries both flags rather than a single boolean.
+        print(json.dumps({
+            "stale": bool(stale),
+            "schema_affecting": any(f.schema_affecting for f in findings),
+            "findings": [dict(name=f.name, ok=f.ok, detail=f.detail,
+                              schema_affecting=f.schema_affecting) for f in findings],
+        }, indent=2))
     else:
         for finding in findings:
             print(finding.line())

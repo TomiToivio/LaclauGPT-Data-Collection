@@ -91,9 +91,29 @@ if [[ -n "${LACLAUGPT_RUNTIME_EXTRA_CHECKOUTS:-}" ]]; then
     [[ -n "$checkout" ]] && RUNTIME_CHECK+=(--checkout "$checkout")
   done < <(printf '%s\\n' "${LACLAUGPT_RUNTIME_EXTRA_CHECKOUTS//:/$'\\n'}")
 fi
-if ! "${RUNTIME_CHECK[@]}" 2>&1; then
-  echo "[$(date -Is)] AI26 runtime verification failed; collection stopped" >&2
+# #457: classify the drift and act on its kind, rather than treating every finding alike.
+# A blanket stop would be wrong here for a structural reason: the deployed source roster
+# legitimately differs from the tracked plan (#456), so config drift fires every cycle and a
+# hard stop would end collection permanently. So: refuse when the drift can change the shape
+# of a stored record, keep collecting when it cannot, and still refuse when the check itself
+# cannot run (a check that fails to run is not evidence of compatibility).
+RUNTIME_JSON="$("${RUNTIME_CHECK[@]}" --json 2>/dev/null)" || RUNTIME_CHECK_FAILED=1
+if [[ -n "${RUNTIME_CHECK_FAILED:-}" ]]; then
+  echo "[$(date -Is)] AI26 runtime verification could not run; collection stopped" >&2
   exit 2
+fi
+if [[ -n "$RUNTIME_JSON" ]]; then
+  export LACLAUGPT_RUNTIME_DRIFT_JSON="$RUNTIME_JSON"
+  RUNTIME_STALE="$(printf '%s' "$RUNTIME_JSON" | python3 -c 'import json,sys; print(str(json.load(sys.stdin).get("stale")).lower())' 2>/dev/null)"
+  SCHEMA_DRIFT="$(printf '%s' "$RUNTIME_JSON" | python3 -c 'import json,sys; print(str(json.load(sys.stdin).get("schema_affecting")).lower())' 2>/dev/null)"
+  if [[ "$RUNTIME_STALE" == "true" ]]; then
+    "${RUNTIME_CHECK[@]}" 2>&1 || true   # human-readable lines for the log
+    if [[ "$SCHEMA_DRIFT" == "true" ]]; then
+      echo "[$(date -Is)] AI26 runtime drift touches record schema; refusing to collect (fail-closed, #457)"
+      exit 78
+    fi
+    echo "[$(date -Is)] AI26 runtime drift does not touch record schema; collecting anyway (verdict is in the cycle summary, #457)"
+  fi
 fi
 # #401: read-only Mongo capture provenance check. Laskin is not an X producer.
 # A stale/missing capture must be visible but must not block non-browser ingestion.

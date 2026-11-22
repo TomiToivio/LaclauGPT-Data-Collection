@@ -195,13 +195,21 @@ def test_a_sibling_checkout_without_the_package_is_not_called_stale(
 
 
 def test_the_collect_wrapper_reports_drift_without_applying_it() -> None:
-    """The hourly stage may report a stale runtime; it must never enforce or fetch one."""
+    """The hourly stage reports a stale runtime; it must never fetch, apply or migrate one.
+
+    #277 said "reported, never enforced". #457 refines that: a drift that can change the
+    shape of a stored record is fail-closed, because collecting old-shaped records is not a
+    smaller problem than collecting late. The read-only half of the contract is unchanged --
+    the check still writes nothing, and the wrapper still never applies or migrates.
+    """
     wrapper = (ROOT / "scripts" / "run_ai26_laskin_collect.sh").read_text(encoding="utf-8")
 
     assert "check_ai26_runtime.py" in wrapper
-    assert "if ! \"${RUNTIME_CHECK[@]}\"" in wrapper, "the check must be guarded, or set -e aborts the cycle"
+    assert "LACLAUGPT_RUNTIME_DRIFT_JSON" in wrapper, "the verdict must reach the cycle summary"
+    assert "RUNTIME_CHECK_FAILED" in wrapper, "a check that cannot run must not look compatible"
     assert "--fetch" in wrapper
     assert "collection stopped" in wrapper
+    assert "exit 78" in wrapper, "schema-affecting drift is fail-closed (#457)"
     assert "--apply" not in wrapper
 
 

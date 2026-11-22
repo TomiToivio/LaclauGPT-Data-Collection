@@ -861,8 +861,28 @@ def run_phase1_laskin(
         "source_budget": (budget.summary() if budget is not None else None),
         "deferred_by_source_budget": deferred_by_budget,
         "manifest_drift": manifest_drift,
+        # #457: the drift verdict belongs in the summary, not only in the log preamble.
+        "runtime_drift": runtime_drift_verdict(),
         "notification_errors": list(rss.get("notification_errors") or []) + list(sink.notification_errors),
     }
+
+
+def runtime_drift_verdict(environment: dict[str, str] | None = None) -> dict[str, object] | None:
+    """The wrapper's runtime-check verdict, parsed for the cycle summary (#457).
+
+    The wrapper already knows whether the checkout is stale and whether the drift touches
+    the stored record shape; without carrying it into the summary that knowledge lives only
+    in a log preamble nobody can query next to ``records_new`` and ``errors``. Absent or
+    unparseable input returns ``None`` or an explicit verdict rather than a fabricated "ok".
+    """
+    raw = (environment if environment is not None else os.environ).get("LACLAUGPT_RUNTIME_DRIFT_JSON", "")
+    if not raw.strip():
+        return None
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        return {"verdict": "unparseable"}
+    return parsed if isinstance(parsed, dict) else {"verdict": "unparseable"}
 
 
 def per_source_limit_default(environment: dict[str, str] | None = None) -> int:
