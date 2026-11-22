@@ -314,14 +314,51 @@ def main(argv: list[str] | None = None) -> int:
     findings = collect(root, checkouts, fetch=args.fetch)
     stale = [finding for finding in findings if not finding.ok]
 
+    # #457: distinguish an out-of-date but schema-compatible checkout from
+    # a checkout whose record-writing contract could have changed.
+    schema_paths: list[str] = []
+    blocking_reasons: list[str] = []
+    for checkout in checkouts:
+        label = f"code ({checkout.name})"
+        finding = next((f for f in findings if f.name == label), None)
+        if finding is None or finding.ok:
+            continue
+        if "commit(s) behind origin/main" not in finding.detail or "ahead" in finding.detail or "uncommitted" in finding.detail:
+            blocking_reasons.append(f"{label}: unverified checkout state")
+            continue
+        changed = git("diff", "--name-only", "HEAD..refs/remotes/origin/main", cwd=checkout)
+        if not changed:
+            blocking_reasons.append(f"{label}: cannot inspect changed files")
+            continue
+        affected = [name for name in changed.splitlines() if (
+            name.startswith("src/laclaugpt_data_collection/canonical")
+            or name.startswith("src/laclaugpt_data_collection/models")
+            or name.startswith("schemas/")
+            or name.startswith("src/laclaugpt_data_collection/analysis_schema_compat")
+        )]
+        if affected:
+            schema_paths.extend(f"{checkout.name}/{name}" for name in affected)
+            blocking_reasons.append(f"{label}: schema-affecting changes upstream")
+    for finding in stale:
+        if finding.name.startswith("code ("):
+            continue
+        if finding.name != "ai26.sources.toml":
+            blocking_reasons.append(f"{finding.name}: {finding.detail}")
+    verdict = {
+        "stale": bool(stale),
+        "blocking": bool(blocking_reasons),
+        "blocking_reasons": blocking_reasons,
+        "schema_changed_paths": sorted(set(schema_paths)),
+        "status": "blocked" if blocking_reasons else ("stale_compatible" if stale else "in_sync"),
+        "findings": [dict(name=f.name, ok=f.ok, detail=f.detail) for f in findings],
+    }
     if args.json:
-        print(json.dumps({"stale": bool(stale), "findings":
-                          [dict(name=f.name, ok=f.ok, detail=f.detail) for f in findings]}, indent=2))
+        print(json.dumps(verdict, indent=2))
     else:
         for finding in findings:
             print(finding.line())
-        print(f"runtime result: {'STALE' if stale else 'in sync'} ({len(stale)} of {len(findings)} checks)")
-    return 1 if stale else 0
+        print(f"runtime result: {verdict['status']} ({len(stale)} of {len(findings)} checks)")
+    return 2 if blocking_reasons else (1 if stale else 0)
 
 
 if __name__ == "__main__":
