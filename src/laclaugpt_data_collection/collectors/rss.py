@@ -107,9 +107,17 @@ def _entry_to_record(feed_url: str, entry: Any, *, feed_language: str = "") -> N
         max((excerpt, full_text), key=len),
         declared=str(getattr(entry, "language", "") or feed_language),
     )
+    # #450: a short RSS summary is not a complete article. When the entry carries the publisher's own
+    # full content, store it; otherwise store the excerpt and say so, so nothing downstream can treat an
+    # excerpt as full text.
+    body = full_text if len(full_text.strip()) > len(excerpt.strip()) else excerpt
+    completeness = "full_text" if body is full_text and full_text.strip() else "feed_excerpt"
     metadata: dict[str, Any] = {
         "source_publication_time_present": bool(published),
         "language_method": language_method,
+        "text_completeness": completeness,
+        "text_source": "feed_entry_content" if completeness == "full_text" else "feed_entry_summary",
+        "text_chars": len(body),
     }
     if publisher_url or publisher_name:
         metadata["publisher_url"] = publisher_url
@@ -121,7 +129,7 @@ def _entry_to_record(feed_url: str, entry: Any, *, feed_language: str = "") -> N
         language=language,
         timestamp=published,
         source_url=link,
-        text="\n\n".join(part for part in (title, summary) if part),
+        text=body,
         raw_payload=raw_entry,
         raw_content_type="application/feed+json",
         collection_provenance=CollectionProvenance(

@@ -23,7 +23,9 @@ def test_full_feed_content_drives_detection(monkeypatch):
     assert record is not None
     assert record.source.language == "en"
     assert len(observed[0][0]) > 1000
-    assert record.content.text == "Brief\n\nShort"
+    # #450: the publisher's full content is now stored, not only used for detection.
+    assert record.content.text.startswith("Long body")
+    assert record.collection_provenance.metadata["text_completeness"] == "full_text"
 
 
 def test_source_language_is_preserved(monkeypatch):
