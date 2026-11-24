@@ -15,6 +15,8 @@ from urllib.parse import urlparse
 
 import yaml
 
+from laclaugpt_data_collection.arena_backfill import identity
+
 
 def declared_x_handles(config: dict) -> dict[str, tuple[str, str]]:
     result: dict[str, tuple[str, str]] = {}
@@ -54,17 +56,29 @@ def x_handle_from_profile(value: str) -> str:
 
 def resolve_record(row: dict, mapping: dict[str, tuple[str, str]]) -> tuple[str, str] | None:
     src = row.get("source") or {}
-    if str(src.get("platform") or "").lower() != "x":
+    # A bridge-captured record may have no platform and no author, only the source_url it was read
+    # from; arena_backfill.identity() proves the platform and handle from that URL when it can, and
+    # returns nothing when it cannot (#470).
+    platform, proven_handle = identity(src)
+    if platform != "x":
         return None
     raw = src.get("raw_metadata") or {}
     # Prefer the declared capture target, falling back to the actual author only
     # when it is an exact known handle. Conflicting identities are not repaired.
     target = x_handle_from_profile(raw.get("source_platform_url") or "")
-    author = x_handle_from_profile(str(src.get("author") or ""))
+    author = x_handle_from_profile(str(src.get("author") or "")) or (
+        proven_handle.casefold() if proven_handle.casefold() in mapping else ""
+    )
     if not author:
         author_text = str(src.get("author") or "").strip().lstrip("@").casefold()
         author = author_text if author_text in mapping else ""
-    candidates = [x for x in (target, author) if x]
+    # The stored source_url is a third witness: if it names a different account than the recorded
+    # author, the record contradicts itself and is not repaired.
+    proven = x_handle_from_profile(str(src.get("source_url") or "")) or proven_handle.casefold()
+    recorded = x_handle_from_profile(str(src.get("author") or ""))
+    if recorded and proven and proven != recorded:
+        return None
+    candidates = [x for x in (target, author, proven) if x]
     if str(src.get("author") or "").strip() and not author:
         return None
     if len(set(candidates)) > 1:
