@@ -124,6 +124,12 @@ fi
 # still sees a non-zero exit for a partial tick.
 # #378: opt in to the shared queue. Off by default so a host that has not been
 # migrated keeps the audited manifest behaviour unchanged.
+BRIDGE_ARGS=()
+# Explicit opt-in: the X bridge target file is private and not part of the repository.
+# Missing/invalid files are reported as audit errors, never treated as a clean plan.
+if [[ -n "${LACLAUGPT_AI26_X_BRIDGE_TARGETS:-}" ]]; then
+  BRIDGE_ARGS=(--bridge-targets "$LACLAUGPT_AI26_X_BRIDGE_TARGETS")
+fi
 DISPATCH_ARGS=()
 if [[ "${LACLAUGPT_AI26_DISTRIBUTED_JOBS:-0}" == "1" ]]; then
   DISPATCH_ARGS=(--dispatch-mongo --dispatch-lease-seconds "${LACLAUGPT_AI26_LEASE_SECONDS:-1800}")
@@ -132,6 +138,7 @@ fi
 set +e
 "${RUN[@]}" \
   "${DISPATCH_ARGS[@]}" \
+  "${BRIDGE_ARGS[@]}" \
   --study-config "$STUDY_CONFIG" \
   --source-manifest "$SOURCE_MANIFEST" \
   --collection-id "ai26" \
