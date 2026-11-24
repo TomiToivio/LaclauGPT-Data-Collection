@@ -222,6 +222,10 @@ def drift_summary(report: dict[str, Any]) -> str:
     """One-line human summary, suitable for a log line or a cron notification."""
     if report["in_sync"]:
         return "source manifest in sync with the tracked plan"
+    bridge = report.get("x_bridge")
+    if bridge and not bridge["in_sync"]:
+        names = ", ".join(bridge["undeclared_bridge_handles"])
+        return f"source manifest DRIFT: undeclared X bridge targets: {names or 'none'}; undeployed: {len(bridge['undeployed_bridge_handles'])}"
     parts = [
         f"{kind}: {report['counts'][kind]['deployed']}->{report['counts'][kind]['tracked']}"
         for kind in report["drift_kinds"]
