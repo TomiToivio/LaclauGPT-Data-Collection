@@ -173,6 +173,51 @@ def compare_manifests(
     }
 
 
+
+def _x_handle(value: str) -> str:
+    """Normalize X account identity for plan comparison, not actor classification."""
+    handle = value.strip().lstrip("@").casefold()
+    if not handle or not all(ch.isascii() and (ch.isalnum() or ch == "_") for ch in handle):
+        raise ValueError(f"invalid X account handle: {value!r}")
+    return handle
+
+
+def compare_bridge_targets(
+    deployed: str | Path, tracked: str | Path, targets_file: str | Path
+) -> dict[str, Any]:
+    """Audit an explicitly supplied X bridge target list against both manifests.
+
+    The target file is a private JSON array of X handle strings, not an inferred
+    sampling plan. Missing or malformed input is an error, never an all-clear.
+    This does not change the plan, assign arenas, or mutate stored records.
+    """
+    path = Path(targets_file)
+    targets = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(targets, list) or any(not isinstance(item, str) for item in targets):
+        raise ValueError("bridge target file must be a JSON array of X handle strings")
+    bridge = {_x_handle(item) for item in targets}
+    if len(bridge) != len(targets):
+        raise ValueError("bridge target file contains duplicated X handles")
+    def declared(manifest: str | Path) -> set[str]:
+        rows = load_manifest_rows(manifest)["x_account"]
+        return {_x_handle(row["handle"]) for row in rows if isinstance(row.get("handle"), str)
+                and row["handle"].strip()}
+    deployed_handles = declared(deployed)
+    tracked_handles = declared(tracked)
+    undeclared = sorted(bridge - tracked_handles)
+    undeployed = sorted(bridge - deployed_handles)
+    return {
+        "checked": True,
+        "bridge_target_count": len(bridge),
+        "tracked_x_count": len(tracked_handles),
+        "deployed_x_count": len(deployed_handles),
+        "undeclared_bridge_handles": undeclared,
+        "undeployed_bridge_handles": undeployed,
+        "in_sync": not undeclared and not undeployed,
+        "sampling_decision_required": bool(undeclared),
+    }
+
+
 def drift_summary(report: dict[str, Any]) -> str:
     """One-line human summary, suitable for a log line or a cron notification."""
     if report["in_sync"]:
@@ -203,9 +248,13 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="exit 1 when the manifests differ (for a CI/cron gate)",
     )
+    parser.add_argument("--bridge-targets", help="private JSON array of X handles used by an external bridge")
     args = parser.parse_args(argv)
 
     report = compare_manifests(args.deployed, args.tracked)
+    if args.bridge_targets:
+        report["x_bridge"] = compare_bridge_targets(args.deployed, args.tracked, args.bridge_targets)
+        report["in_sync"] = report["in_sync"] and report["x_bridge"]["in_sync"]
     print(json.dumps(report, indent=2, sort_keys=True))
     print(drift_summary(report), file=__import__("sys").stderr)
     if args.fail_on_drift and not report["in_sync"]:
