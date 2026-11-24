@@ -62,9 +62,12 @@ def _plugins_list(_args: argparse.Namespace) -> int:
 
 
 def _manifest_drift(args: argparse.Namespace) -> int:
-    from .manifest_drift import compare_manifests, drift_summary
+    from .manifest_drift import compare_bridge_targets, compare_manifests, drift_summary
 
     report = compare_manifests(args.deployed, args.tracked)
+    if args.bridge_targets:
+        report["x_bridge"] = compare_bridge_targets(args.deployed, args.tracked, args.bridge_targets)
+        report["in_sync"] = report["in_sync"] and report["x_bridge"]["in_sync"]
     print(json.dumps(report, indent=2, sort_keys=True))
     print(drift_summary(report), file=sys.stderr)
     if args.fail_on_drift and not report["in_sync"]:
@@ -278,6 +281,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     drift.add_argument("--deployed", required=True, help="manifest the pipeline reads")
     drift.add_argument("--tracked", required=True, help="audited plan under configs/studies/")
+    drift.add_argument("--bridge-targets", help="private JSON array of external X bridge handles")
     drift.add_argument(
         "--fail-on-drift",
         action="store_true",
