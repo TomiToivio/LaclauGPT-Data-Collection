@@ -532,6 +532,7 @@ def run_phase1_laskin(
     limit: int = 40,
     rotation: int | None = None,
     tracked_plan: str | Path | None = None,
+    bridge_targets: str | Path | None = None,
     enforce_source_budgets: bool | None = None,
     dispatch: Any | None = None,
     dispatch_lease_seconds: int = 1800,
@@ -788,9 +789,13 @@ def run_phase1_laskin(
     manifest_drift: dict[str, Any] | None = None
     if tracked_plan is not None:
         try:
-            from .manifest_drift import compare_manifests, drift_summary
+            from .manifest_drift import compare_bridge_targets, compare_manifests, drift_summary
 
             drift_report = compare_manifests(source_manifest, tracked_plan)
+            if bridge_targets is not None:
+                bridge_report = compare_bridge_targets(source_manifest, tracked_plan, bridge_targets)
+                drift_report["x_bridge"] = bridge_report
+                drift_report["in_sync"] = drift_report["in_sync"] and bridge_report["in_sync"]
             manifest_drift = {
                 "in_sync": drift_report["in_sync"],
                 "summary": drift_summary(drift_report),
@@ -798,6 +803,7 @@ def run_phase1_laskin(
                 "removed": drift_report["removed"],
                 "deployed_total": drift_report["deployed_total"],
                 "tracked_total": drift_report["tracked_total"],
+                "x_bridge": drift_report.get("x_bridge", {"checked": False}),
             }
         except Exception as exc:  # noqa: BLE001 - a report must not fail the cycle
             manifest_drift = {"in_sync": None, "error": str(exc)[:180]}
@@ -964,6 +970,11 @@ def main(argv: list[str] | None = None) -> int:
         help="force the declared caps OFF for a deliberate unbounded run",
     )
     parser.add_argument(
+        "--bridge-targets",
+        default=None,
+        help="private JSON array of X handles used by the external bridge; audit only",
+    )
+    parser.add_argument(
         "--tracked-plan",
         default=None,
         help="audited plan under configs/studies/; when set, report manifest drift",
@@ -1022,6 +1033,7 @@ def main(argv: list[str] | None = None) -> int:
             per_source_limit=args.per_source_limit,
             limit=args.limit,
             tracked_plan=args.tracked_plan,
+            bridge_targets=args.bridge_targets,
             enforce_source_budgets=args.enforce_source_budgets,
             dispatch=dispatch,
             dispatch_lease_seconds=args.dispatch_lease_seconds,
