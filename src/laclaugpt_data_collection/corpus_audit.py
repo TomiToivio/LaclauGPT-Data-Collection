@@ -136,6 +136,16 @@ def _shares(counter: Counter[str], total: int) -> list[dict[str, Any]]:
     ]
 
 
+def _normalise_declared(value: str) -> str:
+    """Compare a declared source name or handle with a captured author handle.
+
+    Captures record ``@MIRIBerkeley`` or ``miriberkeley`` depending on what the page rendered, and a
+    study config may write either form as a source name. Case and a leading ``@`` are therefore not
+    meaningful differences.
+    """
+    return str(value or "").strip().lstrip("@").casefold()
+
+
 def audit_records(
     records: Iterable[dict[str, Any]],
     *,
@@ -209,6 +219,30 @@ def audit_records(
     # all. #207's core finding is exactly a nominal stratum, so this tool must not
     # be able to fake its own all-clear. `checked` makes the state explicit.
     configured_checked = bool(configured)
+
+    # The opposite failure to `unrepresented`, and the one that hides itself (#470).
+    #
+    # `unrepresented` asks "is every declared source present?". It cannot notice the
+    # inverse: a handle that feeds the corpus while appearing in no group of the study
+    # config. Those records arrive with a blank arena and no platform, so they are not
+    # a collection bug and not a missing source -- they are an *undeclared stratum*, and
+    # an audit that only checks one direction reports a clean, fully declared plan while
+    # they accumulate. In AI26 that was 609 records (4.9 % of the corpus) from eleven
+    # elite X handles that no config named.
+    #
+    # This is reported, never resolved: whether such a handle should be declared in
+    # `groups:` or recorded as an explicit out-of-plan `exploratory` block is a sampling
+    # decision for the researcher, not something an audit may decide (paper §4.2: a
+    # record without an evidenced arena is counted separately, not assigned silently).
+    # Only checked when the caller passed a declared list, so an unrun check cannot read
+    # as an all-clear.
+    declared_lookup = {_normalise_declared(c) for c in configured}
+    undeclared_authors = sorted(
+        name
+        for name in author_counts
+        if name and name != _BLANK and _normalise_declared(name) not in declared_lookup
+    )
+    undeclared_record_count = sum(author_counts[name] for name in undeclared_authors)
 
     deferred = sorted({p.strip() for p in (deferred_platforms or []) if isinstance(p, str) and p.strip()})
     declared_empty_all = [p for p in DECLARED_PLATFORMS if platform_counts.get(p, 0) == 0]
@@ -313,6 +347,11 @@ def audit_records(
             "checked": configured_checked,
             "unrepresented": unrepresented,
             "unrepresented_count": len(unrepresented),
+            # The inverse check (#470): authors with records that no declared source names.
+            "undeclared_checked": configured_checked,
+            "undeclared_count": len(undeclared_authors) if configured_checked else None,
+            "undeclared": undeclared_authors if configured_checked else [],
+            "undeclared_records": undeclared_record_count if configured_checked else None,
         },
     }
 
@@ -332,6 +371,12 @@ def audit_summary(report: dict[str, Any]) -> str:
         )
     else:
         configured_clause = "configured-source check not run (pass --configured-sources)"
+    # #470: an undeclared stratum is invisible in the "unrepresented" clause, so it gets its own.
+    if configured.get("undeclared_checked"):
+        configured_clause += (
+            f", {configured['undeclared_count']} undeclared author(s) contributing "
+            f"{configured['undeclared_records']} record(s)"
+        )
     # #294: name an arena whose whole stratum carries no language, rather than
     # folding it into a store-wide total diluted by labelled arenas.
     silent_arenas = [
