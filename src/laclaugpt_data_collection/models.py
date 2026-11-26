@@ -17,26 +17,56 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 SCHEMA_VERSION = "1.1.0"
 _TRACKING_KEYS = {"fbclid", "gclid", "mc_cid", "mc_eid"}
 
+#: Hosts that serve the same X/Twitter posts (#478). ``source_url`` is the record's identity — it is the
+#: ``source_url`` half of the ``routing_source_unique`` index — so two captures of one post under different
+#: hosts or share parameters become two documents. X links share as ``?s=20`` / ``?t=…&s=19`` / ``?a=…``,
+#: which are not tracking parameters in the usual sense but behave exactly like them for identity.
+_X_HOSTS = frozenset(
+    {"x.com", "www.x.com", "mobile.x.com", "twitter.com", "www.twitter.com", "mobile.twitter.com"}
+)
+_X_SHARE_PARAMS = frozenset({"s", "t", "a", "ref_src", "ref_url"})
+
+#: ``https://`` is the only scheme X serves, so the scheme is pinned rather than carried through. Pinning
+#: it for these hosts only leaves every other URL's scheme untouched.
+_X_CANONICAL_HOST = "x.com"
+
 
 def canonicalize_source_url(value: str) -> str:
-    """Deterministically normalize a web URL while preserving URI-like IDs."""
+    """Deterministically normalize a web URL while preserving URI-like IDs.
+
+    Identity, not display: the same post, page or document must reduce to one string. Scheme and host are
+    lowercased, a trailing slash is dropped, and tracking parameters are removed.
+
+    For X/Twitter hosts this additionally (a) maps ``twitter.com`` and the ``www.``/``mobile.`` variants to
+    ``x.com`` and pins the scheme to ``https``, and (b) removes the share parameters X appends
+    (``s``, ``t``, ``a``, ``ref_src``, ``ref_url``). Without that, a post collected on one localhost and
+    re-collected on another is two documents, which is what #478 was filed about.
+    """
     value = value.strip()
     if not value:
         return value
     parts = urlsplit(value)
     if parts.scheme in {"http", "https"} and parts.netloc:
+        netloc = parts.netloc.lower()
+        scheme = parts.scheme.lower()
+        is_x = netloc in _X_HOSTS
+        if is_x:
+            netloc = _X_CANONICAL_HOST
+            scheme = "https"
         query = [
             (key, val)
             for key, val in parse_qsl(parts.query, keep_blank_values=True)
-            if not key.lower().startswith("utm_") and key.lower() not in _TRACKING_KEYS
+            if not key.lower().startswith("utm_")
+            and key.lower() not in _TRACKING_KEYS
+            and not (is_x and key.lower() in _X_SHARE_PARAMS)
         ]
         path = parts.path
         if path != "/":
             path = path.rstrip("/")
         return urlunsplit(
             (
-                parts.scheme.lower(),
-                parts.netloc.lower(),
+                scheme,
+                netloc,
                 path,
                 urlencode(query, doseq=True),
                 "",
