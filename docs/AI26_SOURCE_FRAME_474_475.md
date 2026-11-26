@@ -85,3 +85,47 @@ nonempty parliamentary record. Nonfatal parsing warnings remain visible. HTTP an
 are distinct from a valid empty feed. A pass is not evidence of deployed
 collection, analysis consumption, or AI relevance; repeat the MongoDB acceptance
 audit after the normal collection cycle.
+
+## Live deployment and verification (2026-11-26, Laskin)
+
+At the start of this verification the deployed manifest held four #474 feed
+rows while the tracked plan held two: `us_house_homeland` (US House Committee on
+Homeland Security) and `uk_dsit_ai` (UK Department for Science, Innovation and
+Technology) were deployed with their rationale but were not yet declared in Git.
+Every cycle therefore reported
+`source manifest DRIFT: deployed 109 vs tracked 107 (feed: 54->52)`, and because
+the collection window is built from the audited plan, both rows were polled never —
+zero records, no error line. The tracked plan now declares all four rows, and the
+runtime was re-checked against it:
+
+```
+$ python scripts/check_ai26_runtime_sync.py
+AI26_RUNTIME_SYNC=in_sync sources=sync study=sync code=sync
+```
+
+The arena's `sampling_focus` now names all three articulations the declared
+sources actually provide: a congressional bill stream, a congressional committee
+stream, and a non-EU ministry stream (with the UK read as supplemental, not a
+fourth core region). One full declared pass (`--max-feeds 60 --limit 300`)
+produced, per feed, records that are all `arena=parliamentary`,
+`handoff.status=ready`, dated and text-bearing:
+
+| feed | records | ready | dated | text |
+| --- | --- | --- | --- | --- |
+| `us_congressional_bills` | 5 | 5 | 5 | 5 |
+| `us_house_homeland` | 5 | 5 | 5 | 5 |
+| `uk_ai_security_institute` | 1 | 1 | 1 | 1 |
+| `uk_dsit_ai` | 0 | — | — | — |
+
+The parliamentary arena rose from 1 689 to 1 708 records (corpus 12 623). The
+DSIT row's zero is expected rather than a fault: its newest entry is
+2026-08-24, before the 2026-09-10 publication floor, and the row's own rationale
+warns that it is a low-frequency stream.
+
+Two limits stay visible. The GovInfo feed publishes general bills, so five new
+records are legislative text whose AI relevance is resolved downstream, not at
+collection; the committee feed is a press-release stream with the same property.
+Neither source guarantees that a specific AI bill enters the arena, and no
+analysis of the new records has run yet: the seed order still reaches priority-3
+X before any P2 feed only when the earlier tiers are exhausted, so coverage in
+`ai26__analysis_results` lags collection by construction.
