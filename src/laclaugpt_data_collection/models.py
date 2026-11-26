@@ -8,6 +8,7 @@ storage adapter.
 """
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -16,10 +17,34 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 SCHEMA_VERSION = "1.1.0"
 _TRACKING_KEYS = {"fbclid", "gclid", "mc_cid", "mc_eid"}
+#: Parameters X appends to a shared status link. Applied only on the X host family: `t` and `src`
+#: are meaningful elsewhere (a video timestamp, a page variant), and #478 is about X identity.
+_X_SHARE_KEYS = {"s", "t", "ref_src", "ref_url", "src"}
+
+#: The X/Twitter host family. One post can arrive under any of these spellings depending on which machine
+#: captured it and which URL the browser happened to hold; they are the same post (#478).
+_X_HOSTS = frozenset(
+    {
+        "x.com",
+        "www.x.com",
+        "mobile.x.com",
+        "m.x.com",
+        "twitter.com",
+        "www.twitter.com",
+        "mobile.twitter.com",
+        "m.twitter.com",
+    }
+)
+_X_CANONICAL_HOST = "x.com"
 
 
 def canonicalize_source_url(value: str) -> str:
-    """Deterministically normalize a web URL while preserving URI-like IDs."""
+    """Deterministically normalize a web URL while preserving URI-like IDs.
+
+    This is the form a record *shows*: the source URL as captured, minus tracking parameters and a trailing
+    slash. It is deliberately conservative — a human reading a record should see the link they could open, and
+    the route a machine took is not identity (#478 uses :func:`source_identity` for that).
+    """
     value = value.strip()
     if not value:
         return value
@@ -43,6 +68,36 @@ def canonicalize_source_url(value: str) -> str:
             )
         )
     return value
+
+
+_STATUS_ID = re.compile(r"/status(?:es)?/(\d+)")
+
+
+def source_identity(value: str) -> str:
+    """The identity two machines, a retry and an x.com/twitter.com spelling must agree on (#478).
+
+    A post's identity is its numeric status id, not the path a machine happened to hold:
+    ``x.com/<user>/status/<id>``, ``twitter.com/<USER>/status/<id>/photo/1`` and ``x.com/i/web/status/<id>``
+    are one post, and share parameters (``s=``/``t=``/``ref_src=``) carry no identity. Every other host is
+    left to :func:`canonicalize_source_url`: rewriting a news site's host would change what the source *is*.
+    """
+    normalized = canonicalize_source_url(value)
+    if not normalized:
+        return normalized
+    parts = urlsplit(normalized)
+    host = parts.netloc.lower().split("@")[-1]
+    if host not in _X_HOSTS:
+        return normalized
+    status = _STATUS_ID.search(parts.path)
+    if status:
+        return f"https://{_X_CANONICAL_HOST}/i/status/{status.group(1)}"
+    query = [
+        (key, val)
+        for key, val in parse_qsl(parts.query, keep_blank_values=True)
+        if key.lower() not in _X_SHARE_KEYS
+    ]
+    path = parts.path.casefold()
+    return urlunsplit(("https", _X_CANONICAL_HOST, path, urlencode(query, doseq=True), ""))
 
 
 class Model(BaseModel):
