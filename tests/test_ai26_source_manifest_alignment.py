@@ -50,3 +50,20 @@ def test_declared_mastodon_handles_match_active_manifest():
     for group in design["groups"]:
         for acct in group.get("accounts", {}).get("mastodon", []):
             assert acct.casefold() in rows, (group["id"], acct)
+
+
+
+def test_correct_miri_identity_and_parliamentary_sources():
+    manifest, design = _load()
+    x_handles = {row["handle"].casefold() for row in manifest["x_account"]}
+    assert "miri_ai" not in x_handles
+    assert "miriberkeley" in x_handles
+    group = next(g for g in design["groups"] if g["id"] == "elites_xrisk")
+    assert "MIRIBerkeley" in group["accounts"]["x"]
+    assert "MIRI_AI" not in group["accounts"]["x"]
+    assert "intelligence.org" in group["accounts"]["bluesky"]
+    feeds = {row["name"]: row for row in manifest["feed"]}
+    for name in ("us_congressional_bills", "uk_ai_security_institute"):
+        assert feeds[name]["arena"] == "parliamentary"
+        assert feeds[name].get("enabled", True)
+        assert feeds[name]["priority"] == "P2"
