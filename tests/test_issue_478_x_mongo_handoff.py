@@ -66,8 +66,8 @@ def test_two_mirrors_share_text_ready_mongo_without_allas(
         assert records.count_documents({}) == 1
         stored = records.find_one()
         assert stored["handoff"]["status"] == "ready"
-        assert stored["content"]["media_references"] == []
-        assert stored["source"]["raw_metadata"]["deferred_media_references"]
+        assert stored["content"]["media_references"][0]["kind"] == "image"
+        assert stored["handoff"]["reason"] == "ai26_x_text_only"
         assert stored["raw_capture"]["payload"]["id"] == "123"
         if first_key is None:
             first_key = stored["handoff"]["handoff_key"]

@@ -18,6 +18,7 @@ from .realtime import (
 )
 
 _READY_MEDIA = {"completed", "downloaded", "ok"}
+_X_SUPPLEMENTARY_MEDIA = {"image", "photo", "video", "animated_gif"}
 
 
 def routing_metadata(record: dict[str, Any], *, default_collection: str = "default") -> tuple[str, str]:
@@ -130,11 +131,27 @@ def build_handoff(
             reason = eligibility_reason
 
     if status == "ready":
-        ready, media_reason = media_ready(record, media_states)
+        # AI26 #450 is text-only. An X post with source text does not require
+        # supplementary image/video bytes; retain all references and identity.
+        # Document-like or unknown references still use the normal media gate.
+        refs = _media_references(record)
+        source = record.get("source") or {}
+        content = record.get("content") or {}
+        supplementary = (
+            collection_id.casefold() == "ai26"
+            and source.get("platform") == "x"
+            and bool(str(content.get("text") or "").strip())
+            and bool(refs)
+            and all(str(ref.get("kind") or "").casefold() in _X_SUPPLEMENTARY_MEDIA for ref in refs)
+        )
+        if supplementary:
+            ready, media_reason = True, "ai26_x_text_only"
+        else:
+            ready, media_reason = media_ready(record, media_states)
         if not ready:
             status = "waiting_media"
             reason = media_reason
-        elif media_reason == "media_ready":
+        elif media_reason in {"media_ready", "ai26_x_text_only"}:
             reason = media_reason
 
     key_material = f"{collection_id}\n{source_url}\n{revision}"

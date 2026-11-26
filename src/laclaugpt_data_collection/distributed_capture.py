@@ -196,18 +196,6 @@ class DistributedCaptureSink:
             if key in CanonicalRecord.model_fields
         }
         record = CanonicalRecord.model_validate(canonical_data)
-        if (
-            self.settings.project_id == "ai26"
-            and self.objects is None
-            and record.source.platform in {"x", "twitter"}
-        ):
-            # Source media URLs are provenance, not dependencies of text-only analysis.
-            # Keep them for future research without asking the media queue to download them.
-            if record.content.media_references:
-                record.source.raw_metadata["deferred_media_references"] = [
-                    ref.model_dump(mode="json") for ref in record.content.media_references
-                ]
-                record.content.media_references = []
         # #322: refuse URL-only placeholders before touching S3, Mongo or Redis.
         has_text = bool((record.content.text or "").strip())
         has_raw = record.raw_capture.preserved
