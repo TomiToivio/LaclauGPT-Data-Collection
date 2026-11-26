@@ -58,7 +58,7 @@ def test_correct_miri_identity_and_parliamentary_sources():
     x_handles = {row["handle"].casefold() for row in manifest["x_account"]}
     assert "miri_ai" not in x_handles
     assert "miriberkeley" in x_handles
-    group = next(g for g in design["groups"] if g["id"] == "elites_xrisk")
+    group = next(g for g in design["groups"] if g["id"] == "xrisk_safety_x")
     assert "MIRIBerkeley" in group["accounts"]["x"]
     assert "MIRI_AI" not in group["accounts"]["x"]
     assert "intelligence.org" in group["accounts"]["bluesky"]
