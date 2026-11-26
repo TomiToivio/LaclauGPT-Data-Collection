@@ -10,6 +10,7 @@ import hashlib
 import json
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from .config import Settings
 from .deployment import validate_profile
@@ -90,7 +91,7 @@ class DistributedCaptureSink:
             prefix=f"{settings.s3_prefix_root}/{settings.project_id}",
             signature_version=settings.s3_signature_version,
             addressing_style=settings.s3_addressing_style,
-        )
+        ) if settings.object_backend == "s3" else None
         self.redis = (
             RedisCoordinator(settings.redis_url, namespace)
             if settings.messaging_backend == "redis"
@@ -146,8 +147,11 @@ class DistributedCaptureSink:
         ).encode("utf-8")
         digest = hashlib.sha256(encoded).hexdigest()
         key = f"runs/{self.settings.run_id}/raw/{digest}.json"
-        uri = self.objects.put_bytes(key, encoded, content_type="application/json")
         record.raw_capture.checksum = f"sha256:{digest}"
+        if self.objects is None:
+            # MongoDB retains the raw JSON payload; no Allas dependency for text capture.
+            return record.raw_capture.ref or ""
+        uri = self.objects.put_bytes(key, encoded, content_type="application/json")
         record.raw_capture.ref = uri
         return uri
 
@@ -193,6 +197,27 @@ class DistributedCaptureSink:
             if key in CanonicalRecord.model_fields
         }
         record = CanonicalRecord.model_validate(canonical_data)
+        if (
+            self.settings.project_id == "ai26"
+            and self.objects is None
+            and record.source.platform in {"x", "twitter"}
+        ):
+            # Both X domains identify the same post when the status path matches.
+            parts = urlsplit(record.source_url)
+            path = parts.path.rstrip("/")
+            if (
+                parts.hostname in {"x.com", "www.x.com", "twitter.com", "www.twitter.com"}
+                and "/status/" in path
+                and path.rsplit("/", 1)[-1].isdigit()
+            ):
+                record.source_url = f"https://x.com{path}"
+            # Source media URLs are provenance, not dependencies of text-only analysis.
+            # Keep them for future research without asking the media queue to download them.
+            if record.content.media_references:
+                record.source.raw_metadata["deferred_media_references"] = [
+                    ref.model_dump(mode="json") for ref in record.content.media_references
+                ]
+                record.content.media_references = []
         # #322: refuse URL-only placeholders before touching S3, Mongo or Redis.
         has_text = bool((record.content.text or "").strip())
         has_raw = record.raw_capture.preserved

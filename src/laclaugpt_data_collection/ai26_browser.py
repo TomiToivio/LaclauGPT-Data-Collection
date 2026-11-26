@@ -53,6 +53,14 @@ def _ai26_settings(*, env_file: str | Path | None = None) -> Settings:
     return settings
 
 
+def _text_browser_settings() -> Settings:
+    """Keep AI26 browser raw JSON in MongoDB without requiring Allas."""
+    settings = _ai26_settings()
+    settings.object_backend = "filesystem"
+    settings.capture_media_inline = False
+    return settings
+
+
 class JsonlDistributedMirror:
     """Mirror newly appended canonical JSONL rows to the remote AI26 stack."""
 
@@ -232,7 +240,7 @@ def run_backend(
     if host not in _LOOPBACK:
         raise ValueError("AI26 browser backend must bind to localhost/loopback")
     study = _ensure_ai26_study(study_config)
-    settings = _ai26_settings()
+    settings = _text_browser_settings()
     # #378: a host with no MongoDB/S3 credentials still has to be able to capture. Brazil26's
     # backend already degrades to local-only; AI26 used to construct the distributed sink
     # unconditionally and crashed at startup, which is why the Firefox path could not be
@@ -328,9 +336,18 @@ def _mirror_if_distributed(
 
 def run_check(*, study_config: str) -> int:
     study = _ensure_ai26_study(study_config)
-    settings = _ai26_settings()
-    sink = DistributedCaptureSink(settings)
-    sink.assert_private_config(study_config)
+    settings = _text_browser_settings()
+    if not settings.mongodb_uri or settings.record_backend not in {"auto", "mongodb"}:
+        raise ValueError("AI26 X capture requires the shared MongoDB record backend")
+    try:
+        sink = DistributedCaptureSink(settings)
+        sink.assert_private_config(study_config)
+        if not sink.records.ping():
+            raise RuntimeError("MongoDB ping failed")
+    except Exception as exc:
+        raise RuntimeError(
+            f"AI26 central MongoDB preflight failed ({type(exc).__name__}); check private configuration"
+        ) from None
     result: dict[str, Any] = {
         "status": "ok",
         "study": study,

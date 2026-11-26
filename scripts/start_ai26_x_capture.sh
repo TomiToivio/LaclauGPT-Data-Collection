@@ -239,6 +239,17 @@ fi
 
 PYTHON_BIN=$(resolve_python) || exit 2
 
+# A live loopback listener does not prove that records reach shared MongoDB.
+central_ready() {
+  printf '%s' "$1" | "$PYTHON_BIN" -c '
+import json, sys
+d = json.load(sys.stdin)
+mirror = d.get("distributed") or {}
+study = str(d.get("study") or d.get("project_id") or "").lower()
+sys.exit(0 if (study == "ai26" or study.startswith("ai26-")) and mirror.get("enabled") and not mirror.get("last_error") else 1)
+'
+}
+
 # ---------------------------------------------------------------------- status
 if [[ "$MODE" == status ]]; then
   pid=$(read_pid || true)
@@ -269,19 +280,19 @@ if [[ "$MODE" == status ]]; then
 import json, sys
 d = json.load(sys.stdin).get("distributed") or {}
 if not d.get("enabled"):
-    print("off (" + (d.get("reason") or "local-only") + ")")
+    print("off (local-only)")
 else:
     line = "on, synced %s, rejected %s" % (d.get("synced_total"), d.get("rejected_total"))
     if d.get("last_error"):
-        line += " | last error: " + d["last_error"][:160]
+        line += " | mirror error present (inspect private log)"
     print(line)
 ' 2>/dev/null || echo unknown)
   echo "  distributed:   $distributed"
-  if pid_alive "$pid" && [[ -n "$status_json" ]] && probe_tour; then
+  if pid_alive "$pid" && [[ -n "$status_json" ]] && probe_tour && central_ready "$status_json"; then
     echo "  health:        ok"
     exit 0
   fi
-  echo "  health:        not serving AI26 capture"
+  echo "  health:        central AI26 capture not verified"
   exit 3
 fi
 
@@ -436,4 +447,7 @@ After a capture, verify (this is what an idle month looked like):
 
 Stop with:  $0 stop
 SUMMARY
-[[ "$study" == "ai26" ]] || echo "warning: /status reports '$study', not 'ai26' — stop and fix the private config" >&2
+if ! central_ready "$status_json"; then
+  echo "Central AI26 mirroring is disabled or failing; local capture is not a successful handoff." >&2
+  exit 3
+fi

@@ -119,6 +119,11 @@ class MongoRecordStore:
             name="handoff_key",
         )
 
+    def ping(self) -> bool:
+        """Check the configured central record store."""
+        self._client.admin.command("ping")
+        return True
+
     def _payload(self, record: CanonicalRecord) -> dict[str, Any]:
         payload = record.model_dump(mode="json")
         collection_id, arena = _routing_metadata(record, self.project_id)
@@ -170,12 +175,26 @@ class MongoRecordStore:
             payload["handoff"] = build_handoff(
                 payload, project_id=self.project_id, run_id=_run_id(record)
             )
-        self._collection.replace_one(
+        # Exact replays from another collector must not replace completed analysis.
+        # Keep the existing handoff (including any downstream state) and add capture
+        # provenance only, while a genuinely changed source revision can be re-analysed.
+        if (
+            existing
+            and (existing.get("handoff") or {}).get("revision") == payload["handoff"]["revision"]
+            and record.source.platform in {"x", "twitter"}
+            and self.project_id == "ai26"
+        ):
+            self._collection.update_one(
+                self._query(record),
+                {"$addToSet": {"provenance": {"$each": payload["provenance"]}}},
+            )
+            return False
+        result = self._collection.replace_one(
             self._query(record),
             payload,
             upsert=True,
         )
-        return existing is None
+        return getattr(result, "upserted_id", None) is not None if result is not None else existing is None
 
     def upsert_many(self, records: Iterable[CanonicalRecord]) -> None:
         try:
