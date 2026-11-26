@@ -11,6 +11,7 @@ Synthetic fixtures: this repository is public and its tests carry no corpus.
 from __future__ import annotations
 
 import json
+from urllib.parse import urlsplit
 
 from laclaugpt_data_collection.duplicate_audit import (
     GROUP_SCHEMA,
@@ -161,6 +162,11 @@ class TestCli:
             == 0
         )
         out = capfd.readouterr().out
+        lines = [line.strip() for line in out.splitlines()]
         assert "1 duplicate identit" in out
-        assert f"x.com/status/{POST}" in out
+        # Compare whole output rows rather than a URL-shaped substring: a containment check on a
+        # host string is what CodeQL flags (py/incomplete-url-substring-sanitization), and it would
+        # also pass for a row that merely mentions the id somewhere else.
+        host = urlsplit("https://x.com/synthetic/status/%s" % POST).netloc
+        assert any(row.startswith(f"{host}/status/{POST}") for row in lines), out
         assert "not printed, ever" not in out
