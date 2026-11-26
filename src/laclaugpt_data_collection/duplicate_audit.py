@@ -106,7 +106,7 @@ def audit_collection(
     )
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None, *, client_factory: Any | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mongodb-uri", required=True, help="connection string (never echoed)")
     parser.add_argument("--database", required=True)
@@ -119,15 +119,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
-    try:
-        from pymongo import MongoClient
-    except ImportError:  # pragma: no cover - optional dependency
-        print("pymongo is not installed; install the [distributed] extra", file=sys.stderr)
-        return 2
+    factory = client_factory
+    if factory is None:
+        try:
+            from pymongo import MongoClient
+        except ImportError:  # pragma: no cover - optional dependency
+            print("pymongo is not installed; install the [distributed] extra", file=sys.stderr)
+            return 2
+        factory = MongoClient
 
-    collection = MongoClient(args.mongodb_uri, serverSelectionTimeoutMS=5000)[args.database][
-        args.collection
-    ]
+    client = factory(args.mongodb_uri, serverSelectionTimeoutMS=5000)
+    collection = client[args.database][args.collection]
     report = audit_collection(
         collection, args.project, show_groups=args.show_groups, limit=args.limit
     )

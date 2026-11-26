@@ -128,7 +128,7 @@ class TestGroupShape:
 
 
 class TestCli:
-    def test_the_cli_reports_counts_without_a_database(self, capfd, monkeypatch):
+    def test_the_cli_reports_counts_without_a_database(self, capfd):
         class FakeCollection:
             def find(self, query, projection=None):
                 return iter(
@@ -150,12 +150,12 @@ class TestCli:
             def __getitem__(self, name):
                 return FakeDatabase()
 
-        import pymongo
-
-        monkeypatch.setattr(pymongo, "MongoClient", FakeClient)
+        # No pymongo import: the CLI takes an injectable factory, so this test runs where the optional
+        # [distributed] dependency is absent (CI installs only the base requirements).
         assert (
             main(
-                ["--mongodb-uri", "mongodb://example.invalid", "--database", "db", "--show-groups"]
+                ["--mongodb-uri", "mongodb://example.invalid", "--database", "db", "--show-groups"],
+                client_factory=FakeClient,
             )
             == 0
         )
