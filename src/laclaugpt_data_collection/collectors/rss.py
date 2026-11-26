@@ -32,15 +32,27 @@ class RSSCollector:
         result = CollectionResult()
         for feed_url in self.feed_urls:
             result.requests_seen += 1
-            parsed = feedparser.parse(feed_url)
-            result.bodies_seen += 1
+            label = f"{self.source_name}: " if self.source_name else ""
+            try:
+                parsed = feedparser.parse(feed_url)
+            except OSError as exc:
+                result.warnings.append(f"{label}feed transport failure ({type(exc).__name__})")
+                continue
+            status = getattr(parsed, "status", None)
+            if isinstance(status, int) and status >= 400:
+                result.warnings.append(f"{label}feed HTTP failure ({status})")
+                continue
             entries = list(parsed.entries[: self.max_items_per_feed])
+            if getattr(parsed, "bozo", False):
+                error = type(getattr(parsed, "bozo_exception", None)).__name__
+                result.warnings.append(f"{label}feed parsing warning ({error})")
+            result.bodies_seen += 1
             result.raw_items_seen += len(entries)
             for entry in entries:
                 record = _entry_to_record(feed_url, entry, feed_language=_feed_language(parsed))
                 if record:
                     result.records.append(record)
-        if not result.records:
+        if not result.records and not result.warnings:
             if result.bodies_seen and not result.raw_items_seen:
                 # Parsed cleanly and carried nothing: a publisher-side empty
                 # feed, not payload drift. Report it by name so the source is
