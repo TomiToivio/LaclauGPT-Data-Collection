@@ -43,6 +43,40 @@ def test_declared_bluesky_handles_are_collectable_in_their_arena():
             assert row["arena"] == group["arena"], (group["id"], handle)
 
 
+def test_parliamentary_arena_carries_a_us_legislature_and_a_non_eu_institution():
+    """#474: the arena declares `regions: [FI, EU, US, GLOBAL]`; its sources must make that true.
+
+    Before #474 the only non-EU governance source was a US *agency*, and there was no legislative
+    source of any kind -- so the arena could not observe a congressional committee or a non-EU
+    ministry no matter what they did. The test is structural rather than name-based: it asks whether
+    a category of source exists, so replacing a committee feed with a better one stays possible
+    without editing the test.
+    """
+    manifest, design = _load()
+    parliamentary = [row for row in manifest["feed"] if row.get("arena") == "parliamentary"]
+
+    us_legislature = [
+        row for row in parliamentary
+        if "us legislature" in str(row.get("source_family", "")).casefold()
+    ]
+    non_eu = [
+        row for row in parliamentary
+        if "non-eu governance" in str(row.get("source_family", "")).casefold()
+    ]
+
+    assert us_legislature, "the arena declares a US region but names no US legislative source"
+    assert non_eu, "the arena declares GLOBAL but names no non-EU governance institution"
+
+    for row in us_legislature + non_eu:
+        assert row["feed_url"].startswith("https://"), row["name"]
+        assert row.get("sampling_rationale"), f"{row['name']} must say why it is sampled"
+        # A sampling rationale is a claim about evidence, so it must record when the feed was checked.
+        assert "Verified live" in row["sampling_rationale"], row["name"]
+
+    focus = " ".join(design["arenas"]["parliamentary"].get("sampling_focus") or []).casefold()
+    assert "us legislative" in focus and "non-eu" in focus
+
+
 def test_miri_row_names_the_handle_miri_publishes_not_a_lookalike():
     """#475: @MIRI_AI is an unrelated Japanese personal account; intelligence.org names @MIRIBerkeley.
 
