@@ -74,3 +74,18 @@ def test_feed_with_items_produces_no_warning(monkeypatch: pytest.MonkeyPatch) ->
 
     assert len(result.records) == 1
     assert result.warnings == []
+
+
+@pytest.mark.parametrize(
+    "details, expected",
+    [
+        ({"status": 503}, "HTTP failure (503)"),
+        ({"bozo": True, "bozo_exception": ValueError()}, "parsing warning (ValueError)"),
+    ],
+)
+def test_failed_feed_is_not_reported_as_empty(monkeypatch, details, expected):
+    parser = SimpleNamespace(parse=lambda _: SimpleNamespace(entries=[], **details))
+    monkeypatch.setitem(sys.modules, "feedparser", parser)
+    result = RSSCollector(["https://example.invalid/feed"], source_name="test").collect()
+    assert result.warnings == [f"test: feed {expected}"]
+    assert not result.records

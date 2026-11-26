@@ -67,3 +67,21 @@ provenance. Resume the analysis consumer after re-running the audit and reviewin
 any conflicts or pre-existing analysis results separately. The audit additionally
 reports `usable_dated_text`: records meeting all four parliamentary acceptance
 conditions simultaneously, rather than unrelated aggregate counts.
+
+### Public-feed preflight
+
+Before deploying, run from the repository root with the feed dependencies
+installed:
+
+```bash
+timeout 60 python scripts/probe_ai26_parliamentary_sources.py
+```
+
+Use `--manifest` to check the deployed manifest instead of the tracked example.
+The preflight exercises the collection normalization and AI26 handoff policy
+without MongoDB writes. It prints only aggregate counts and sanitized warnings,
+and exits nonzero unless both named feeds produce at least one dated, ready,
+nonempty parliamentary record. Nonfatal parsing warnings remain visible. HTTP and parsing failures
+are distinct from a valid empty feed. A pass is not evidence of deployed
+collection, analysis consumption, or AI relevance; repeat the MongoDB acceptance
+audit after the normal collection cycle.
