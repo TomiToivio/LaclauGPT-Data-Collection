@@ -88,14 +88,15 @@ audit after the normal collection cycle.
 
 ## Live deployment and verification (2026-11-26, Laskin)
 
-The deployed manifest held four #474 feed rows while the tracked plan held two:
-`us_house_homeland` (US House Committee on Homeland Security) and `uk_dsit_ai`
-(UK Department for Science, Innovation and Technology) had been deployed with
-their rationale but never declared in Git, so every cycle reported
-`source manifest DRIFT: deployed 109 vs tracked 107 (feed: 54->52)` and the
-collection window silently left both rows out. Declaring them in
-`configs/studies/ai26.sources.example.toml` — same rows, same rationale, no new
-sampling decision — is what makes the audit and the runtime agree:
+At the start of this verification the deployed manifest held four #474 feed
+rows while the tracked plan held two: `us_house_homeland` (US House Committee on
+Homeland Security) and `uk_dsit_ai` (UK Department for Science, Innovation and
+Technology) were deployed with their rationale but were not yet declared in Git.
+Every cycle therefore reported
+`source manifest DRIFT: deployed 109 vs tracked 107 (feed: 54->52)`, and because
+the collection window is built from the audited plan, both rows were polled never —
+zero records, no error line. The tracked plan now declares all four rows, and the
+runtime was re-checked against it:
 
 ```
 $ python scripts/check_ai26_runtime_sync.py
