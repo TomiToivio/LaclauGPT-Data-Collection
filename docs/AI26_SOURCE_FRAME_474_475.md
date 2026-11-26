@@ -48,3 +48,22 @@ and Bluesky identities separately. It prints aggregate counts only. This is not
 a disposition decision, publication-date bypass, or guarantee of broad regional
 coverage. The operator should repeat it after a collection cycle and record the
 sanitized results on #474 and #475 before closure.
+
+### Historical wrong-account quarantine
+
+A confirmed old X status URL with corroborating or absent author/platform is
+excluded from new AI26 handoffs with reason `ai26_wrong_miri_account`. A conflicting
+identity is not automatically changed. To assess existing records:
+
+```bash
+python scripts/reconcile_ai26_wrong_miri_handoffs.py
+```
+
+Review the counts and the audit. Pause the analysis consumer before an approved
+repair to avoid racing an in-flight analysis job. Only then run the command with
+`--apply`. It changes the handoff status and reason of confirmed records without
+existing exact-URL analysis results, preserving identity, raw data, revision and
+provenance. Resume the analysis consumer after re-running the audit and reviewing
+any conflicts or pre-existing analysis results separately. The audit additionally
+reports `usable_dated_text`: records meeting all four parliamentary acceptance
+conditions simultaneously, rather than unrelated aggregate counts.
