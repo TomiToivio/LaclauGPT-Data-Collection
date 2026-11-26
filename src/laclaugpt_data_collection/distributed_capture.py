@@ -10,7 +10,6 @@ import hashlib
 import json
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
 
 from .config import Settings
 from .deployment import validate_profile
@@ -202,15 +201,6 @@ class DistributedCaptureSink:
             and self.objects is None
             and record.source.platform in {"x", "twitter"}
         ):
-            # Both X domains identify the same post when the status path matches.
-            parts = urlsplit(record.source_url)
-            path = parts.path.rstrip("/")
-            if (
-                parts.hostname in {"x.com", "www.x.com", "twitter.com", "www.twitter.com"}
-                and "/status/" in path
-                and path.rsplit("/", 1)[-1].isdigit()
-            ):
-                record.source_url = f"https://x.com{path}"
             # Source media URLs are provenance, not dependencies of text-only analysis.
             # Keep them for future research without asking the media queue to download them.
             if record.content.media_references:

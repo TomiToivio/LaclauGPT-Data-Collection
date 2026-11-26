@@ -231,7 +231,20 @@ def collect_manifest(
         raise ValueError(f"invalid AI26 publication date floor: {floor!r}")
 
     settings = Settings()
-    base_store = build_record_store(settings)
+    # A queue-dispatched cycle is a *shared-corpus* cycle: claiming work from the
+    # cross-host queue but writing the result to this host's local CSV is exactly
+    # the silent local-only fallback #478 exists to remove. Force the strict
+    # MongoDB backend (which pings on construction) whenever dispatch is active.
+    if dispatch is not None:
+        if not settings.mongodb_uri:
+            raise ValueError(
+                "shared AI26 collection requires LACLAUGPT_MONGODB_URI; refusing "
+                "to write a dispatched cycle to local storage"
+            )
+        shared_settings = settings.model_copy(update={"record_backend": "mongodb"})
+        base_store = build_record_store(shared_settings)
+    else:
+        base_store = build_record_store(settings)
     store = _WindowedStore(base_store, not_before)
     plugins = default_registry()
     results: list[dict[str, Any]] = []

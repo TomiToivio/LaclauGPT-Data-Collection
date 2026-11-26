@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import mongomock
 import pytest
@@ -15,7 +17,7 @@ def test_two_mirrors_share_text_ready_mongo_without_allas(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     client = mongomock.MongoClient()
-    monkeypatch.setattr("pymongo.MongoClient", lambda *args, **kwargs: client)
+    monkeypatch.setitem(sys.modules, "pymongo", SimpleNamespace(MongoClient=lambda *args, **kwargs: client))
     monkeypatch.setattr(
         "laclaugpt_data_collection.distributed_capture.S3ObjectStore",
         lambda **kwargs: pytest.fail("text-only mirror must not instantiate S3"),
