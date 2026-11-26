@@ -43,6 +43,27 @@ def test_declared_bluesky_handles_are_collectable_in_their_arena():
             assert row["arena"] == group["arena"], (group["id"], handle)
 
 
+def test_miri_row_names_the_handle_miri_publishes_not_a_lookalike():
+    """#475: @MIRI_AI is an unrelated Japanese personal account; intelligence.org names @MIRIBerkeley.
+
+    The row is not cosmetic. It decides whose posts are counted in the existential-risk stratum, and a
+    lookalike handle silently substitutes a stranger's timeline for an institution's voice -- 218 records,
+    with 194 of them in Japanese and 2 mentioning AI at all. This pins the handle, and pins that the
+    design and the manifest agree about it, so a revert cannot be quiet.
+    """
+    manifest, design = _load()
+    row = next(row for row in manifest["x_account"] if row["name"] == "Machine Intelligence Research Institute")
+    assert row["handle"] == "MIRIBerkeley", "MIRI's own site links to x.com/MIRIBerkeley"
+
+    declared = {
+        handle
+        for group in design["groups"]
+        for handle in group.get("accounts", {}).get("x", [])
+    }
+    assert "MIRIBerkeley" in declared
+    assert "MIRI_AI" not in declared, "the lookalike handle must not remain in any group"
+
+
 def test_declared_mastodon_handles_match_active_manifest():
     manifest, design = _load()
     rows = {row["acct"].casefold() for row in manifest["mastodon_account"]

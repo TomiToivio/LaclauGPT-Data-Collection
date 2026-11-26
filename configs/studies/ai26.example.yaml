@@ -318,7 +318,7 @@ groups:
       Bluesky API: postsCount 323, followers 3447, 50 posts between
       2026-10-15 and 2026-11-06, i.e. active inside the study window.
     accounts:
-      x: [ESYudkowsky, MIRI_AI, FLI_org]
+      x: [ESYudkowsky, MIRIBerkeley, FLI_org]
       bluesky: [metr.org]
 
   - id: critical_ai_x
