@@ -786,7 +786,9 @@ priority = "P1"
 
 [[x_account]]
 name = "Machine Intelligence Research Institute"
-handle = "MIRI_AI"
+# #475: intelligence.org names @MIRIBerkeley. @MIRI_AI is an unrelated Japanese personal
+# account, and the 218 records it brought are not MIRI's.
+handle = "MIRIBerkeley"
 arena = "elites"
 source_family = "alignment / catastrophic-risk discourse"
 priority = "P1"
