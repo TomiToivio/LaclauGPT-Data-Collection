@@ -1223,6 +1223,35 @@ source_family = "EU legislature / first-party parliamentary documents"
 sampling_rationale = "First-party European Parliament press-room stream: the legislature speaking in its own voice about legislation, oversight and plenary decisions. Added for #295, where the parliamentary arena held 40% technical ML papers from a scholarly query and no first-party parliamentary material. Read as institutional position in the policy process, not as a stance. Verified live 2026-10-21: HTTP 200, 20 items."
 priority = "P2"
 
+# --- #474: the parliamentary arena declared a US region and held no US legislature ---------
+# The arena declares `regions: [FI, EU, US, GLOBAL]`, and before these rows the only non-EU
+# governance source was NIST: one US agency, nothing legislative, nothing from outside the EU.
+# Today's clearest parliamentary objects -- the RSI Safety Act (US, introduced 2026-11-24) and the
+# Australian Joint Select Committee's 46 recommendations (2026-11-24) -- were invisible to the
+# arena by construction.
+#
+# Both rows are SAMPLING decisions, not ideological classifications: a committee is sampled for its
+# institutional position in the policy process, never for a stance. P2 so they do not displace an
+# existing P1 tick budget. Not every item is AI-related; relevance is resolved at analysis stage.
+[[feed]]
+name = "us_house_homeland"
+feed_url = "https://homeland.house.gov/feed/"
+homepage = "https://homeland.house.gov/"
+arena = "parliamentary"
+source_family = "US legislature / first-party congressional committee documents"
+sampling_rationale = "First-party feed of the US House Committee on Homeland Security, whose jurisdiction covers cybersecurity, critical infrastructure and the security framing of AI. Added for #474 because the parliamentary arena declared a US region and carried no US legislative source of any kind -- the only US governance row was NIST, an agency, not a legislature. A congressional committee is sampled as an institutional position in the policy process, not as an ideological classification. Verified live 2026-11-26: HTTP 200, 10 items, newest 2026-11-25T18:41Z. Deliberately a bounded committee stream rather than a chamber-wide one: the arena observes how legislatures articulate AI, and a committee feed is small enough not to swamp the P1 tick budget. Not all items are AI-related; relevance is resolved at analysis stage, not at collection."
+priority = "P2"
+
+[[feed]]
+name = "uk_dsit_ai"
+feed_url = "https://www.gov.uk/search/news-and-communications.atom?organisations%5B%5D=department-for-science-innovation-and-technology"
+homepage = "https://www.gov.uk/government/organisations/department-for-science-innovation-and-technology"
+arena = "parliamentary"
+source_family = "Non-EU governance / national AI policy institution"
+sampling_rationale = "First-party news and communications stream of the UK Department for Science, Innovation and Technology (DSIT), the ministry that carries UK AI policy and AI safety-institute sponsorship. Added for #474 because outside the EU the arena's governance layer consisted of one US agency: no non-EU executive institution was declared, so the arena could not observe how a non-EU state articulates AI regulation. DSIT is sampled as an institutional position in the policy process, not as an ideological classification, and the United Kingdom is read here as an independent regulatory space rather than as a member or near-member of the EU. Verified live 2026-11-26: HTTP 200, Atom feed, 20 entries, newest 2026-08-24T18:00Z -- a low-frequency stream, so the row is expected to produce few records per month and its emptiness in a given window is not evidence of a collection fault. Relevance is resolved at analysis stage, not at collection."
+priority = "P2"
+
+
 [[feed]]
 name = "datacenterdynamics"
 feed_url = "https://www.datacenterdynamics.com/en/rss/"
