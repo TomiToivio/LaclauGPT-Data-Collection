@@ -30,3 +30,21 @@ source URLs, and arena provenance; do not treat a successful config parse as
 coverage. Recheck corpus-audit and the bridge target report. No live host or
 MongoDB access was available for this patch, so existing records are unchanged
 and new source coverage is not yet verified.
+
+## Aggregate-only acceptance audit
+
+After loading the trusted private runtime environment on Laskin:
+
+```bash
+python scripts/audit_ai26_source_frame_474_475.py
+```
+
+The audit reads the AI26 collections but never writes to them. It counts actual
+records, dated text and ready handoffs for the two new parliamentary feeds;
+counts confirmed historical wrong-account records (including blank-arena X
+captures and URL-proven identities), ambiguous identities requiring human review,
+and exact URL matches with analysis results; and counts the corrected MIRI X
+and Bluesky identities separately. It prints aggregate counts only. This is not
+a disposition decision, publication-date bypass, or guarantee of broad regional
+coverage. The operator should repeat it after a collection cycle and record the
+sanitized results on #474 and #475 before closure.
