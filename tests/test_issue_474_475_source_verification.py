@@ -34,7 +34,7 @@ def test_source_frame_audit_counts_candidates_and_never_mutates():
     }
     assert report["correct_miri_x"]["records"] == 1
     assert report["miri_bluesky"]["records"] == 1
-    assert report["parliamentary_sources"]["us_congressional_bills"]["ready"] == 1
+    assert report["parliamentary_sources"]["us_congressional_bills"]["usable_dated_text"] == 1
     assert report["parliamentary_sources"]["uk_ai_security_institute"]["text"] == 0
     assert list(records.find()) == before
     assert "private synthetic text" not in json.dumps(report)
