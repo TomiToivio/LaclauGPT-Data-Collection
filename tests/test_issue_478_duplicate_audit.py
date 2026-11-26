@@ -98,9 +98,8 @@ class TestGroupShape:
         group = summarise_group(
             "https://example.org/some/article", [doc(1, "https://example.org/some/article")]
         )
-        assert group["identity"].startswith("example.org/")
         # The path text is replaced by its length, so the article slug never appears in the identity.
-        assert group["identity"].endswith("path chars")
+        assert group["identity"] == "example.org/12 path chars"
 
     def test_the_report_never_contains_text_or_handles(self):
         report = audit_documents(

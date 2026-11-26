@@ -6,22 +6,13 @@ import json
 import os
 from collections import Counter
 from typing import Any
-from urllib.parse import urlsplit
 
+from laclaugpt_data_collection.ai26_source_frame import is_wrong_miri_account, x_status_handle
 from laclaugpt_data_collection.corpus_audit import record_source_name
 
 _TARGETS = ("us_congressional_bills", "uk_ai_security_institute")
-_X_HOSTS = {"x.com", "twitter.com", "www.x.com", "www.twitter.com", "mobile.x.com", "mobile.twitter.com"}
 _OLD = "miri_ai"
 _CORRECT = "miriberkeley"
-
-
-def _x_handle(url: str) -> str:
-    parts = urlsplit(url)
-    segments = parts.path.strip("/").split("/")
-    if parts.hostname in _X_HOSTS and len(segments) >= 3 and segments[1] == "status":
-        return segments[0].casefold()
-    return ""
 
 
 def audit(records: Any, analysis: Any) -> dict[str, Any]:
@@ -39,13 +30,13 @@ def audit(records: Any, analysis: Any) -> dict[str, Any]:
         url = str(record.get("source_url") or "")
         platform = str(source.get("platform") or "").casefold()
         author = str(source.get("author") or "").strip().lstrip("@").casefold()
-        handle = _x_handle(url)
+        handle = x_status_handle(url)
         if handle in {_OLD, _CORRECT} or author in {_OLD, _CORRECT}:
             # Never infer an X identity from a conflicting author/platform.
-            if ((platform in {"x", "twitter", ""} and handle in {_OLD, _CORRECT}
-                 and author in {"", handle})
-                or (platform in {"x", "twitter"} and author in {_OLD, _CORRECT}
-                    and not handle)):
+            if is_wrong_miri_account(record) or (
+                platform in {"x", "twitter", ""}
+                and handle == _CORRECT and author in {"", handle}
+            ):
                 bucket = old if (handle or author) == _OLD else correct
                 bucket["records"] += 1
                 bucket["arena_blank"] += not bool(record.get("arena"))
@@ -62,6 +53,12 @@ def audit(records: Any, analysis: Any) -> dict[str, Any]:
             bucket["text"] += bool(str((record.get("content") or {}).get("text") or "").strip())
             bucket["dated"] += bool((record.get("handoff") or {}).get("published_at"))
             bucket["ready"] += (record.get("handoff") or {}).get("status") == "ready"
+            bucket["usable_dated_text"] += (
+                record.get("arena") == "parliamentary"
+                and bool(str((record.get("content") or {}).get("text") or "").strip())
+                and bool((record.get("handoff") or {}).get("published_at"))
+                and (record.get("handoff") or {}).get("status") == "ready"
+            )
         if platform == "bluesky" and author == "intelligence.org":
             miri_bluesky["records"] += 1
             miri_bluesky["ready"] += (record.get("handoff") or {}).get("status") == "ready"
@@ -74,7 +71,7 @@ def audit(records: Any, analysis: Any) -> dict[str, Any]:
         "correct_miri_x": counts(correct, x_keys),
         "miri_bluesky": counts(miri_bluesky, ("records", "ready")),
         "parliamentary_sources": {
-            name: counts(bucket, ("records", "parliamentary", "text", "dated", "ready"))
+            name: counts(bucket, ("records", "parliamentary", "text", "dated", "ready", "usable_dated_text"))
             for name, bucket in coverage.items()
         },
         "mode": "read_only",

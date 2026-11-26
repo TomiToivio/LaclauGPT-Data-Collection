@@ -49,6 +49,43 @@ a disposition decision, publication-date bypass, or guarantee of broad regional
 coverage. The operator should repeat it after a collection cycle and record the
 sanitized results on #474 and #475 before closure.
 
+### Historical wrong-account quarantine
+
+A confirmed old X status URL with corroborating or absent author/platform is
+excluded from new AI26 handoffs with reason `ai26_wrong_miri_account`. A conflicting
+identity is not automatically changed. To assess existing records:
+
+```bash
+python scripts/reconcile_ai26_wrong_miri_handoffs.py
+```
+
+Review the counts and the audit. Pause the analysis consumer before an approved
+repair to avoid racing an in-flight analysis job. Only then run the command with
+`--apply`. It changes the handoff status and reason of confirmed records without
+existing exact-URL analysis results, preserving identity, raw data, revision and
+provenance. Resume the analysis consumer after re-running the audit and reviewing
+any conflicts or pre-existing analysis results separately. The audit additionally
+reports `usable_dated_text`: records meeting all four parliamentary acceptance
+conditions simultaneously, rather than unrelated aggregate counts.
+
+### Public-feed preflight
+
+Before deploying, run from the repository root with the feed dependencies
+installed:
+
+```bash
+timeout 60 python scripts/probe_ai26_parliamentary_sources.py
+```
+
+Use `--manifest` to check the deployed manifest instead of the tracked example.
+The preflight exercises the collection normalization and AI26 handoff policy
+without MongoDB writes. It prints only aggregate counts and sanitized warnings,
+and exits nonzero unless both named feeds produce at least one dated, ready,
+nonempty parliamentary record. Nonfatal parsing warnings remain visible. HTTP and parsing failures
+are distinct from a valid empty feed. A pass is not evidence of deployed
+collection, analysis consumption, or AI relevance; repeat the MongoDB acceptance
+audit after the normal collection cycle.
+
 ## Live deployment and verification (2026-11-26, Laskin)
 
 The deployed manifest held four #474 feed rows while the tracked plan held two:

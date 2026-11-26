@@ -110,7 +110,8 @@ arenas:
       - labour, rights and public-interest AI
       - safety standards, liability and independent evaluation
       # #474: the arena declares a US region, so it carries a US legislature, and it declares
-      # GLOBAL, so it carries at least one non-EU executive institution.
+      # GLOBAL, so it carries at least one non-EU executive institution. Both are bounded
+      # first-party committee/ministry streams sampled for institutional position, not stance.
       - US legislative articulation (a congressional committee stream)
       - non-EU national AI policy articulation (a ministry stream)
       - US congressional bills and supplemental non-EU public AI governance (UK AI Security Institute; not a fourth core comparison region)

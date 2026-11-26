@@ -10,6 +10,7 @@ import hashlib
 import json
 from typing import Any, Iterable
 
+from .ai26_source_frame import MIRI_WRONG_ACCOUNT_REASON, is_wrong_miri_account
 from .realtime import (
     RealtimePolicy,
     analysis_eligibility,
@@ -126,7 +127,10 @@ def build_handoff(
         policy = RealtimePolicy.ai26()
         eligible, eligibility_reason = analysis_eligibility(record, policy)
         priority = source_priority(record, policy)
-        if not eligible:
+        if is_wrong_miri_account(record):
+            status = "excluded"
+            reason = MIRI_WRONG_ACCOUNT_REASON
+        elif not eligible:
             status = "excluded"
             reason = eligibility_reason
 
