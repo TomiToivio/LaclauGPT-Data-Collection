@@ -90,7 +90,7 @@ class DistributedCaptureSink:
             prefix=f"{settings.s3_prefix_root}/{settings.project_id}",
             signature_version=settings.s3_signature_version,
             addressing_style=settings.s3_addressing_style,
-        )
+        ) if settings.object_backend == "s3" else None
         self.redis = (
             RedisCoordinator(settings.redis_url, namespace)
             if settings.messaging_backend == "redis"
@@ -146,8 +146,11 @@ class DistributedCaptureSink:
         ).encode("utf-8")
         digest = hashlib.sha256(encoded).hexdigest()
         key = f"runs/{self.settings.run_id}/raw/{digest}.json"
-        uri = self.objects.put_bytes(key, encoded, content_type="application/json")
         record.raw_capture.checksum = f"sha256:{digest}"
+        if self.objects is None:
+            # MongoDB retains the raw JSON payload; no Allas dependency for text capture.
+            return record.raw_capture.ref or ""
+        uri = self.objects.put_bytes(key, encoded, content_type="application/json")
         record.raw_capture.ref = uri
         return uri
 
