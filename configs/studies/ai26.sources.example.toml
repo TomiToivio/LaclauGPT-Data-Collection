@@ -905,7 +905,7 @@ source_family = "Critical AI / language-model critique"
 priority = "P1"
 
 # ---- 2026-11-11: the existential-risk / evaluation sub-stratum had NO reachable
-# social source. Its three X handles (ESYudkowsky, MIRI_AI, FLI_org) are covered
+# social source. Its three X handles (ESYudkowsky, MIRIBerkeley, FLI_org) are covered
 # only by the X replay bridge, and the X stratum is closed for Phase 1
 # (docs/ai26/X_STRATUM_DECISION_401.md, #401), so that half of the elites arena's
 # declared sampling_focus -- "AI safety, alignment, evaluation and pacing" -- was
@@ -1371,3 +1371,34 @@ arena = "elites"
 source_family = "network state / crypto-capital / AI defence"
 sampling_rationale = "Network State Podcast (Network School) publishes the full transcript on the episode page; this episode is the crypto/zero-knowledge framing of 'defending against AI' inside the network-state scene, i.e. the technological-elite competitor to the safety position the corpus already samples. Collected as already-published text: no audio or video is downloaded and an absent transcript stays absent (#450)."
 priority = "P2"
+
+# #474: bounded first-party parliamentary and supplemental governance sources.
+# The GovInfo feed covers general bills, not only AI. Preserve relevance as
+# unjudged; distinguish bill versions and collect text only, never PDF binaries.
+[[feed]]
+name = "us_congressional_bills"
+feed_url = "https://www.govinfo.gov/rss/bills.xml"
+homepage = "https://www.govinfo.gov/help/bills"
+arena = "parliamentary"
+source_family = "US federal legislative proposals"
+sampling_rationale = "Official congressional bill publications for both chambers; bounded recent feed, not comprehensive AI legislation coverage. General bills require downstream relevance assessment. Source: https://www.govinfo.gov/feeds."
+priority = "P2"
+
+[[feed]]
+name = "uk_ai_security_institute"
+feed_url = "https://www.gov.uk/search/news-and-communications.atom?organisations%5B%5D=ai-security-institute"
+homepage = "https://www.gov.uk/government/organisations/ai-security-institute"
+arena = "parliamentary"
+source_family = "supplemental non-EU public AI governance"
+sampling_rationale = "Official UK government AI security communications, supplemental GLOBAL context, not a fourth core comparison region. No ideological classification. Source: https://www.gov.uk/search/news-and-communications?organisations%5B%5D=ai-security-institute."
+priority = "P2"
+
+# #475: the institute's own website identifies this account. The corrected X
+# identity does not reopen the closed X capture stratum (#401).
+[[bluesky_account]]
+name = "Machine Intelligence Research Institute"
+handle = "intelligence.org"
+profile_url = "https://bsky.app/profile/intelligence.org"
+arena = "elites"
+source_family = "alignment / catastrophic-risk discourse"
+priority = "P1"

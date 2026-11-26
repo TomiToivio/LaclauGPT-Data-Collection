@@ -109,6 +109,7 @@ arenas:
       - national security and geopolitical competition
       - labour, rights and public-interest AI
       - safety standards, liability and independent evaluation
+      - US congressional bills and supplemental non-EU public AI governance (UK AI Security Institute; not a fourth core comparison region)
 
 # Sampling anchors only. The paper treats these as provisional formations,
 # not actor identities or labels to stamp onto documents during collection.
@@ -319,7 +320,7 @@ groups:
       2026-10-15 and 2026-11-06, i.e. active inside the study window.
     accounts:
       x: [ESYudkowsky, MIRIBerkeley, FLI_org]
-      bluesky: [metr.org]
+      bluesky: [metr.org, intelligence.org]
 
   - id: critical_ai_x
     name: Critical AI and political economy
